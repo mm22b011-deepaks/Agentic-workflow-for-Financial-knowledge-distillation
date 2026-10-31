@@ -9,6 +9,26 @@ Outputs are index-level only: no ticker or CIK ever reaches `reports/` or `aggre
 > extraction runner. Aggregation, nowcast, evaluation and reporting (phases 4–8) are not
 > built yet. See `status.md` and `tasks.md`.
 
+## Where this is heading
+
+Two amendments sit on top of the original spec and change the architecture. Both are
+recorded in full in `tasks.md` (PART 1 and PART 1B) and their decisions in `DECISIONS.md`.
+
+- **R0–R8.** SQLite (single file, WAL) becomes the system of record; parquet and CSV are
+  exports only. Data moves through a lossless hierarchy —
+  document → company_period → sector_period → index_period — where every upper-level
+  number traces back to leaf facts. All arithmetic happens in SQL or pandas, never in a
+  language model. Every model call goes through one context packer with a token budget
+  and edge-aware ordering, calibrated from measured needle-recall.
+- **Amendment Q.** No number is ever silently missing, excluded or non-comparable. Every
+  gap, corporate event and exclusion becomes a schema-validated JSON record carrying a
+  code from a versioned taxonomy (`configs/quality_taxonomy.yaml`), an explanation and
+  evidence. The model reports only what the document states; the code reports everything
+  else.
+
+Do not build on the current tree expecting either to be in place yet: `status.md` lists
+what is actually done and what is blocked.
+
 ## 15-minute Colab quickstart
 
 1. Open `notebooks/00_colab_bootstrap.ipynb` in Colab.

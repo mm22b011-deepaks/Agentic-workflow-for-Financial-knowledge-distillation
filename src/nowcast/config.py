@@ -156,6 +156,16 @@ class ExtractionConfig:
 
 
 @dataclass(frozen=True)
+class AggregationConfig:
+    """Index-level aggregation settings, including the privacy guardrail."""
+
+    weighting: str = 'equal'
+    weights_csv: str = ''
+    min_constituents: int = 10
+    winsorize_pct: float = 0.05
+
+
+@dataclass(frozen=True)
 class NowcastConfig:
     """Nowcast aggregation settings."""
 
@@ -207,6 +217,7 @@ class Config:
     cache: CacheConfig = CacheConfig()
     budget: BudgetConfig = BudgetConfig()
     extraction: ExtractionConfig = ExtractionConfig()
+    aggregation: AggregationConfig = AggregationConfig()
     nowcast: NowcastConfig = NowcastConfig()
     reporting: ReportingConfig = ReportingConfig()
     universe: UniverseConfig = UniverseConfig()
@@ -313,6 +324,7 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
     cache = _section(raw, 'cache', _fields(CacheConfig))
     budget = _section(raw, 'budget', _fields(BudgetConfig))
     extraction = _section(raw, 'extraction', _fields(ExtractionConfig))
+    aggregation = _section(raw, 'aggregation', _fields(AggregationConfig))
     nowcast = _section(raw, 'nowcast', _fields(NowcastConfig))
     reporting = _section(raw, 'reporting', _fields(ReportingConfig))
     universe = _section(raw, 'universe', _fields(UniverseConfig))
@@ -346,6 +358,7 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
         extraction=ExtractionConfig(
             **{**extraction, 'themes': _tuple(extraction.get('themes'), 'extraction.themes')}
         ),
+        aggregation=AggregationConfig(**aggregation),
         nowcast=NowcastConfig(**nowcast),
         reporting=ReportingConfig(**reporting),
         universe=UniverseConfig(**universe),
@@ -369,6 +382,13 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
             problems.append(f'data.{key} must be set')
     if '{cik' not in config.data.edgar_submissions_url_template:
         problems.append("data.edgar_submissions_url_template must contain '{cik")
+    # The accession directory is not optional: EDGAR's CDN answers 403 (not 404) when it
+    # is missing, which hides the mistake behind what looks like a permissions failure.
+    if '{accession_nodash}' not in config.data.edgar_index_headers_url_template:
+        problems.append(
+            'data.edgar_index_headers_url_template must contain {accession_nodash} '
+            '(the accession directory); without it EDGAR returns 403'
+        )
     if not config.llm.models:
         problems.append('llm.models must list at least one model')
     for model in config.llm.models:
@@ -389,6 +409,14 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('universe.min_cik_coverage must be between 0 and 1')
     if config.universe.subset_n < 0:
         problems.append('universe.subset_n must be >= 0')
+    if config.aggregation.weighting not in {'equal', 'market_cap'}:
+        problems.append("aggregation.weighting must be 'equal' or 'market_cap'")
+    if config.aggregation.weighting == 'market_cap' and not config.aggregation.weights_csv:
+        problems.append('aggregation.weights_csv must be set when weighting is market_cap')
+    if not 0.0 <= config.aggregation.winsorize_pct < 0.5:
+        problems.append('aggregation.winsorize_pct must be in [0, 0.5)')
+    if config.aggregation.min_constituents < 1:
+        problems.append('aggregation.min_constituents must be >= 1')
     if config.extraction.max_doc_chars <= 0:
         problems.append('extraction.max_doc_chars must be > 0')
     if problems and strict:

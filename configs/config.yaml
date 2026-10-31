@@ -28,7 +28,9 @@ data:
   edgar_submissions_url_template: 'https://data.sec.gov/submissions/CIK{cik_padded}.json'
   edgar_archive_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{filename}'
   edgar_index_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/index.json'
-  edgar_index_headers_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession}-index-headers.html'
+  # The accession directory segment is required: without it EDGAR's CDN answers 403,
+  # not 404, so a missing segment looks like a permissions problem at run time.
+  edgar_index_headers_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{accession}-index-headers.html'
   edgar_forms:
     - 8-K
   # Only parseable text exhibits are downloaded: an EX-99 image (some filers publish
@@ -90,6 +92,12 @@ extraction:
     - supply_chain
     - ai_investment
   review_queue_path: extractions/review_queue.parquet
+
+aggregation:
+  weighting: equal
+  weights_csv: ''
+  min_constituents: 10
+  winsorize_pct: 0.05
 
 nowcast:
   min_documents: 3

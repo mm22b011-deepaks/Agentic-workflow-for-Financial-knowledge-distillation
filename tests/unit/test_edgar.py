@@ -322,3 +322,35 @@ def test_text_suffix_check_is_case_insensitive() -> None:
     assert not is_text_document('archive.htm.zip', allowed)
     # An empty allow-list means "parse nothing", never "parse everything".
     assert not is_text_document('anything.htm', ())
+
+
+def test_headers_url_carries_the_accession_directory(config: Config) -> None:
+    """The index-headers URL includes the accession directory EDGAR requires.
+
+    Live check on 2026-10-31: without that segment the CDN answers 403, not 404, which
+    makes the defect look like a permissions problem instead of a wrong URL.
+    """
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if 'submissions' in request.url.path:
+            return httpx.Response(200, json=SUBMISSIONS)
+        seen.append(request.url.path)
+        if request.url.path.endswith('-index-headers.html'):
+            return httpx.Response(200, text=HEADERS_HTML)
+        return httpx.Response(200, text=EXHIBIT_HTML)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    ingest_edgar(
+        config,
+        ['1'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+    )
+    headers_paths = [path for path in seen if path.endswith('-index-headers.html')]
+    assert headers_paths, 'no index-headers request was made'
+    for path in headers_paths:
+        # /Archives/edgar/data/<cik>/<accession-nodash>/<accession>-index-headers.html
+        assert path.split('/')[-2] == '000000000126000001', path

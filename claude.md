@@ -4,6 +4,40 @@
 Proceed with the plan (Build Pack Parts A–E) using the provided instructions. Work in small
 phases. Follow the FROZEN SPEC exactly. Stop at every gate until it is green.
 
+Two amendments override parts of the frozen spec. Both are recorded in full in
+`tasks.md` (PART 1 and PART 1B) and their decisions in `DECISIONS.md`:
+
+1. **R-amendment — course correction + optimization.** Lossless hierarchy
+   (document → company_period → sector_period → index_period); numbers aggregated by
+   SQL/pandas in code, **never** by an LLM; every LLM call through one context packer
+   with a token budget and edge-aware ordering; **SQLite (WAL, single file) is the system
+   of record** and parquet/CSV are exports only; standard tools only (LangChain,
+   SQLAlchemy 2.0, Alembic, pydantic v2, tenacity, scikit-learn, pytest, hypothesis);
+   measured speedups only. Phases **R0–R8**, each gated.
+2. **Amendment Q — data-quality and nuance output.** No number is ever silently missing,
+   excluded or non-comparable: every gap, event and exclusion is a structured,
+   schema-validated JSON record with a code from a **versioned taxonomy file**, an
+   explanation and evidence. The LLM reports only what the document states; the code
+   reports everything else. Taxonomy codes live in `configs/quality_taxonomy.yaml`, never
+   in Python.
+
+### Standing rules added by the amendments
+- **Never ask an LLM to sum, average, compare or compute any number.** Arithmetic is
+  code (SQL or pandas).
+- **Never replace or delete leaf facts with summaries.** Every upper-level number
+  traces through `node_facts`/`node_edges` to leaf facts with their quotes.
+- **Never send more tokens than `context.target_tokens`**, and never fill the full model
+  window. Context length is probed from the provider, never hard coded.
+- **Never hard code** a sector map, ticker, URL, concept name, taxonomy code, or model
+  context length.
+- **Never expose company or sector identifiers** in `outputs/json/index` or `reports`
+  unless `reporting.max_detail_level` allows it — and never without the NDA owner's
+  written confirmation.
+- **No NaN without a reason.** Every missing metric carries a `node_metric_status` and a
+  `status_reason` drawn from the taxonomy.
+- **Never claim a test, benchmark or recall number not run and seen.** If a path was
+  exercised only on a fixture, say so.
+
 ## Hard constraints
 - **Download minimal documents.** Target ~100 real documents total (e.g. 100 8-K earnings
   releases). Do not bulk-scrape EDGAR. If 100 pass end to end, scale up only after explicit
@@ -30,8 +64,21 @@ phases. Follow the FROZEN SPEC exactly. Stop at every gate until it is green.
 6. Never invent data, results or test output. Never claim a test passed without seeing output.
 
 ## Gates
-Each phase: `ruff check . && mypy src && pytest -q tests/unit`, plus the phase's greps. Commit only
-when green. If a phase fails 3 repair attempts, escalate per Part D.
+Each phase: `ruff check . && ruff format --check . && mypy src && pytest -q`, plus the
+phase's greps. Commit only when green. If a phase fails 3 repair attempts, escalate per
+Part D.
+
+Amended gates (each must be GREEN before the next phase starts):
+
+| Gate | Requirement |
+|------|-------------|
+| R0 | ruff + mypy + pytest green; Phase 0 files exist; `test_validators` + `test_review_queue` pass; 10 real documents ingested; `evidence/phase_R0.txt` |
+| R1 | all green + `PRAGMA integrity_check` ok |
+| R2 | unit tests green; needle sweep run per model with the recall table shown; `context.target_tokens` set from measured middle-position recall, logged in `DECISIONS.md` |
+| R3 | green + 10 real documents end to end; human spot-checks 5 facts |
+| R4 | green + index output contains no identifiers |
+| R8 | ~10 real documents with benchmark and needle tables in the report |
+| Q | all Q tests green + real output shown for `documents/<id>.json`, index JSON and the data-quality report |
 
 ## Part D verification prompts
 - **D1 mechanical checks:** ruff / ruff format --check / mypy / pytest, then greps for
