@@ -89,6 +89,7 @@ class DataConfig:
     edgar_index_url_template: str = ''
     edgar_index_headers_url_template: str = ''
     edgar_forms: tuple[str, ...] = ()
+    edgar_document_suffixes: tuple[str, ...] = ()
     edgar_earnings_items: tuple[str, ...] = ()
     edgar_lookback_days: int = 730
     edgar_max_documents: int = 100
@@ -329,6 +330,9 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
                 'edgar_forms': _tuple(data.get('edgar_forms'), 'data.edgar_forms'),
                 'edgar_earnings_items': _tuple(
                     data.get('edgar_earnings_items'), 'data.edgar_earnings_items'
+                ),
+                'edgar_document_suffixes': _tuple(
+                    data.get('edgar_document_suffixes'), 'data.edgar_document_suffixes'
                 ),
             }
         ),

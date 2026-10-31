@@ -119,6 +119,12 @@ def parse_exhibits(headers_html: str) -> list[tuple[str, str]]:
     return exhibits
 
 
+def is_text_document(filename: str, allowed: tuple[str, ...]) -> bool:
+    """Return whether an exhibit filename has a suffix we can parse as text."""
+    suffix = Path(filename).suffix.lower()
+    return bool(allowed) and suffix in {item.lower() for item in allowed}
+
+
 def _configured_date(config: Config, value: str) -> date | None:
     """Parse a configured ISO date, returning None when it is blank."""
     text = str(value or '').strip()
@@ -181,7 +187,13 @@ def fetch_disclosures(
         except httpx.HTTPError as exc:
             LOGGER.warning('index headers failed cik=%s accession=%s error=%s', cik, accession, exc)
             continue
+        allowed = config.data.edgar_document_suffixes
         for document_type, filename in parse_exhibits(headers_response.text):
+            if not is_text_document(filename, allowed):
+                # An EX-99 image ("..._ex99-1img001.jpg") is a scanned release; decoding
+                # it as HTML yields binary noise and burns a document slot.
+                LOGGER.info('skip non-text exhibit cik=%s file=%s', cik, filename)
+                continue
             found.append(
                 Disclosure(
                     cik=cik,
@@ -193,6 +205,15 @@ def fetch_disclosures(
                 )
             )
     return found
+
+
+def _document_text(path: Path) -> str:
+    """Return a downloaded file's text, treating it as HTML only when it looks like HTML."""
+    suffix = path.suffix.lower()
+    raw = path.read_text(encoding='utf-8', errors='replace')
+    if suffix in {'.htm', '.html'}:
+        return html_to_text(raw)
+    return raw
 
 
 def download_document(
@@ -262,7 +283,7 @@ def ingest_edgar(
                         )
                         continue
                     taken += 1
-                    text = html_to_text(path.read_text(encoding='utf-8', errors='replace'))
+                    text = _document_text(path)
                     rows.append(
                         {
                             'document_id': f'{cik.zfill(10)}-{disclosure.accession}-{disclosure.document}',

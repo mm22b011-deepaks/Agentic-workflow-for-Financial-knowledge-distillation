@@ -19,11 +19,17 @@ from nowcast.llm.caller import LLMCaller  # noqa: E402
 logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(message)s')
 
 
+TEXT_SUFFIXES = ('.htm', '.html', '.txt')
+
+
 def main(limit: int) -> int:
-    """Run extraction over the first `limit` indexed documents with one free model."""
+    """Run extraction over the first `limit` text documents with one free model."""
     load_dotenv(ROOT / '.env', override=True)
     config = load_config(ROOT / 'configs' / 'config.yaml')
-    documents = load_documents(config, ROOT / 'data' / 'document_index.parquet')[:limit]
+    indexed = load_documents(config, ROOT / 'data' / 'document_index.parquet')
+    # An index written before the suffix filter existed can contain EX-99 images; a scan
+    # decoded as HTML is noise in, noise out, so skip anything that is not text.
+    documents = [doc for doc in indexed if doc.raw_path.suffix.lower() in TEXT_SUFFIXES][:limit]
     print(f'documents={len(documents)} model={config.llm.models[0]}')
     caller = LLMCaller(config.llm)
 

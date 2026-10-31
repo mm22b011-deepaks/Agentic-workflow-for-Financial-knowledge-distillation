@@ -271,3 +271,54 @@ def test_raw_path_is_stored_relative_to_data_dir(config: Config) -> None:
     assert not Path(stored).is_absolute()
     assert stored.startswith('raw/')
     assert (data_root(config) / stored).is_file()
+
+
+IMAGE_HEADERS_HTML = (
+    '<DOCUMENT><TYPE>EX-99.1\n<SEQUENCE>2\n<FILENAME>dex991.htm</DOCUMENT>'
+    '<DOCUMENT><TYPE>EX-99.1\n<SEQUENCE>3\n<FILENAME>ibm_ex991001.jpg</DOCUMENT>'
+)
+
+
+def test_non_text_exhibits_are_never_downloaded(config: Config) -> None:
+    """An EX-99 image is skipped: decoding a scan as HTML burns a document slot."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith('.json') and 'submissions' in path:
+            return httpx.Response(200, json=SUBMISSIONS)
+        if path.endswith('-index-headers.html'):
+            return httpx.Response(200, text=IMAGE_HEADERS_HTML)
+        if path.endswith('dex991.htm'):
+            return httpx.Response(200, text=EXHIBIT_HTML)
+        if path.endswith('.jpg'):
+            raise AssertionError('an image exhibit was downloaded')
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    rows = ingest_edgar(
+        config,
+        ['0000000001'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        max_documents=10,
+        per_cik_limit=10,
+        # The canned submissions feed files on 2030-01-02, so widen the window to it.
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+    )
+    assert [row['document_type'] for row in rows] == ['EX-99.1']
+    assert rows[0]['document_id'].endswith('dex991.htm')
+    assert rows[0]['chars'] > 0
+
+
+def test_text_suffix_check_is_case_insensitive() -> None:
+    """Suffix matching ignores case and requires membership in the configured list."""
+    from nowcast.ingestion.edgar import is_text_document
+
+    allowed = ('.htm', '.txt')
+    assert is_text_document('EX-99.HTM', allowed)
+    assert is_text_document('body.txt', allowed)
+    assert not is_text_document('chart.jpg', allowed)
+    assert not is_text_document('archive.htm.zip', allowed)
+    # An empty allow-list means "parse nothing", never "parse everything".
+    assert not is_text_document('anything.htm', ())
