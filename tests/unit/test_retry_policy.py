@@ -10,9 +10,9 @@ import pytest
 
 from nowcast.config import load_config
 from nowcast.errors import BudgetExceeded, RateLimited
-from nowcast.extraction.runner import CachedCaller
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.caller import LLMResult, _retry_after_seconds
+from nowcast.llm.composition import RetryingCaller
 
 REPO = Path(__file__).resolve().parent.parent.parent
 
@@ -71,10 +71,10 @@ def test_retry_honours_provider_delay(tmp_path: Path, monkeypatch: pytest.Monkey
     )
     inner = FlakyCaller([RateLimited('429', retry_after_seconds=45.0)])
     sleeps: list[float] = []
-    import nowcast.extraction.runner as runner_module
 
-    monkeypatch.setattr(runner_module.time, 'sleep', lambda seconds: sleeps.append(float(seconds)))
-    wrapper = CachedCaller(inner, ResponseCache(config.cache, tmp_path / 'cache'), config)
+    wrapper = RetryingCaller(
+        inner, ResponseCache(config.cache, tmp_path / 'cache'), config, sleep=sleeps.append
+    )
     result = wrapper.complete('fake/model:free', [{'role': 'user', 'content': 'hi'}])
     assert result.text == '{"ok": true}'
     assert sleeps == [45.0]
@@ -88,10 +88,10 @@ def test_retry_caps_absurd_provider_delay(tmp_path: Path, monkeypatch: pytest.Mo
     )
     inner = FlakyCaller([RateLimited('429', retry_after_seconds=3600.0)])
     sleeps: list[float] = []
-    import nowcast.extraction.runner as runner_module
 
-    monkeypatch.setattr(runner_module.time, 'sleep', lambda seconds: sleeps.append(float(seconds)))
-    wrapper = CachedCaller(inner, ResponseCache(config.cache, tmp_path / 'cache'), config)
+    wrapper = RetryingCaller(
+        inner, ResponseCache(config.cache, tmp_path / 'cache'), config, sleep=sleeps.append
+    )
     wrapper.complete('fake/model:free', [{'role': 'user', 'content': 'hi'}])
     assert sleeps == [60.0]
 
@@ -101,10 +101,10 @@ def test_budget_exceeded_is_not_retried(tmp_path: Path, monkeypatch: pytest.Monk
     config = load_config(REPO / 'configs' / 'config.yaml', overrides={'llm.retry_attempts': '3'})
     inner = FlakyCaller([BudgetExceeded('spent')])
     sleeps: list[float] = []
-    import nowcast.extraction.runner as runner_module
 
-    monkeypatch.setattr(runner_module.time, 'sleep', lambda seconds: sleeps.append(float(seconds)))
-    wrapper = CachedCaller(inner, ResponseCache(config.cache, tmp_path / 'cache'), config)
+    wrapper = RetryingCaller(
+        inner, ResponseCache(config.cache, tmp_path / 'cache'), config, sleep=sleeps.append
+    )
     with pytest.raises(BudgetExceeded):
         wrapper.complete('fake/model:free', [{'role': 'user', 'content': 'hi'}])
     assert sleeps == []

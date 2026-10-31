@@ -157,10 +157,14 @@ def test_runner_stops_on_budget_and_keeps_results(config: Config, tmp_path: Path
             return result
 
     outcomes = _run(config, documents, BudgetCaller())
-    assert any(outcome.status == 'ok' for outcome in outcomes)
-    assert any(outcome.status == 'budget_stopped' for outcome in outcomes) or any(
-        outcome.status == 'failed' and outcome.error for outcome in outcomes
-    )
+    accepted = [outcome for outcome in outcomes if outcome.status == 'ok']
+    stopped = [outcome for outcome in outcomes if outcome.status == 'budget_stopped']
+    # 'either budget_stopped or failed' could never fail on the original bug: assert
+    # the exact behaviour, and that the work already done is still on disk.
+    assert accepted, 'the run must keep the documents it completed'
+    assert stopped, 'the remaining documents must stop on the budget, not fail'
+    assert not [outcome for outcome in outcomes if outcome.status == 'failed']
+    assert len(accepted) + len(stopped) == len(outcomes)
 
 
 def test_model_disagreement_queued(config: Config, tmp_path: Path) -> None:

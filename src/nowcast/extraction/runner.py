@@ -6,7 +6,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +18,7 @@ from nowcast.errors import BudgetExceeded
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.validators import needs_review, validate_record
-from nowcast.llm.cache import ResponseCache, cache_key
+from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
 from nowcast.llm.structured import extract_structured
 from nowcast.parsing.html import html_to_text
@@ -144,60 +143,19 @@ def _write_result(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
-class CachedCaller:
-    """Wraps a caller with the response cache and turns transient failures into retries."""
+def compose_caller(config: Config, inner: Any, cache: ResponseCache | None = None) -> Any:
+    """Wrap a raw caller in the shared retry-plus-cache composition.
 
-    def __init__(self, caller: Any, cache: ResponseCache, config: Config) -> None:
-        """Store the inner caller, cache and retry settings."""
-        self._caller = caller
-        self._cache = cache
-        self._config = config
-        self.cache_hits = 0
+    A caller that is already composed (a test fake, or a `RetryingCaller` handed in by a
+    caller) is passed through unchanged, so composing twice is harmless and never
+    double-counts retries.
+    """
+    from nowcast.llm.composition import RetryingCaller
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> Any:
-        """Return a cached or fresh completion, retrying transient errors."""
-        prompt_text = '\n'.join(message['content'] for message in messages)
-        key = cache_key(
-            prompt_text,
-            model,
-            params={
-                'temperature': self._config.llm.temperature,
-                'max_tokens': self._config.llm.max_tokens,
-            },
-        )
-        cached = self._cache.get(key)
-        if cached is not None:
-            self.cache_hits += 1
-            from nowcast.llm.caller import LLMResult
-
-            return LLMResult(text=cached, model=model)
-        attempts = max(1, int(self._config.llm.retry_attempts))
-        backoff = float(self._config.llm.retry_backoff_seconds)
-        max_wait = float(self._config.llm.retry_max_wait_seconds)
-        last_error: Exception | None = None
-        for attempt in range(attempts):
-            try:
-                result = self._caller.complete(model, messages)
-            except BudgetExceeded:
-                raise
-            except Exception as exc:
-                last_error = exc
-                LOGGER.warning('call failed attempt=%d model=%s error=%s', attempt, model, exc)
-                if attempt < attempts - 1:
-                    requested = getattr(exc, 'retry_after_seconds', None)
-                    delay = backoff * (attempt + 1)
-                    if isinstance(requested, (int, float)):
-                        # A provider-stated delay (usually a 429 on a busy free pool)
-                        # beats our fixed backoff, which is far too short for it.
-                        delay = max(delay, float(requested))
-                    delay = min(delay, max_wait)
-                    if delay > 0:
-                        LOGGER.info('retrying in %.1fs attempt=%d model=%s', delay, attempt, model)
-                        time.sleep(delay)
-                continue
-            self._cache.set(key, result.text, model)
-            return result
-        raise RuntimeError(f'all {attempts} attempts failed: {last_error}')
+    if isinstance(inner, RetryingCaller):
+        return inner
+    active_cache = cache if cache is not None else ResponseCache(config.cache, cache_dir(config))
+    return RetryingCaller(inner, active_cache, config)
 
 
 async def run_extraction(
@@ -240,7 +198,9 @@ async def run_extraction(
         async with semaphore:
             if stop['budget']:
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')
-            caller = caller_factory(model)
+            # Every model call goes through the one composition point, so retry,
+            # Retry-After and the cache apply on the live path, not only in tests.
+            caller = compose_caller(config, caller_factory(model))
             variables = {
                 'document_id': document.document_id,
                 'document_text': document_text(config, document),
