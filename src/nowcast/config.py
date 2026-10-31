@@ -95,6 +95,9 @@ class DataConfig:
     edgar_lookback_days: int = 730
     edgar_max_documents: int = 100
     edgar_docs_per_cik: int = 3
+    # Data-root-relative path of the index the pipeline reads and writes. A rebuild
+    # writes a new file here; the old index is never overwritten or moved.
+    document_index: str = 'document_index.v2.parquet'
 
 
 @dataclass(frozen=True)
@@ -381,6 +384,8 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('data.sec_max_requests_per_sec must be > 0')
     if config.data.sec_abort_after_blocked < 1:
         problems.append('data.sec_abort_after_blocked must be >= 1')
+    if not config.data.document_index:
+        problems.append('data.document_index must be set')
     for key in (
         'edgar_submissions_url_template',
         'edgar_archive_url_template',

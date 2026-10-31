@@ -213,7 +213,7 @@ def test_cli_extract_uses_retrying_caller(
                 'items': '2.02',
             }
         ]
-    ).to_parquet(root / 'document_index.parquet', index=False)
+    ).to_parquet(root / config.data.document_index, index=False)
 
     monkeypatch.setattr(cli, '_load', lambda _args: config)
     monkeypatch.setattr(cli, 'start_manifest', lambda *_a, **_k: _NullManifest())
