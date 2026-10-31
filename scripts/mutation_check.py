@@ -27,11 +27,15 @@ VALIDATORS = 'src/nowcast/extraction/validators.py'
 EDGAR = 'src/nowcast/ingestion/edgar.py'
 RUNNER = 'src/nowcast/extraction/runner.py'
 AGGREGATE = 'src/nowcast/aggregation/aggregate.py'
+UNITS = 'src/nowcast/extraction/units.py'
+PROMPTS = 'src/nowcast/llm/prompts.py'
 
 VALIDATOR_TESTS = ['tests/unit/test_validators.py']
 EDGAR_TESTS = ['tests/unit/test_edgar.py']
 RUNNER_TESTS = ['tests/unit/test_runner.py', 'tests/unit/test_truncation.py']
 AGGREGATE_TESTS = ['tests/unit/test_aggregate.py']
+UNITS_TESTS = ['tests/unit/test_units.py']
+PROMPT_TESTS = ['tests/unit/test_prompts.py']
 
 
 @dataclass(frozen=True)
@@ -153,6 +157,36 @@ MUTANTS = (
         "        except Exception as exc:\n            LOGGER.exception('document failed",
         "        except ZeroDivisionError as exc:\n            LOGGER.exception('document failed",
         tuple(RUNNER_TESTS),
+    ),
+    Mutant(
+        'diagnostics claim no truncation',
+        RUNNER,
+        "'truncated': prepared.truncated,",
+        "'truncated': False,",
+        tuple(RUNNER_TESTS + UNITS_TESTS),
+    ),
+    # units.py
+    Mutant(
+        'growth fraction correction dropped',
+        UNITS,
+        'candidates = [value] if abs(value) >= 1 else [value, value * 100]',
+        'candidates = [value]',
+        tuple(UNITS_TESTS),
+    ),
+    Mutant(
+        'units canonicalisation dropped',
+        UNITS,
+        "return f'{recognised_currency} {recognised_scale}'",
+        'return text or None',
+        tuple(UNITS_TESTS),
+    ),
+    # prompts.py
+    Mutant(
+        'prompt hash drops few-shots',
+        PROMPTS,
+        'if bundle.few_shots:',
+        'if False:',
+        tuple(PROMPT_TESTS),
     ),
     # aggregate.py
     Mutant(

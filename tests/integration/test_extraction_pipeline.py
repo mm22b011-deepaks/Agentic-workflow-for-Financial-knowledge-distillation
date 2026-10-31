@@ -114,6 +114,9 @@ def test_fixture_documents_index_parse_and_extract(
     assert by_id.loc['doc-fixture-001', 'prior_year_eps'] == pytest.approx(0.48)
     assert by_id.loc['doc-fixture-002', 'guidance_direction'] == 'raised'
     assert by_id.loc['doc-fixture-003', 'reported_eps'] == pytest.approx(-0.12)
+    # H5: the fixture's model reply says 0.08 for "up 8%"; the stored frame is percent
+    # as printed. A pre-corrected fixture would not prove the correction runs.
+    assert by_id.loc['doc-fixture-001', 'revenue_yoy_growth_pct'] == pytest.approx(8.0)
     # A theme that was never mentioned still gets a column, set false.
     assert not bool(by_id.loc['doc-fixture-003', 'theme_demand_mentioned'])
     assert bool(by_id.loc['doc-fixture-001', 'theme_demand_mentioned'])

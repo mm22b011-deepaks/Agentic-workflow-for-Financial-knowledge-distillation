@@ -330,6 +330,42 @@ def test_non_text_exhibits_are_never_downloaded(config: Config) -> None:
     assert rows[0]['chars'] > 0
 
 
+IMAGE_ONLY_HEADERS_HTML = (
+    '<DOCUMENT><TYPE>EX-99.1\n<SEQUENCE>2\n<FILENAME>ibm_ex991001.jpg</DOCUMENT>'
+)
+
+
+def test_image_only_filing_is_skipped_not_downloaded(config: Config) -> None:
+    """When a filing's only exhibit is a scan, the filing is dropped at the index.
+
+    The other image test pairs the scan with a text exhibit, so the per-filing exhibit
+    reduction can mask a missing suffix check. Here there is nothing else to keep.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith('.json') and 'submissions' in path:
+            return httpx.Response(200, json=SUBMISSIONS)
+        if path.endswith('-index-headers.html'):
+            return httpx.Response(200, text=IMAGE_ONLY_HEADERS_HTML)
+        if path.endswith('.jpg'):
+            raise AssertionError('an image exhibit was downloaded')
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    rows = ingest_edgar(
+        config,
+        ['0000000001'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        max_documents=10,
+        per_cik_limit=10,
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+    )
+    assert rows == []
+
+
 def test_text_suffix_check_is_case_insensitive() -> None:
     """Suffix matching ignores case and requires membership in the configured list."""
     from nowcast.ingestion.edgar import is_text_document

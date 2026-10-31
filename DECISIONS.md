@@ -364,3 +364,90 @@ wants it configurable, the change is one key plus a `_tuple` in `load_config`.
 **Not measured.** This is offline behaviour only. How many of the 519 members actually
 have a 2.02 filing in each quarter is a live question and stays blocked with the rest of
 the live work.
+
+## D16 — H5 and prompt hardening: measured truncation, printed percent, canonical units (2026-10-31)
+
+### What was measured, and why it decided the fix
+
+At `max_doc_chars = 24000`, over the 61 parseable text documents in the current index:
+
+| Measure | Result |
+|---------|--------|
+| Documents over the cut | **14 of 61 (23.0%)** |
+| Characters never sent | **515,868 of 1,232,947 (41.8%)** |
+| First occurrence after the cut: guidance / growth | **4 / 1 of 14** |
+| First occurrence after the cut: EPS / revenue | 0 of 14 |
+| Any occurrence after the cut: revenue / EPS / guidance / growth | 6 / 5 / 4 / 1 of 14 |
+
+Search terms, applied case-insensitively to the same converted text the runner prepares:
+EPS = `earnings per share|EPS`, revenue = `revenue|net sales`, guidance =
+`guidance|outlook`, growth = `growth|grew`. Reproduce with
+`python scripts/measure_truncation.py --index document_index.parquet`, which applies the
+runner's own conversion and cut so the terms and the text cannot drift apart. The four
+documents whose only guidance text sits past the cut are JPMorgan supplements
+(77k–90k chars). The consequence is specific: the cut is not neutral for guidance. R2's
+context packer is where selection changes; until then the honest response is to record
+what was sent and how much was dropped, never to let a cut extraction look like a whole
+one. That is why diagnostics ships before the packer.
+
+### Conventions, now enforced in code and in the prompt
+
+- **`revenue_yoy_growth` is percent as printed.** `4%` is `4.0`, never `0.04`. A model
+  that returns a fraction is corrected only when the evidence quote carries a percent
+  marker and the corrected digits appear in that quote. A printed `0.5%` stays `0.5`:
+  scaling it to 50 would misread the quote. Spelled-out numbers ("eight percent") are
+  not parsed; validation reports the mismatch instead of guessing.
+- **`units` is canonical** `<CCY>` or `<CCY> <scale>` ("dollars" → `USD`,
+  "USD billions" → `USD billion`, "£m" → `GBP million`). A scale-only label takes the
+  record's currency. A label with neither part is preserved verbatim: dropping what the
+  model said is a silent loss, and an unrecognised label is exactly what a human should
+  see.
+- **Normalise before validating.** Validation first would penalise a fraction the code
+  can simply read correctly, and would put a correctable record into the review queue.
+- **The consolidated column is `revenue_yoy_growth_pct`.** The unit belongs in the name,
+  not in a reader's assumption.
+- **The fixture keeps `0.08` for "up 8%" deliberately.** It is a *model reply*, not a
+  golden output, and the integration/end-to-end tests assert the stored and consolidated
+  value is `8.0`. Pre-correcting the fixture would remove the end-to-end proof that the
+  correction runs. This deviates from the earlier plan to change it to `8.0`; the
+  reason is test strength, not convenience.
+
+### Diagnostics
+
+`prepare_text` returns `DocumentText(text, chars_total, chars_sent)` with
+`truncated = chars_sent < chars_total`. The result payload stores
+`diagnostics: {chars_total, chars_sent, truncated}`, the outcome carries `truncated`,
+and `consolidate` writes the three columns. Results written before H5 have no
+diagnostics; they consolidate as `None`, not `False`, because "not measured" and "not
+truncated" are different claims.
+
+Naming deviation: the register says `doc_truncated`; the payload key is `truncated` to
+match Q-PART 3 and the outcome flag. The `doc_truncated` *reason code* remains a Q-PART 3
+task.
+
+### Few-shot examples are part of the prompt
+
+Found while writing the prompt rules: `prompt_hash` hashed the system and user templates
+only, while `few_shot.yaml` is sent to the model as user/assistant messages. Editing an
+example changed the prompt without invalidating stored results. `prompt_hash` now hashes
+the canonical JSON of the few-shot tuple as well; `test_prompt_hash_changes_with_few_shots`
+pins it. Consequence: every fingerprint changes with this release, so existing results
+are stale by design and will be re-extracted on the next live run.
+
+### Prompt hardening for weak models
+
+The v1 system prompt is now a field-level data-entry contract rather than a short rule
+list: every field is defined, `eps_basis` / `guidance_direction` / `tone` have explicit
+vocabularies, GAAP is preferred when both bases are printed, segment revenue is excluded
+from `revenue`, growth is the printed percent, `units` is `<CCY> <scale>`, each null
+reason has its own rule, evidence quotes must contain the digits and the unit, arithmetic
+is forbidden, and the reply is one bare JSON object. The user message restates all
+sixteen top-level keys immediately before the document. The three synthetic few-shots
+cover GAAP + growth, revenue only with missing EPS and explicitly unavailable guidance,
+and adjusted EPS with a "flat" quarter whose growth stays null rather than being inferred
+as 0.0; their units are canonical and their themes use the configured vocabulary.
+
+**Not measured live.** Whether this helps the weakest free model is an empirical
+question. The 401 blocks it; the measurement is queued as task P0 in `tasks.md`, with
+per-field coverage, empty-completion rate, review-queue rate and 429 count required
+before any improvement is claimed.

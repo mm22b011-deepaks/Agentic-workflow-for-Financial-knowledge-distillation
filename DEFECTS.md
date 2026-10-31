@@ -19,37 +19,42 @@ pytest -q               -> 167 passed
 
 ## BLOCKERS
 
-### N1 — Retry and cache are not wired into the live path `[CONFIRMED]`
+### N1 — Retry and cache are not wired into the live path `[CONFIRMED]` → `[FIXED 2026-10-31]`
 `CachedCaller` appeared only in `tests/unit/test_retry_policy.py`;
 `cli._cmd_extract` and `scripts/extract_sample.py` handed the bare `LLMCaller` to
 `run_extraction`. `extract_structured` called `cache.set` but never `cache.get`.
-- [ ] `make_caller(config, ledger, cache)` composition point used by every entry point
-- [ ] Dead write-only cache path removed or made to read
-- [ ] `CachedCaller` never caches empty / truncated / unparseable replies
-- [ ] Fix `cache.get` returning `''` for an empty entry while callers test `is not None`
+- [x] `compose_caller(config, ledger, cache)` composition point used by every entry point
+- [x] Dead write-only cache path removed or made to read
+- [x] `CachedCaller` never caches empty / truncated / unparseable replies
+- [x] Fix `cache.get` returning `''` for an empty entry while callers test `is not None`
 - Tests: `test_cli_extract_uses_retrying_caller`, `test_runner_retries_429_with_retry_after`,
   `test_cache_hit_avoids_second_call`, `test_empty_reply_never_cached`,
   `test_unparseable_reply_never_cached`
 
-### N2 — Empty completions from reasoning models `[CONFIRMED]`
+### N2 — Empty completions from reasoning models `[CONFIRMED]` → `[PARTIALLY FIXED 2026-10-31; live items blocked]`
 `complete()` only logged a warning on empty content with `finish_reason == 'length'`; the
 empty text entered the repair loop, spending `1 + max_repairs` calls on nothing.
 `message.reasoning` was never read.
-- [ ] Raise `TruncatedCompletion` on empty content; not counted as a parse failure
-- [ ] Retry once with larger `max_tokens` up to `llm.max_tokens_ceiling`
-- [ ] `UNSURE`: reasoning field name and `reasoning` parameter honoured — one live call
-- [ ] Read supported parameters from the provider's models list, never hard code
-- [ ] Log `completion_tokens` vs `max_tokens` in the ledger
+- [x] Raise `TruncatedCompletion` on empty content; not counted as a parse failure
+- [x] Retry once with larger `max_tokens` up to `llm.max_tokens_ceiling`
+- [ ] `UNSURE`: reasoning field name and `reasoning` parameter honoured — **blocked on
+      the OpenRouter 401**; no live call has been made
+- [ ] Read supported parameters from the provider's models list, never hard code —
+      **not implemented**
+- [x] Log `completion_tokens` vs `max_tokens` in the ledger
 - [ ] `model-bakeoff` command over the same 10 real releases per candidate `:free` model
+      — **not implemented**; needs the live key first
 - Tests: `test_empty_length_completion_raises_truncated`,
   `test_truncated_retries_with_larger_max_tokens_then_gives_up`,
   `test_truncated_not_counted_as_parse_failure`
 
-### N3 — All-null extractions reported as success, on non-earnings documents `[CONFIRMED]`
-- [ ] `empty_extraction` review reason when an earnings release yields no `reported_eps`
+### N3 — All-null extractions reported as success, on non-earnings documents `[CONFIRMED]` → `[PARTIALLY FIXED 2026-10-31; live rerun blocked]`
+- [x] `empty_extraction` review reason when an earnings release yields no `reported_eps`
       and no `revenue`, distinct from `not_stated`; counted in the run summary
-- [ ] Never extract a document whose index row lacks Item 2.02
-- [ ] After N4/N7: rerun 10 real earnings releases, report per-field coverage
+      (`cli.py` sums it from the outcomes)
+- [x] Never extract a document whose index row lacks Item 2.02
+- [ ] After N4/N7: rerun 10 real earnings releases, report per-field coverage —
+      **blocked on the OpenRouter 401**
 - Tests: `test_all_null_earnings_record_flagged_empty_extraction`,
   `test_non_earnings_document_not_extracted`
 
@@ -78,46 +83,52 @@ Deviations: `EXHIBIT_PRIORITY` is a code constant rather than a config key (the 
 said "from config"); a config key would add a knob no other code reads and the list is a
 property of EDGAR's filing convention, not of a deployment. Noted for the human.
 
-### N5 — Aggregation can double-count and mislabel `[CONFIRMED]`
-- [ ] Collapse to one record per (cik, season) by a configurable rule
-- [ ] `n_reported` counts distinct companies
-- [ ] Assert `share_reported <= 1`, raise `DataError` otherwise
-- [ ] Rename season columns to `season_year` / `season_quarter`
-- [ ] `n_review_excluded` computed per as-of date
-- Tests: `test_two_models_do_not_double_count`, `test_two_exhibits_same_filing_count_once`,
+### N5 — Aggregation can double-count and mislabel `[CONFIRMED]` → `[FIXED 2026-10-31]`
+- [x] Collapse to one record per (cik, season) by a configurable rule
+- [x] `n_reported` counts distinct companies
+- [x] Assert `share_reported <= 1`, raise `DataError` otherwise
+- [x] Rename season columns to `season_year` / `season_quarter`
+- [x] `n_review_excluded` computed per as-of date
+- Tests (all present and green in the 248-test suite):
+  `test_two_models_do_not_double_count`, `test_two_exhibits_same_filing_count_once`,
   `test_share_reported_never_exceeds_one`, `test_review_excluded_is_per_asof`,
   `test_season_column_names`
 
-### N6 — Ingest hides failures `[CONFIRMED]`
-- [ ] `IngestReport` with status-code counts, skips by reason, zero-disclosure companies
-- [ ] Abort after N consecutive 403/429 (N from config) with a clear message
-- [ ] Write `manifests/ingest_report.json`
+### N6 — Ingest hides failures `[CONFIRMED]` → `[FIXED OFFLINE 2026-10-31; live CIK check blocked]`
+- [x] `IngestReport` with status-code counts, skips by reason, zero-disclosure companies
+- [x] Abort after N consecutive 403/429 (N from config) with a clear message
+- [x] Write `manifests/ingest_report.json`
 - [ ] `UNSURE`: does `filings.recent` reach `data.start_date` for high-volume filers;
-      are `filings.files` pages needed — one live high-volume CIK
-- [ ] Atomic download (temp file then rename), verify size
-- [ ] Strip the SGML `<DOCUMENT><TYPE>..<TEXT>` wrapper before text conversion
+      are `filings.files` pages needed — **blocked on the OpenRouter 401**
+- [x] Atomic download (temp file then rename), verify size
+- [x] Strip the SGML `<DOCUMENT><TYPE>..<TEXT>` wrapper before text conversion
 - Tests: `test_ingest_report_counts_by_status`, `test_consecutive_403_aborts`,
   `test_partial_download_not_treated_as_complete`, `test_sgml_wrapper_stripped`,
-  plus `@pytest.mark.live` on one high-volume CIK
+  plus a live-marked high-volume CIK test that has **not** been run (no live access).
 
-### N7 — The document index is stale `[CONFIRMED]`
-- [ ] New column `items`; rebuild from scratch into `data.document_index`
+### N7 — The document index is stale `[CONFIRMED]` → `[FIXED OFFLINE 2026-10-31; rebuild run blocked]`
+- [x] New column `items`; rebuild from scratch into `data.document_index`
       (default `data/document_index.v2.parquet`) — never overwrite or `mv`
-- [ ] Move affected extraction results and review-queue rows to a `superseded/` folder;
+- [x] Move affected extraction results and review-queue rows to a `superseded/` folder;
       never delete raw files
-- [ ] Index validation fails on any row lacking 2.02, outside the window, or non-text
+- [x] Index validation fails on any row lacking 2.02, outside the window, or non-text
 - Tests: `test_index_validation_rejects_non_202_non_text_out_of_window`,
-  `test_rebuild_writes_new_path_and_keeps_backup`
+  `test_rebuild_writes_new_path_and_keeps_backup`,
+  `test_rebuild_moves_superseded_results_and_queue_rows`.
+- **Not run on live data.** The zero-cap smoke run wrote a headers-only
+  `data/document_index.v2.parquet`; a real rebuild is blocked by the 401. Nothing old
+  was deleted.
 
 ---
 
 ## HIGH
 
-### H1 — Per-document crash safety incomplete `[CONFIRMED]`
+### H1 — Per-document crash safety incomplete `[CONFIRMED]` → `[FIXED 2026-10-31]`
 Only the model call is protected in `runner._process`; `document_text`, `validate_record`,
 `review_queue.append_rows` and `_write_result` are not.
-- [ ] Wrap the whole path; record the failure per document; continue
-- Test: `test_runner_survives_missing_raw_file_and_write_error`
+- [x] Wrap the whole path; record the failure per document; continue
+- Test: `test_runner_survives_missing_raw_file_and_write_error` — a missing raw file and
+  an unwritable result fail one document each, while the third succeeds.
 
 ### H2 — Weak or misleading tests `[CONFIRMED]` → `[FIXED 2026-10-31]`
 `test_runner_stops_on_budget_and_keeps_results` accepts either outcome.
@@ -141,6 +152,13 @@ pinned, and each got a test that fails only under that mutant:
 Second run (after those tests, and again after the H3 refactor):
 **20 mutants, 20 killed, 0 survived** — `python scripts/mutation_check.py`.
 
+Third run (2026-10-31, after H5 added `units.py` / `prompts.py` mutants and a truncation
+diagnostics mutant): **24 mutants, 23 killed, 1 survived**. The survivor was
+`non-text exhibits allowed`: the existing image test pairs the `.jpg` with a text exhibit,
+so the per-filing exhibit reduction kept the scan out even with the suffix check gone.
+`test_image_only_filing_is_skipped_not_downloaded` pins a filing whose *only* exhibit is
+a scan, which the guard alone can drop. Final: **24 mutants, 24 killed, 0 survived**.
+
 ### H3 — Reproducibility and portability leftovers `[CONFIRMED]` → `[FIXED 2026-10-31]`
 - [x] No `load_dotenv(override=True)` in scripts; no `ROOT/'data'` or `ROOT/'inputs'`;
       no `print`
@@ -158,27 +176,73 @@ from `--tickers` (default `inputs/tickers.txt` under the data root); models from
 (`--extra dev`), neither containing a local path. `requests` stays pinned: it is a
 transitive dependency of `langchain-core`/`langsmith`, not a direct one.
 
-### H4 — Fingerprint and stored validation `[CONFIRMED]`
+### H4 — Fingerprint and stored validation `[CONFIRMED]` → `[FIXED 2026-10-31]`
 Fingerprint omits `max_doc_chars` and the validation thresholds; penalties are baked into
 the stored record, so changing a threshold silently reuses old results.
-- Test: `test_changing_threshold_invalidates_or_revalidates`
+- Fixed by hashing `validation_settings(config)` (max_doc_chars, quote ratio, confidence
+  penalty, min confidence, EPS tolerance, evidence words, themes, section patterns,
+  schema version) into the fingerprint.
+- Test: `test_changing_threshold_invalidates_or_revalidates` covers every setting and
+  also asserts that identical settings produce an identical digest.
+- Related gap found during H5 (D16): the few-shot pairs were sent to the model but not
+  hashed; they are now part of `prompt_hash`.
 
-### H5 — Truncation and units `[CONFIRMED]`
+### H5 — Truncation and units `[CONFIRMED]` → `[FIXED OFFLINE 2026-10-31; live rerun blocked]`
 `max_doc_chars = 24000` cuts long releases (one real release is 56k chars, a supplement
 93k).
-- [ ] Measure the share of documents whose guidance or EPS text sits after the cut
-- [ ] Until R2: record `doc_truncated` in diagnostics
-- [ ] Define the percent convention for `revenue_yoy_growth` (as printed, unit `percent`)
-- [ ] Normalize the free-text `units` field in code; tests for `4%` and `0.04`
+- [x] Measure the share of documents whose guidance or EPS text sits after the cut.
+      Measured on the real index (`data/document_index.parquet`, 61 parseable text
+      documents, `max_doc_chars = 24000`): **14 of 61 (23.0%)** exceed the cut, and
+      **515,868 of 1,232,947 corpus characters (41.8%)** never reach the prompt.
+      Search terms applied to the same converted text the runner prepares (case
+      insensitive): EPS = `earnings per share|EPS`, revenue = `revenue|net sales`,
+      guidance = `guidance|outlook`, growth = `growth|grew`. First occurrence only after
+      the cut: guidance **4/14**, growth **1/14**, EPS 0/14, revenue 0/14. Any occurrence
+      after the cut: revenue 6/14, EPS 5/14, guidance 4/14, growth 1/14. The four
+      guidance-only-after-the-cut documents are JPMorgan supplements (77k–90k chars);
+      the other over-cut documents are six Caterpillar 8-Ks (48k–55k), three IBM
+      releases (25k–27k) and one 114,744-char release with no term after the cut.
+      Reproduce with `python scripts/measure_truncation.py --index
+      document_index.parquet`.
+- [x] Until R2: record how much text was sent. `runner.prepare_text` returns
+      `DocumentText(text, chars_total, chars_sent)`; the result payload carries
+      `diagnostics: {chars_total, chars_sent, truncated}`, the outcome carries
+      `truncated`, `consolidate` writes the three columns (absent diagnostics → `None`,
+      "not measured", not `False`), and a warning logs the cut percentage. Naming
+      deviation: the register says `doc_truncated`; the payload key is `truncated` to
+      match Q-PART 3 and the outcome flag. The `doc_truncated` *reason code* remains a
+      Q-PART 3 task.
+- [x] Define the percent convention for `revenue_yoy_growth` (as printed, unit
+      `percent`): `4%` is `4.0`, never `0.04`. Rule added to the system prompt; the
+      consolidated column is named `revenue_yoy_growth_pct`.
+- [x] Normalise the free-text `units` field in code (`extraction/units.py`) into
+      `<CCY> [scale]` ("dollars" → "USD", "USD billions" → "USD billion"), with the
+      record's currency as fallback and unrecognised labels preserved. Growth is
+      corrected from the evidence quote when it shows a percent sign; a sub-1% printed
+      figure such as 0.5% is left as 0.5. Normalisation runs **before** validation so a
+      correctable fraction is not penalised.
+- Tests: `tests/unit/test_units.py` (parametrised units/growth cases, `prepare_text`
+  measurement, and a runner-to-parquet end-to-end case), plus
+  `test_runner_stores_diagnostics_and_corrected_values`.
+- Deviation, logged in `DECISIONS.md` D16: `tests/fixtures/documents/records.json`
+  keeps `0.08` as a *model reply* for "up 8%", and the integration/end-to-end tests
+  assert the stored and consolidated value is `8.0`. Correcting the input is the
+  behaviour under test, so a pre-corrected fixture would hide it.
 
 ---
 
 ## MEDIUM
 
-### M1 — Dead and duplicate config `[CONFIRMED]`
+### M1 — Dead and duplicate config `[CONFIRMED]` — partially fixed
 `cache.dir` unused; `HTTP-Referer` set to the app name, not a URL; SEC client reuses
 `llm.timeout_seconds`; `:free` defined in both `config.py` and `caller.py`;
 `EXHIBIT_99_RE` / `EXHIBIT_FORMS_PREFIX` unused; dead dict in `runner.document_text`.
+- [x] Dead `sections` dict removed when `runner.document_text` became `prepare_text` (H5)
+- [ ] `cache.dir` — `config.paths.cache_dir` is used; confirm no second unused key
+- [ ] `HTTP-Referer` should be a URL, not the app name (OpenRouter reads it as one)
+- [ ] SEC client should not borrow `llm.timeout_seconds`
+- [ ] One `:free` suffix constant, not two
+- [ ] Remove or use `EXHIBIT_99_RE` / `EXHIBIT_FORMS_PREFIX`
 
 ### M2 — Unknown key raises `TypeError` `[UNSURE]` → `[ALREADY-FIXED (test) + one real gap]`
 `_section` already rejected unknown keys inside a known section with `ConfigError`.
@@ -193,9 +257,14 @@ Test: `test_unknown_top_level_section_is_rejected`; the per-section case keeps
 ### M3 — Docs report only measured state `[ONGOING]`
 `DEFECTS.md`, `status.md`, `tasks.md` updated with real counts after each item.
 
-### M4 — Hidden files `[TO VERIFY]`
-Confirm `.gitignore`, `.env.example`, `.git` exist; `data/`, `.env`, `.cache`,
-`__pycache__`, `*.egg-info`, nested zips are ignored; no secrets committed.
+### M4 — Hidden files `[VERIFIED 2026-10-31, one known deviation]`
+Confirmed: `.gitignore` and `.env.example` exist; `.git` is present; `.env` and every
+`*.parquet` are untracked; `data/`, `__pycache__/`, `*.egg-info/`, `.venv/` and the
+tool caches are ignored. The LLM cache resolves under `data/`, so it is covered.
+**Deviation:** `tresata.zip` is tracked in git by accident (added in commit `008add1`;
+it contains `tests/__pycache__`). Removing it is a deliberate repository change that
+needs the human's go-ahead, so it is recorded here rather than deleted. A `.gitignore`
+entry for nested zips goes with that removal.
 
 ---
 

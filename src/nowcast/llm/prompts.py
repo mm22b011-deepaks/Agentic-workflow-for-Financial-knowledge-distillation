@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,8 +31,21 @@ class PromptBundle:
 
     @property
     def prompt_hash(self) -> str:
-        """Return the sha256 hash of the prompt version's rendered template text."""
-        return hashlib.sha256(self.text.encode('utf-8')).hexdigest()
+        """Return the sha256 hash of everything sent to the model as prompt text."""
+        return hashlib.sha256(_prompt_material(self)).hexdigest()
+
+
+def _prompt_material(bundle: PromptBundle) -> bytes:
+    """Return the template text and the few-shot pairs, which reach the model together.
+
+    The pairs are messages in their own right, so editing an example changes what the
+    model is asked exactly as editing a template does. Leaving them out of the hash
+    would resume records extracted under a different prompt.
+    """
+    material = bundle.text
+    if bundle.few_shots:
+        material += '\x00' + json.dumps(bundle.few_shots, sort_keys=True, default=str)
+    return material.encode('utf-8')
 
 
 def _read(path: Path) -> str:
@@ -89,9 +103,9 @@ def render_prompt(bundle: PromptBundle, variables: dict[str, Any]) -> str:
 
 
 def prompt_hash(bundle: PromptBundle, variables: dict[str, Any] | None = None) -> str:
-    """Return the sha256 hash of the raw template text plus rendered variables."""
+    """Return the sha256 hash of the prompt text, few-shots and rendered variables."""
     digest = hashlib.sha256()
-    digest.update(bundle.text.encode('utf-8'))
+    digest.update(_prompt_material(bundle))
     if variables:
         digest.update(b'\x00')
         digest.update(repr(sorted(variables.items())).encode('utf-8'))
