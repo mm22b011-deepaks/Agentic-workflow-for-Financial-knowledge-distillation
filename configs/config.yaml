@@ -59,6 +59,8 @@ llm:
   timeout_seconds: 120.0
   temperature: 0.0
   max_tokens: 8192
+  # A truncated (empty) completion is retried once at double this, never above the ceiling.
+  max_tokens_ceiling: 32768
   reasoning_effort: low
   max_reasoning_tokens: 3000
   retry_attempts: 3

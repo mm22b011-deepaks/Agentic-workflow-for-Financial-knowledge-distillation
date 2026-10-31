@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 from nowcast.config import Config, cache_dir
-from nowcast.errors import BudgetExceeded, RateLimited
+from nowcast.errors import BudgetExceeded, RateLimited, TruncatedCompletion
 from nowcast.llm.cache import ResponseCache, cache_key
 from nowcast.llm.caller import LLMResult
 
@@ -93,7 +93,9 @@ class RetryingCaller:
         attempts = max(1, int(self._config.llm.retry_attempts))
         backoff = float(self._config.llm.retry_backoff_seconds)
         max_wait = float(self._config.llm.retry_max_wait_seconds)
+        ceiling = int(self._config.llm.max_tokens_ceiling)
         last_error: Exception | None = None
+        truncated_retry_used = False
         for attempt in range(attempts):
             try:
                 self.calls += 1
@@ -101,6 +103,24 @@ class RetryingCaller:
             except BudgetExceeded:
                 # A spend cap is a deliberate stop, never something to retry.
                 raise
+            except TruncatedCompletion as exc:
+                # Not a parse failure: there is no text. Retry once with a larger budget,
+                # then give up clearly instead of feeding '' to a repair loop.
+                last_error = exc
+                if truncated_retry_used or exc.max_tokens >= ceiling:
+                    break
+                truncated_retry_used = True
+                raised = min(int(exc.max_tokens) * 2, ceiling)
+                LOGGER.warning(
+                    'truncated completion: retrying with max_tokens=%d (was %d) model=%s',
+                    raised,
+                    exc.max_tokens,
+                    model,
+                )
+                override = getattr(self._caller, 'with_max_tokens', None)
+                if override is not None:
+                    override(raised)
+                continue
             except Exception as exc:
                 last_error = exc
                 LOGGER.warning('call failed attempt=%d model=%s error=%s', attempt, model, exc)
@@ -115,6 +135,8 @@ class RetryingCaller:
             else:
                 LOGGER.info('reply not cacheable model=%s chars=%d', model, len(result.text))
             return result
+        if isinstance(last_error, TruncatedCompletion):
+            raise last_error
         requested = getattr(last_error, 'retry_after_seconds', None)
         if isinstance(requested, (int, float)) and not isinstance(requested, bool):
             raise RateLimited(

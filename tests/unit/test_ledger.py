@@ -32,8 +32,12 @@ def test_ledger_total_and_parquet(tmp_path: Path) -> None:
         'completion_tokens',
         'total_tokens',
         'cost_usd',
+        'max_tokens',
+        'cached',
     ]
     assert len(frame) == 2
+    # The budget each call ran under is recorded, so a truncated reply is visible.
+    assert frame['max_tokens'].tolist() == [0, 0]
     reloaded = BudgetLedger(tmp_path / 'ledger.parquet', max_usd=1.0)
     assert reloaded.total_usd == pytest.approx(0.05)
 

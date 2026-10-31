@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from nowcast.config import LLMConfig
-from nowcast.errors import ConfigError, RateLimited
+from nowcast.errors import ConfigError, RateLimited, TruncatedCompletion
 from nowcast.llm.ledger import BudgetLedger
 
 LOGGER = logging.getLogger(__name__)
@@ -97,6 +97,7 @@ class LLMCaller:
         if not api_key:
             raise ConfigError(f'environment variable {config.api_key_env!r} is not set')
         self._api_key = api_key
+        self._budget = int(config.max_tokens)
         self._client = httpx.Client(
             base_url=config.base_url,
             timeout=config.timeout_seconds,
@@ -129,13 +130,21 @@ class LLMCaller:
         if not model.endswith(FREE_SUFFIX):
             raise ConfigError(f'model {model!r} is not a free OpenRouter model (must end in :free)')
 
+    def with_max_tokens(self, max_tokens: int) -> None:
+        """Raise the completion budget for subsequent calls.
+
+        Called only after a truncated completion, so the retry gets room the first
+        attempt did not have. The configured value is never mutated.
+        """
+        self._budget = max(int(self._budget), int(max_tokens))
+
     def _payload(self, model: str, messages: list[dict[str, str]]) -> dict[str, Any]:
         """Build the request body for one completion."""
         payload: dict[str, Any] = {
             'model': model,
             'messages': messages,
             'temperature': self._config.temperature,
-            'max_tokens': self._config.max_tokens,
+            'max_tokens': self._budget,
         }
         if self._config.reasoning_effort:
             payload['reasoning'] = {'effort': self._config.reasoning_effort}
@@ -186,9 +195,21 @@ class LLMCaller:
         usage: dict[str, Any] = body.get('usage') or {}
         cost = self._cost_from_headers(response, usage)
         finish = str(choices[0].get('finish_reason') or '') if choices else ''
-        if not text and finish == 'length':
+        completion_tokens = int(usage.get('completion_tokens') or 0)
+        if not text.strip() and finish == 'length':
+            # Nothing came back because the budget ran out. Raising here keeps the empty
+            # text out of the repair loop, which would spend 1 + max_repairs calls on it.
             LOGGER.warning(
-                'empty completion: reasoning used the whole token budget model=%s', model
+                'empty completion: reasoning used the whole token budget model=%s '
+                'completion_tokens=%d max_tokens=%d',
+                model,
+                completion_tokens,
+                self._budget,
+            )
+            raise TruncatedCompletion(
+                f'empty completion from {model}: finish_reason=length',
+                max_tokens=int(self._budget),
+                completion_tokens=completion_tokens,
             )
         result = LLMResult(
             text=text,
@@ -199,7 +220,7 @@ class LLMCaller:
             cost_usd=cost,
         )
         if self._ledger is not None:
-            self._ledger.record(model=result.model, usage=result)
+            self._ledger.record(model=result.model, usage=result, max_tokens=int(self._budget))
             self._ledger.check_budget()
         LOGGER.info(
             'completion model=%s tokens=%s cost_usd=%s',

@@ -26,3 +26,18 @@ class RateLimited(NowcastError):
 
 class BudgetExceeded(NowcastError):
     """Raised when the spend ledger reaches the configured budget cap."""
+
+
+class TruncatedCompletion(NowcastError):
+    """The model returned no content because its token budget ran out.
+
+    A reasoning model that spends the whole budget thinking returns `content: ''` with
+    `finish_reason: 'length'`. That is not a parse failure — there is nothing to parse —
+    so it must be retried with a larger budget rather than fed to a repair loop.
+    """
+
+    def __init__(self, message: str, max_tokens: int, completion_tokens: int = 0) -> None:
+        """Store the message and the budget that was exhausted."""
+        super().__init__(message)
+        self.max_tokens = max_tokens
+        self.completion_tokens = completion_tokens
