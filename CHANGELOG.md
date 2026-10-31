@@ -33,3 +33,27 @@ pre-1.0 and follow the phase gates in `tasks.md`.
   as a parse failure.
 - Retries honour a provider's `Retry-After` / `retry_after_ms`, capped by
   `llm.retry_max_wait_seconds`.
+
+### Changed
+- **2026-10-31 — amendments recorded.** The *R-amendment* (course correction +
+  optimization: SQLite as system of record, lossless document→company→sector→index
+  hierarchy, context packer, structure-first extraction, measured benchmarks) and
+  *Amendment Q* (no number silently missing, excluded or non-comparable; versioned
+  taxonomy) are captured in `tasks.md` PART 1 and PART 1B, with decisions D1–D12 in
+  `DECISIONS.md` and the standing rules added to `claude.md`. No code changed for this
+  entry.
+- `data.edgar_index_headers_url_template` now includes the accession directory. See the
+  fix below.
+
+### Fixed
+- **EDGAR discovery returned zero disclosures for every CIK.** The index-headers URL
+  omitted the accession directory; EDGAR's CDN answers **403** (not 404) in that case, so
+  the failure looked like a permissions problem. Verified live: broken URL → 403, correct
+  URL → 200; afterwards Caterpillar yields 16 earnings disclosures and Coca-Cola 8, and a
+  non-earnings 5.02 filing no longer qualifies. `validate_config` rejects a template
+  without `{accession_nodash}`; `test_headers_url_carries_the_accession_directory` covers
+  it.
+- **A surprise exactly at `extraction.eps_tolerance_abs` was graded a beat.** In binary
+  floating point `1.0 + 0.05 - 1.0` is `0.050000000000000044`, clearing a strict `>`
+  comparison. Beat grading now rounds the surprise to `SURPRISE_DECIMALS = 10` before
+  comparing; `test_beat_tolerance_boundaries` pins both edges.

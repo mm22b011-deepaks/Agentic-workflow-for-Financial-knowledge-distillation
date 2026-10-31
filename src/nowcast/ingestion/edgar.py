@@ -100,7 +100,9 @@ FILENAME_RE = re.compile(r'<FILENAME>([^\n<]+)')
 def _headers_url(config: Config, cik: str, accession: str) -> str:
     """Return the filing index-headers URL for one accession."""
     return config.data.edgar_index_headers_url_template.format(
-        cik=str(int(cik)), accession=accession
+        cik=str(int(cik)),
+        accession=accession,
+        accession_nodash=accession.replace('-', ''),
     )
 
 
