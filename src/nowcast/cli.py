@@ -138,7 +138,6 @@ def _cmd_estimate_scope(args: argparse.Namespace) -> int:
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
     """Download earnings documents for the constituents CIKs and index them."""
-    from nowcast.ingestion.constituents import cik_list
     from nowcast.ingestion.doc_index import load_index, upsert_rows, write_index
     from nowcast.ingestion.edgar import IngestReport, ingest_edgar
     from nowcast.ingestion.rebuild import index_path
@@ -154,11 +153,23 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
             'run build-constituents first, or pass --set data.constituents_csv=...'
         )
     from nowcast.ingestion.constituents import load_constituents
+    from nowcast.ingestion.sampling import season_sample
 
     frame = load_constituents(constituents)
-    ciks = cik_list(frame)
     limit = int(config.data.edgar_max_documents)
-    LOGGER.info('ingesting for %d companies, cap %d documents', len(ciks), limit)
+    per_cik = int(config.data.edgar_docs_per_cik)
+    # Seeded per-season walk order, not the sorted head of the CIK list: the ingest stops
+    # at the document cap, so CIK order would fill it with the alphabetically first
+    # companies — a sample of the alphabet, not of the index.
+    sample = season_sample(config, frame)
+    ciks = list(sample.ciks)
+    LOGGER.info(
+        'ingesting for %d companies sampled across %s (cap %d documents, %d per company)',
+        len(ciks),
+        f'{config.data.start_date}..{config.data.end_date}',
+        limit,
+        per_cik,
+    )
     report = IngestReport()
     report_path = manifests_dir(config) / 'ingest_report.json'
     try:
@@ -185,6 +196,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         'cap': limit,
         'start_date': config.data.start_date,
         'end_date': config.data.end_date,
+        'sample': sample.as_dict(),
         'status_counts': report.status_counts,
         'skip_reasons': report.skip_reasons,
         'zero_disclosure_companies': len(report.zero_disclosure_ciks),
@@ -192,6 +204,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     target = manifests_dir(config) / 'ingest_summary.json'
     target.write_text(json.dumps(summary, indent=2), encoding='utf-8')
     manifest.notes = f'indexed {len(rows)} new rows, {len(merged)} total'
+    manifest.sample = sample.as_dict()
     _record_run(config, 'ingest', [str(constituents)], manifest)
     LOGGER.info('indexed %d new documents (%d total) -> %s', len(rows), len(merged), target_index)
     return 0

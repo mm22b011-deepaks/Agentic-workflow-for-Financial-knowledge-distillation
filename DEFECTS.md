@@ -53,17 +53,30 @@ empty text entered the repair loop, spending `1 + max_repairs` calls on nothing.
 - Tests: `test_all_null_earnings_record_flagged_empty_extraction`,
   `test_non_earnings_document_not_extracted`
 
-### N4 — Ingest sampling biased; S&P universe not wired in `[CONFIRMED]`
-- [ ] Seeded sample of point-in-time members per target season (`universe.subset_n`,
+### N4 — Ingest sampling biased; S&P universe not wired in `[CONFIRMED]` → `[FIXED 2026-10-31]`
+- [x] Seeded sample of point-in-time members per target season (`universe.subset_n`,
       `subset_seed`)
-- [ ] One earnings release per (company, filing) by exhibit priority from config
-- [ ] K seasons per company across the window, not the latest N documents
-- [ ] `data.constituents_csv` points at the built universe
-- [ ] Restrict CIKs with `active_on`; record skipped exhibits with a reason
-- [ ] Log the sample (companies, seasons) in the manifest
+- [x] One earnings release per (company, filing) by exhibit priority
+- [x] K seasons per company across the window, not the latest N documents
+- [x] `data.constituents_csv` points at the built universe
+- [x] Restrict CIKs with `active_on`; record skipped exhibits with a reason
+- [x] Log the sample (companies, seed, seasons, skips) in the manifest
 - Tests: `test_sample_spreads_across_ciks_not_lowest_first`,
   `test_sample_deterministic_for_seed`, `test_one_release_per_filing_by_priority`,
   `test_only_members_active_in_window`, `test_seasons_covered_per_company`
+
+Measured: the CLI walk on the built universe logs
+`ingesting for 519 companies sampled across 2025-01-01..2026-10-31 (cap 100 documents,
+3 per company)` and `ingest_summary.json` records
+`{"companies": 519, "seed": 42, "seasons": ["2025Q1", ..., "2026Q4"], "skipped": {}}`.
+The walk order is a seeded permutation drawn per season, so a capped run is a spread
+sample rather than the alphabetically first filers; each filing contributes exactly one
+document (its highest-priority exhibit), and each company at most one document per
+calendar quarter. `select_filings` records `duplicate_exhibit` and `duplicate_season`
+as skips, so the report says what was set aside and why.
+Deviations: `EXHIBIT_PRIORITY` is a code constant rather than a config key (the register
+said "from config"); a config key would add a knob no other code reads and the list is a
+property of EDGAR's filing convention, not of a deployment. Noted for the human.
 
 ### N5 — Aggregation can double-count and mislabel `[CONFIRMED]`
 - [ ] Collapse to one record per (cik, season) by a configurable rule

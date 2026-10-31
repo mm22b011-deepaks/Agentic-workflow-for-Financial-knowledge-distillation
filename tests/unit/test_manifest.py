@@ -32,6 +32,7 @@ REQUIRED_KEYS = {
     'input_fingerprints',
     'stage',
     'notes',
+    'sample',
 }
 
 

@@ -16,6 +16,7 @@ import httpx
 from nowcast.config import Config, data_root, raw_dir
 from nowcast.errors import ConfigError, DataError
 from nowcast.ingestion.doc_index import file_sha256
+from nowcast.ingestion.sampling import select_filings
 from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
 
 LOGGER = logging.getLogger(__name__)
@@ -379,7 +380,13 @@ def ingest_edgar(
                     window_end,
                     active_report,
                 )
-                disclosures.sort(key=lambda item: item.filing_date, reverse=True)
+                # One exhibit per filing and one filing per season, newest season first:
+                # sorting newest-first alone spends the per-company cap on the same
+                # quarter's release and supplement, leaving the other seasons unseen.
+                disclosures, filing_skips = select_filings(disclosures)
+                for reason, count in filing_skips.items():
+                    for _ in range(count):
+                        active_report.record_skip(reason)
                 if not disclosures:
                     active_report.zero_disclosure_ciks.append(cik.zfill(10))
                 for disclosure in disclosures:
