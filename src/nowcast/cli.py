@@ -143,7 +143,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     """Download earnings documents for the constituents CIKs and index them."""
     from nowcast.ingestion.constituents import cik_list
     from nowcast.ingestion.doc_index import load_index, upsert_rows, write_index
-    from nowcast.ingestion.edgar import ingest_edgar
+    from nowcast.ingestion.edgar import IngestReport, ingest_edgar
     from nowcast.ingestion.universe.builder import _resolve_input
 
     config = _load(args)
@@ -161,12 +161,21 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     ciks = cik_list(frame)
     limit = int(config.data.edgar_max_documents)
     LOGGER.info('ingesting for %d companies, cap %d documents', len(ciks), limit)
-    rows = ingest_edgar(
-        config,
-        ciks,
-        max_documents=limit,
-        per_cik_limit=int(config.data.edgar_docs_per_cik),
-    )
+    report = IngestReport()
+    report_path = manifests_dir(config) / 'ingest_report.json'
+    try:
+        rows = ingest_edgar(
+            config,
+            ciks,
+            max_documents=limit,
+            per_cik_limit=int(config.data.edgar_docs_per_cik),
+            report=report,
+        )
+    finally:
+        # Written even on the abort path: the reason the run stopped is the most useful
+        # thing the file can say, and losing it to an exception would be absurd.
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report.as_dict(), indent=2), encoding='utf-8')
     index_path = data_root(config) / 'document_index.parquet'
     existing = load_index(index_path)
     merged = upsert_rows(existing, rows)
@@ -178,6 +187,9 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         'cap': limit,
         'start_date': config.data.start_date,
         'end_date': config.data.end_date,
+        'status_counts': report.status_counts,
+        'skip_reasons': report.skip_reasons,
+        'zero_disclosure_companies': len(report.zero_disclosure_ciks),
     }
     target = manifests_dir(config) / 'ingest_summary.json'
     target.write_text(json.dumps(summary, indent=2), encoding='utf-8')

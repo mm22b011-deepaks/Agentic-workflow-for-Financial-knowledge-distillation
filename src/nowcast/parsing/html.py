@@ -6,6 +6,13 @@ import re
 
 from bs4 import BeautifulSoup, Comment
 
+# EDGAR delivers a filing document as an SGML envelope:
+#   <DOCUMENT><TYPE>EX-99.1<SEQUENCE>3<FILENAME>d123dex991.htm<DESCRIPTION>...
+#   <TEXT> ...the document... </TEXT></DOCUMENT>
+# Everything before <TEXT> is metadata that would otherwise be read as body text.
+SGML_TEXT_RE = re.compile(r'<TEXT>(.*?)(?:</TEXT>|</DOCUMENT>|$)', re.S | re.I)
+SGML_ENVELOPE_RE = re.compile(r'</?DOCUMENT>', re.I)
+
 BLOCK_TAGS = (
     'p',
     'div',
@@ -32,8 +39,23 @@ def _insert_breaks(node: object) -> None:
             tag.insert_after('\n')
 
 
+def strip_sgml_wrapper(raw: str) -> str:
+    """Return the payload of an SGML filing envelope, or the text unchanged.
+
+    A document served from the EDGAR archive can carry the wrapper even when its
+    name ends in `.htm`. Fed to the HTML parser, the `<TYPE>`/`<FILENAME>` header lines
+    become the first lines of the "document text" the model sees.
+    """
+    match = SGML_TEXT_RE.search(raw)
+    payload = match.group(1) if match else raw
+    if match is not None:
+        payload = SGML_ENVELOPE_RE.sub('', payload)
+    return payload
+
+
 def html_to_text(html: str) -> str:
     """Convert an HTML document to plain text with one line per block and table row."""
+    html = strip_sgml_wrapper(html)
     soup = BeautifulSoup(html, 'lxml')
     for tag_name in DROP_TAGS:
         for tag in soup.find_all(tag_name):

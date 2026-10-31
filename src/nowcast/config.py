@@ -84,6 +84,7 @@ class DataConfig:
     weights_csv: str = 'inputs/weights.csv'
     sec_user_agent_env: str = 'SEC_USER_AGENT'
     sec_max_requests_per_sec: float = 8.0
+    sec_abort_after_blocked: int = 5
     edgar_submissions_url_template: str = ''
     edgar_archive_url_template: str = ''
     edgar_index_url_template: str = ''
@@ -378,6 +379,8 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('runtime.max_concurrency must be >= 1')
     if config.data.sec_max_requests_per_sec <= 0:
         problems.append('data.sec_max_requests_per_sec must be > 0')
+    if config.data.sec_abort_after_blocked < 1:
+        problems.append('data.sec_abort_after_blocked must be >= 1')
     for key in (
         'edgar_submissions_url_template',
         'edgar_archive_url_template',

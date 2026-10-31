@@ -25,6 +25,9 @@ data:
   weights_csv: inputs/weights.csv
   sec_user_agent_env: SEC_USER_AGENT
   sec_max_requests_per_sec: 8.0
+  # Consecutive 403/429 answers after which a run stops instead of asking the rest of
+  # the universe for the same refusal.
+  sec_abort_after_blocked: 5
   edgar_submissions_url_template: 'https://data.sec.gov/submissions/CIK{cik_padded}.json'
   edgar_archive_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{filename}'
   edgar_index_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/index.json'

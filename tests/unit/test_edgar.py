@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import json
 from pathlib import Path
@@ -10,9 +11,10 @@ import httpx
 import pytest
 
 from nowcast.config import Config, data_root, load_config, raw_dir
-from nowcast.errors import ConfigError
+from nowcast.errors import ConfigError, DataError
 from nowcast.ingestion.edgar import (
     Disclosure,
+    IngestReport,
     RateLimiter,
     build_client,
     download_document,
@@ -354,3 +356,127 @@ def test_headers_url_carries_the_accession_directory(config: Config) -> None:
     for path in headers_paths:
         # /Archives/edgar/data/<cik>/<accession-nodash>/<accession>-index-headers.html
         assert path.split('/')[-2] == '000000000126000001', path
+
+
+def test_ingest_report_counts_by_status(config: Config) -> None:
+    """Every request's status and every skip lands in the report, not only in a log line."""
+    report = IngestReport()
+    rows = ingest_edgar(
+        config,
+        ['1'],
+        client=_client(),
+        limiter=RateLimiter(1000.0),
+        max_documents=5,
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+        report=report,
+    )
+    assert len(rows) == 1
+    assert report.companies == 1
+    assert report.documents == 1
+    # submissions + index-headers + the exhibit itself
+    assert report.attempts == 3
+    assert report.status_counts == {'200': 3}
+    assert report.as_dict()['documents'] == 1
+    assert 'aborted' not in report.as_dict() or report.aborted is None
+
+
+def test_report_records_zero_disclosure_company(config: Config) -> None:
+    """A company whose 8-Ks are all non-earnings is named, not silently absent."""
+    payload = {
+        'filings': {
+            'recent': {
+                'accessionNumber': ['0000000001-26-000002'],
+                'form': ['8-K'],
+                'filingDate': ['2030-03-04'],
+                'items': ['5.02'],
+            }
+        }
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    report = IngestReport()
+    rows = ingest_edgar(
+        config,
+        ['1'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+        report=report,
+    )
+    assert rows == []
+    assert report.zero_disclosure_ciks == ['0000000001']
+    assert report.status_counts == {'200': 1}
+
+
+def test_consecutive_403_aborts(config: Config, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run of blocked answers stops the ingest instead of asking every company."""
+    # Config sections are frozen dataclasses, so the limit is rebuilt rather than set.
+    config = dataclasses.replace(
+        config,
+        data=dataclasses.replace(config.data, sec_abort_after_blocked=3),
+    )
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url.path)
+        return httpx.Response(403, text='forbidden')
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    report = IngestReport()
+    with pytest.raises(DataError, match='consecutive blocked'):
+        ingest_edgar(
+            config,
+            [str(index) for index in range(1, 8)],
+            client=client,
+            limiter=RateLimiter(1000.0),
+            start_date=datetime.date(2029, 1, 1),
+            end_date=datetime.date(2031, 1, 1),
+            report=report,
+        )
+    assert len(requested) == 3, requested
+    assert report.aborted is not None
+    assert report.status_counts == {'403': 3}
+
+
+def test_partial_download_not_treated_as_complete(config: Config) -> None:
+    """A body shorter than its Content-Length never becomes the stored document."""
+    from nowcast.ingestion.edgar import download_document
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b'short', headers={'content-length': '9999'})
+
+    disclosure = Disclosure(
+        cik='1',
+        accession='0000000001-26-000001',
+        filing_date=datetime.date(2026, 1, 2),
+        form='8-K',
+        exhibit_type='EX-99',
+        document='dex991.htm',
+    )
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(httpx.HTTPError, match='truncated download'):
+        download_document(config, disclosure, client, RateLimiter(1000.0))
+    target = raw_dir(config) / '0000000001' / disclosure.accession / 'dex991.htm'
+    assert not target.exists()
+    assert not target.with_name('dex991.htm.part').exists()
+
+
+def test_sgml_wrapper_stripped() -> None:
+    """The EDGAR SGML envelope never reaches the document text."""
+    from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
+
+    raw = (
+        '<DOCUMENT>\n<TYPE>EX-99.1\n<SEQUENCE>3\n<FILENAME>d123dex991.htm\n'
+        '<DESCRIPTION>EX-99.1\n<TEXT>\n<HTML><BODY><P>Revenue was $5 million.</P>'
+        '</BODY></HTML>\n</TEXT>\n</DOCUMENT>'
+    )
+    text = html_to_text(raw)
+    assert 'Revenue was $5 million.' in text
+    for metadata in ('EX-99.1', 'd123dex991.htm', 'SEQUENCE', 'DESCRIPTION'):
+        assert metadata not in text, metadata
+    assert strip_sgml_wrapper('plain text') == 'plain text'
