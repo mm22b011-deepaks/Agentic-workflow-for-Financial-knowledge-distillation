@@ -23,6 +23,8 @@ LEDGER_COLUMNS = [
     'completion_tokens',
     'total_tokens',
     'cost_usd',
+    'max_tokens',
+    'cached',
 ]
 
 
@@ -65,8 +67,13 @@ class BudgetLedger:
         if total >= self._max_usd:
             raise BudgetExceeded(f'budget exhausted: {total:.6f} >= {self._max_usd:.6f} USD')
 
-    def record(self, model: str, usage: LLMResult) -> None:
-        """Append one call to the in-memory ledger."""
+    def record(self, model: str, usage: LLMResult, max_tokens: int = 0) -> None:
+        """Append one call to the in-memory ledger.
+
+        `max_tokens` is recorded next to the completion size so a budget-exhausted reply
+        (completion_tokens == max_tokens, empty content) is visible in the data rather
+        than only in a log line.
+        """
         row = {
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'model': model,
@@ -74,6 +81,8 @@ class BudgetLedger:
             'completion_tokens': usage.completion_tokens,
             'total_tokens': usage.total_tokens,
             'cost_usd': float(usage.cost_usd),
+            'max_tokens': int(max_tokens),
+            'cached': bool(getattr(usage, 'cached', False)),
         }
         with self._lock:
             self._rows.append(row)

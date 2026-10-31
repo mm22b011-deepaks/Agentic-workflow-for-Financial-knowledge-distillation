@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 
 from nowcast.config import Config, cache_dir, extractions_dir, prompts_dir, resolve_data_path
-from nowcast.errors import BudgetExceeded
+from nowcast.errors import BudgetExceeded, TruncatedCompletion
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.validators import needs_review, validate_record
@@ -143,6 +143,34 @@ def _write_result(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _record_failure(
+    queue_target: Path,
+    document: Document,
+    model: str,
+    reason: str,
+    detail: str | None,
+) -> ExtractionOutcome:
+    """Queue one failed document with its reason and return the outcome."""
+    review_queue.append_rows(
+        queue_target,
+        [
+            {
+                'document_id': document.document_id,
+                'field': 'record',
+                'reason': reason,
+                'model': model,
+            }
+        ],
+    )
+    return ExtractionOutcome(
+        document.document_id,
+        model,
+        'failed',
+        review_reasons=(reason,),
+        error=detail,
+    )
+
+
 def compose_caller(config: Config, inner: Any, cache: ResponseCache | None = None) -> Any:
     """Wrap a raw caller in the shared retry-plus-cache composition.
 
@@ -224,23 +252,12 @@ async def run_extraction(
             except BudgetExceeded:
                 stop['budget'] = True
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')
+            except TruncatedCompletion as exc:
+                # The model returned nothing within its budget. Distinct from llm_failed
+                # so the queue says what actually happened and the run summary can count it.
+                return _record_failure(queue_target, document, model, 'truncated', str(exc))
             if record is None:
-                rows = [
-                    {
-                        'document_id': document.document_id,
-                        'field': 'record',
-                        'reason': 'llm_failed',
-                        'model': model,
-                    }
-                ]
-                review_queue.append_rows(queue_target, rows)
-                return ExtractionOutcome(
-                    document.document_id,
-                    model,
-                    'failed',
-                    review_reasons=('llm_failed',),
-                    error=error,
-                )
+                return _record_failure(queue_target, document, model, 'llm_failed', error)
             record = record.model_copy(
                 update={
                     'document_id': document.document_id,

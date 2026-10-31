@@ -114,6 +114,9 @@ class LLMConfig:
     timeout_seconds: float = 120.0
     temperature: float = 0.0
     max_tokens: int = 8192
+    # The ceiling a truncated completion may be retried up to. Kept in config because
+    # the usable value is a property of the provider tier, not of this code.
+    max_tokens_ceiling: int = 32768
     reasoning_effort: str = 'low'
     max_reasoning_tokens: int = 3000
     retry_attempts: int = 3
@@ -417,6 +420,8 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('aggregation.winsorize_pct must be in [0, 0.5)')
     if config.aggregation.min_constituents < 1:
         problems.append('aggregation.min_constituents must be >= 1')
+    if config.llm.max_tokens_ceiling < config.llm.max_tokens:
+        problems.append('llm.max_tokens_ceiling must be >= llm.max_tokens')
     if config.extraction.max_doc_chars <= 0:
         problems.append('extraction.max_doc_chars must be > 0')
     if problems and strict:
