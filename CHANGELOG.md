@@ -57,3 +57,62 @@ pre-1.0 and follow the phase gates in `tasks.md`.
   floating point `1.0 + 0.05 - 1.0` is `0.050000000000000044`, clearing a strict `>`
   comparison. Beat grading now rounds the surprise to `SURPRISE_DECIMALS = 10` before
   comparing; `test_beat_tolerance_boundaries` pins both edges.
+
+### Added
+- **2026-10-31 — H5: units normalisation and truncation diagnostics.**
+  `extraction/units.py` canonicalises the free-text `units` label to `<CCY> [scale]`
+  (`dollars` → `USD`, `USD billions` → `USD billion`, scale-only labels take the record's
+  currency, unrecognised labels are preserved) and corrects a fractional
+  `revenue_yoy_growth` to the printed percentage when the evidence quote shows one.
+  `runner.prepare_text` reports `chars_total` / `chars_sent` / `truncated`; the result
+  payload, the per-document outcome and the consolidated frame all carry them. A
+  truncated document logs a warning with the cut percentage.
+- **Prompt hardening for weak free models.** The v1 system prompt is now a field-level
+  data-entry contract: every field defined, allowed vocabularies for `eps_basis`,
+  `guidance_direction` and `tone`, GAAP preferred when both EPS bases are printed,
+  segment revenue excluded from `revenue`, growth as printed percent, canonical `units`,
+  per-field null policy, evidence quote must contain digits and unit, no arithmetic,
+  bare-JSON output, and document-is-data. The user message restates all sixteen keys
+  before the document. Three synthetic few-shot examples now cover GAAP+growth,
+  revenue-only with missing EPS and explicitly unavailable guidance, and adjusted EPS
+  with a "flat" quarter left null rather than inferred as 0.0.
+- `tests/unit/test_units.py`: parametrised unit/growth cases, the text-cut measurement,
+  and a runner-to-parquet end-to-end case for the corrected values and diagnostics.
+- `scripts/measure_truncation.py`: reproduces the H5 cut measurement (documents over the
+  cut, characters dropped, key-term positions) using the runner's own conversion and
+  `max_doc_chars`, with the search terms printed in the report.
+
+### Fixed
+- **Few-shot examples were not part of the prompt hash.** They are sent to the model as
+  messages, so editing one changed the prompt while a stored result still resumed as
+  current. `prompt_hash` now hashes them too; `test_prompt_hash_changes_with_few_shots`
+  pins it.
+- **`revenue_yoy_growth` had two conventions.** The few-shot used `4.0` for "up 4%" and
+  the fixture used `0.08` for "up 8%". The convention is now percent as printed
+  everywhere; normalisation corrects a fraction before validation, and the consolidated
+  column is named `revenue_yoy_growth_pct`.
+- **Document truncation was invisible.** The cut is now measured and recorded rather
+  than silently applied; on the real 61-document text corpus 14 documents (23.0%) are
+  cut and 41.8% of characters never reach the prompt (DEFECTS.md H5).
+- **Dead `sections` dict removed** from the runner's text path (M1 item).
+
+### Changed
+- Consolidated extraction columns gain `chars_total`, `chars_sent`, `truncated`;
+  `revenue_yoy_growth` is renamed `revenue_yoy_growth_pct`. Pre-H5 results read `None`
+  for the diagnostics columns ("not measured"), never `False`.
+- **Every extraction fingerprint changes** because the prompt text and few-shot examples
+  changed. Existing stored results are therefore stale and will be re-extracted on the
+  next live run; this is intended, not a resume bug.
+
+### Fixed
+- **R0 defect-remediation pass (2026-10-31).** Retry and cache composed on the live call
+  path (N1); empty length completions classified as truncation with one doubled-budget
+  retry (N2); all-null earnings records flagged `empty_extraction` and non-2.02 filings
+  refused (N3); seeded point-in-time sampling with one release per filing and per
+  company-season (N4); distinct-company aggregation with a `share_reported <= 1` guard
+  (N5); ingest status/skip report, consecutive-block abort and atomic downloads (N6);
+  a rebuild command that writes the new `items`-bearing index to `data.document_index`
+  without touching the old files (N7, execution blocked on the live 401); per-document
+  crash guard and settings-complete fingerprint (H1, H4); 24-mutant check green (H2);
+  one dotenv path and portable scripts (H3); unknown top-level config sections rejected
+  (M2). Status and measurements per item are in `DEFECTS.md`.

@@ -17,6 +17,7 @@ from nowcast.config import Config, cache_dir, extractions_dir, prompts_dir, reso
 from nowcast.errors import BudgetExceeded, TruncatedCompletion
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
+from nowcast.extraction.units import normalise_record
 from nowcast.extraction.validators import needs_review, validate_record
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
@@ -51,6 +52,21 @@ class ExtractionOutcome:
     skipped: bool = False
     review_reasons: tuple[str, ...] = ()
     error: str | None = None
+    truncated: bool = False
+
+
+@dataclass(frozen=True)
+class DocumentText:
+    """One document's prompt text and how much of the source survived the cut."""
+
+    text: str
+    chars_total: int
+    chars_sent: int
+
+    @property
+    def truncated(self) -> bool:
+        """Return True when text was dropped before the prompt."""
+        return self.chars_sent < self.chars_total
 
 
 def model_slug(model: str) -> str:
@@ -112,22 +128,31 @@ def load_documents(
     return documents
 
 
-def document_text(config: Config, document: Document) -> str:
-    """Read, convert and truncate a document's text for prompting."""
+def prepare_text(config: Config, document: Document) -> DocumentText:
+    """Read, convert and cut a document's text, reporting what the cut dropped.
+
+    `chars_total` is the length after conversion and section selection, i.e. the text
+    the prompt would carry if nothing were cut; `chars_sent` is what it did carry.
+    The gap is the only honest measure of how much of a long release the model never
+    saw, and on the real corpus it is not small: see DEFECTS.md H5.
+    """
     raw = document.raw_path.read_text(encoding='utf-8', errors='replace')
     if document.raw_path.suffix.lower() in {'.htm', '.html'}:
         text = html_to_text(raw)
     else:
         # A `.txt` exhibit from EDGAR still carries the <DOCUMENT><TYPE>..<TEXT> wrapper.
         text = strip_sgml_wrapper(raw)
-    sections: dict[str, str] = {}
     if config.parsing.section_patterns:
         text = pick_sections(
             text, dict(config.parsing.section_patterns), list(config.parsing.section_patterns)
         )
-        sections = dict(config.parsing.section_patterns)
-    del sections
-    return text[: int(config.extraction.max_doc_chars)]
+    sent = text[: int(config.extraction.max_doc_chars)]
+    return DocumentText(text=sent, chars_total=len(text), chars_sent=len(sent))
+
+
+def document_text(config: Config, document: Document) -> str:
+    """Read, convert and truncate a document's text for prompting."""
+    return prepare_text(config, document).text
 
 
 def validation_settings(config: Config) -> dict[str, object]:
@@ -320,12 +345,23 @@ async def run_extraction(
             # Every model call goes through the one composition point, so retry,
             # Retry-After and the cache apply on the live path, not only in tests.
             caller = compose_caller(config, caller_factory(model))
+            prepared = prepare_text(config, document)
             variables = {
                 'document_id': document.document_id,
-                'document_text': document_text(config, document),
+                'document_text': prepared.text,
                 'max_evidence_words': config.extraction.max_evidence_words,
                 'themes': ', '.join(config.extraction.themes),
             }
+            if prepared.truncated:
+                # A cut document is not a clean success even when the record is: the
+                # model answered about the part it was shown, not about the release.
+                LOGGER.warning(
+                    'document truncated document=%s sent=%d of %d chars (%.0f%%)',
+                    document.document_id,
+                    prepared.chars_sent,
+                    prepared.chars_total,
+                    100.0 * prepared.chars_sent / max(prepared.chars_total, 1),
+                )
             try:
                 parsed, raw_text, error = await asyncio.to_thread(
                     extract_structured,
@@ -355,9 +391,19 @@ async def run_extraction(
                     'schema_version': config.extraction.schema_version,
                 }
             )
+            # Normalise before validating: the model copies numbers as printed, so a
+            # fraction returned for "up 4%" is corrected to 4.0 first and then checked
+            # against the quote. Validating first would penalise a value the code can
+            # simply read correctly.
+            record = normalise_record(record)
             source = str(variables['document_text'])
             issues, record = validate_record(record, source, config)
             reasons = needs_review(record, issues, config)
+            diagnostics = {
+                'chars_total': prepared.chars_total,
+                'chars_sent': prepared.chars_sent,
+                'truncated': prepared.truncated,
+            }
             if reasons:
                 rows = review_queue.rows_for_record(
                     document.document_id,
@@ -377,10 +423,15 @@ async def run_extraction(
                     'document_type': document.document_type,
                     'raw_text': raw_text,
                     'record': record.model_dump(mode='json'),
+                    'diagnostics': diagnostics,
                 },
             )
             return ExtractionOutcome(
-                document.document_id, model, 'ok', review_reasons=tuple(reasons)
+                document.document_id,
+                model,
+                'ok',
+                review_reasons=tuple(reasons),
+                truncated=prepared.truncated,
             )
 
     tasks = [_process(model, document) for model in active_models for document in documents]
@@ -466,18 +517,21 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
                 'fingerprint': payload['fingerprint'],
             }
             record = payload['record']
+            # Results written before H5 carry no diagnostics; recording them as None
+            # is honest ("not measured"), while False would claim the text was whole.
+            diagnostics = payload.get('diagnostics') or {}
+            row['chars_total'] = diagnostics.get('chars_total')
+            row['chars_sent'] = diagnostics.get('chars_sent')
+            row['truncated'] = diagnostics.get('truncated')
             row['fiscal_year'] = record.get('fiscal_year')
             row['fiscal_quarter'] = record.get('fiscal_quarter')
             row['currency'] = record.get('currency')
             row['units'] = record.get('units')
-            for name in (
-                'reported_eps',
-                'prior_year_eps',
-                'consensus_eps',
-                'revenue',
-                'revenue_yoy_growth',
-            ):
+            for name in ('reported_eps', 'prior_year_eps', 'consensus_eps', 'revenue'):
                 row[name] = (record.get(name) or {}).get('value')
+            # Percent as printed (H5): 4.0 means 4%, so the column carries the unit in
+            # its name instead of leaving every reader to assume one.
+            row['revenue_yoy_growth_pct'] = (record.get('revenue_yoy_growth') or {}).get('value')
             for name in ('eps_basis', 'guidance_direction', 'guidance_metric', 'tone'):
                 row[name] = (record.get(name) or {}).get('value')
             for theme, mention in (record.get('theme_mentions') or {}).items():

@@ -14,14 +14,14 @@
       "fiscal_year": 2026,
       "fiscal_quarter": 3,
       "currency": "USD",
-      "units": "USD",
+      "units": "USD billion",
       "reported_eps": {"value": 0.55, "null_reason": null, "evidence_quote": "GAAP diluted earnings per share were $0.55", "confidence": 0.9},
       "prior_year_eps": {"value": 0.51, "null_reason": null, "evidence_quote": "compared with $0.51 in the prior-year quarter", "confidence": 0.88},
       "consensus_eps": {"value": 0.53, "null_reason": null, "evidence_quote": "expected GAAP earnings per share of $0.53", "confidence": 0.85},
       "eps_basis": {"value": "gaap", "null_reason": null, "evidence_quote": "GAAP diluted earnings per share", "confidence": 0.9},
       "revenue": {"value": 1.2, "null_reason": null, "evidence_quote": "Third quarter revenue was $1.20 billion", "confidence": 0.9},
       "revenue_yoy_growth": {"value": 4.0, "null_reason": null, "evidence_quote": "up 4% year over year", "confidence": 0.9},
-      "guidance_direction": {"value": "raised", "null_reason": null, "evidence_quote": "We expect fourth quarter revenue to grow at a similar pace to the third quarter", "confidence": 0.6},
+      "guidance_direction": {"value": "maintained", "null_reason": null, "evidence_quote": "We expect fourth quarter revenue to grow at a similar pace to the third quarter", "confidence": 0.6},
       "guidance_metric": {"value": "revenue", "null_reason": null, "evidence_quote": "fourth quarter revenue", "confidence": 0.85},
       "tone": {"value": "cautious", "null_reason": null, "evidence_quote": "Demand in our industrial segment remained soft", "confidence": 0.6},
       "theme_mentions": {
@@ -39,7 +39,7 @@
       "fiscal_year": 2026,
       "fiscal_quarter": null,
       "currency": "GBP",
-      "units": "GBP millions",
+      "units": "GBP million",
       "reported_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
       "prior_year_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
       "consensus_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
@@ -50,6 +50,30 @@
       "guidance_metric": {"value": null, "null_reason": "ambiguous", "evidence_quote": null, "confidence": 0.0},
       "tone": {"value": "cautious", "null_reason": null, "evidence_quote": "cost pressures remain elevated", "confidence": 0.6},
       "theme_mentions": {
-        "costs": {"mentioned": true, "direction": "up", "evidence_quote": "cost pressures remain elevated", "confidence": 0.7}
+        "margins": {"mentioned": true, "direction": "down", "evidence_quote": "cost pressures remain elevated", "confidence": 0.7}
       }
+    }
+- input: |
+    SAMPLE INDUSTRIES INC ANNOUNCES FIRST QUARTER RESULTS
+    Adjusted diluted earnings per share were $0.31, compared with $0.29 in the prior-year
+    quarter. Revenue was $2.50 billion, flat compared with the prior-year quarter. The
+    company reaffirmed its full-year guidance.
+  output: |
+    {
+      "schema_version": "v1",
+      "document_id": "synthetic-003",
+      "fiscal_year": 2026,
+      "fiscal_quarter": 1,
+      "currency": "USD",
+      "units": "USD billion",
+      "reported_eps": {"value": 0.31, "null_reason": null, "evidence_quote": "Adjusted diluted earnings per share were $0.31", "confidence": 0.9},
+      "prior_year_eps": {"value": 0.29, "null_reason": null, "evidence_quote": "compared with $0.29 in the prior-year quarter", "confidence": 0.85},
+      "consensus_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "eps_basis": {"value": "adjusted", "null_reason": null, "evidence_quote": "Adjusted diluted earnings per share", "confidence": 0.9},
+      "revenue": {"value": 2.5, "null_reason": null, "evidence_quote": "Revenue was $2.50 billion", "confidence": 0.9},
+      "revenue_yoy_growth": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "guidance_direction": {"value": "maintained", "null_reason": null, "evidence_quote": "reaffirmed its full-year guidance", "confidence": 0.85},
+      "guidance_metric": {"value": null, "null_reason": "ambiguous", "evidence_quote": null, "confidence": 0.0},
+      "tone": {"value": "neutral", "null_reason": null, "evidence_quote": "flat compared with the prior-year quarter", "confidence": 0.6},
+      "theme_mentions": {}
     }

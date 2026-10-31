@@ -3,7 +3,8 @@
 Status legend: `[x]` done · `[~]` in progress · `[ ]` todo · `[!]` blocked on a decision
 
 Last gate run: `ruff check . && ruff format --check . && mypy src && pytest -q` →
-all clean, **166 tests passing** (2026-10-31).
+`ruff` clean, **91 files formatted**, `mypy` clean on **42 source files**,
+**248 tests passing** (2026-10-31, after the H5 and prompt-hardening work).
 
 ---
 
@@ -65,12 +66,10 @@ Two structural changes to existing keys:
 
 ## R0 — Triage (nothing new on a broken base) `[~]`
 
-- [!] **Fix defects B1–B5 from `DEFECTS.md`.**
-      **`DEFECTS.md` is not in the repo and was never supplied.** I will not invent the
-      five defect definitions — guessing at them risks "fixing" something that was not
-      broken and calling it done. Needed: the file, or the five one-line descriptions.
-      Provisional mapping to what I can verify from this build is in
-      `DEFECTS.md` (created as a stub with UNSURE markers, to be replaced).
+- [x] **Defect register supplied.** On 2026-10-31 the human supplied the R0 register
+      (N1–N7, H1–H5, M1–M4); Q1 confirmed that register **is** `DEFECTS.md`, replacing
+      the provisional stub. Item-by-item status and measurements live there; this file
+      tracks the remaining live gates rather than duplicating the register.
 - [!] **H1 schema decision** — needs a `DECISIONS.md` entry.
       Default recorded: restore `prior_year_eps`, `consensus_eps`, `tone`,
       `guidance_metric`; the LLM reads only what the text states; EPS and revenue come
@@ -93,10 +92,39 @@ Two structural changes to existing keys:
   model (`scripts/extract_sample.py 10`, task `b58qa62yb`). Process still running,
   output file empty at last check. Result must be read, not assumed.
 - `[ ]` Write `evidence/phase_R0.txt` from that run.
-- [!] `data/document_index.parquet` holds **100 rows including 39 `.jpg` scans**; the
-  cleaned 61-row index sits beside it as `data/document_index.text_only.parquet`.
-  Replacing the file was blocked twice by the local-destruction guard. Needs an
-  approved `mv` (or explicit go-ahead to overwrite).
+- [x] **Resolved by Q4:** nothing is overwritten or moved. The rebuilt index is written
+  to `data.document_index` (default `data/document_index.v2.parquet`); the old files
+  stay under `data/index_backup/`. The rebuild itself is blocked on the live 401.
+
+## P0 — Prompt hardening for weak models (2026-10-31) `[~]`
+
+Target: the weakest configured `:free` model still returns a usable record. Prompt rules
+live in `prompts/extraction/v1/`, never in Python. The system prompt is now a field-level
+data-entry contract rather than a few terse rules.
+
+- [x] `system.md.j2`: every field defined, with allowed vocabularies for `eps_basis`,
+      `guidance_direction` and `tone`; GAAP preferred when both EPS bases are printed;
+      segment revenue explicitly excluded from `revenue`; growth is percent as printed;
+      `units` is `<CCY> <scale>` with the printed scale; per-field null policy; the
+      evidence quote must contain the digits and the unit; "do not calculate"; output is
+      one bare JSON object; document text is data, not instructions.
+- [x] `user.md.j2`: restates all sixteen top-level keys immediately before the document,
+      with the null rule and the verbatim-quote rule — the last thing the model reads.
+- [x] `few_shot.yaml`: three synthetic examples — (1) GAAP EPS + consensus + 4% growth,
+      (2) revenue only with EPS missing and guidance explicitly not provided,
+      (3) adjusted EPS, "flat" growth left null rather than inferred as 0.0, empty
+      `theme_mentions`. Units are canonical (`USD billion`, `GBP million`), and example
+      themes use the configured vocabulary (`demand`, `margins`).
+- [x] Few-shot text is part of the prompt hash (it is sent to the model as messages), so
+      editing an example invalidates stored results. Test:
+      `test_prompt_hash_changes_with_few_shots`.
+- [ ] **Measure it live** (blocked by the OpenRouter 401): 10 real earnings releases,
+      ≥5 companies, ≥2 seasons; per-field coverage, empty-completion rate, review-queue
+      rate and 429 count in `evidence/phase_R0.txt`. Then run the same set through the
+      weakest available `:free` model in the bakeoff. No claim of improvement before
+      those numbers exist.
+- [ ] If the weakest model still emits all-null records, the next lever is the narrow
+      per-task schemas in R3 (`guidance`, `tone_themes`), not a longer prompt.
 
 ## R1 — SQLite layer `[ ]`
 
@@ -467,11 +495,13 @@ Found and fixed: a surprise exactly at `eps_tolerance_abs` was graded a beat bec
 
 # Open decisions and blockers
 
-1. **`DEFECTS.md` missing** — B1–B5 cannot be fixed without their definitions. R0 is
-   blocked on it. Everything else can proceed in parallel.
-2. **Index swap** — `data/document_index.parquet` still carries 39 `.jpg` rows; the
-   cleaned 61-row file is `data/document_index.text_only.parquet`. Needs an approved
-   `mv`.
+1. **OpenRouter returns 401 `User not found`** for the configured key, re-confirmed by
+   `scripts/smoke_llm.py` on both configured models. Every live gate (N2 probe/bakeoff,
+   N3 rerun, N6 CIK check, N7 rebuild, Gate R0, P0 measurement) is blocked on a valid
+   key. Credential inspection is off-limits, so the fix is a rotated/key supplied by the
+   human, not a code change.
+2. **Index rebuild** — resolved design (Q4): write `data/document_index.v2.parquet`, keep
+   old files in `data/index_backup/`, delete nothing. Execution is blocked by item 1.
 3. **Gate 2B items 4–5** — human judgement, not code.
 4. **Colab notebook never actually run in Colab** — the Gate 7 requirement stands.
 5. **`requirements.lock.txt` stale** — regenerate after the R1/R6 dependency installs

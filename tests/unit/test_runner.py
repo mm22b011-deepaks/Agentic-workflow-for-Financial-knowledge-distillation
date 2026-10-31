@@ -88,7 +88,8 @@ class CountingFakeCaller:
 
         content = '\n'.join(message['content'] for message in messages)
         for marker in ('doc0', 'doc1', 'doc2', 'doc3'):
-            if f'document_id={marker}' in content:
+            # The user template marks the document with either spelling.
+            if f'document_id={marker}' in content or f'<document id="{marker}">' in content:
                 self.calls.append(marker)
                 if self.fail_document == marker:
                     raise RuntimeError('simulated failure')
