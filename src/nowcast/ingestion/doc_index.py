@@ -9,6 +9,10 @@ import pandas as pd
 
 from nowcast.errors import DataError
 
+# `items` is the 8-K item list from the submissions feed ("2.02,9.01"). It is not part
+# of the pre-v2 index, so it is the one column `load_index` backfills rather than
+# rejects: an old index stays readable, but its rows cannot prove they are earnings
+# releases and are therefore not extracted.
 INDEX_COLUMNS = (
     'document_id',
     'cik',
@@ -19,7 +23,25 @@ INDEX_COLUMNS = (
     'sha256',
     'chars',
     'downloaded_at',
+    'items',
 )
+BACKFILLED_COLUMNS = ('items',)
+EARNINGS_ITEM = '2.02'
+
+
+def item_codes(value: object) -> set[str]:
+    """Return the 8-K item codes in an index value, tolerating blanks and lists."""
+    if value is None:
+        return set()
+    if isinstance(value, float) and value != value:  # NaN, as parquet stores a missing cell
+        return set()
+    text = str(value)
+    return {code.strip() for code in text.split(',') if code.strip()}
+
+
+def has_earnings_item(value: object, wanted: tuple[str, ...] = (EARNINGS_ITEM,)) -> bool:
+    """Return whether an index row's items include a configured earnings item."""
+    return bool(item_codes(value).intersection(wanted))
 
 
 def file_sha256(path: Path | str, block_size: int = 1 << 20) -> str:
@@ -39,6 +61,9 @@ def load_index(path: Path | str) -> pd.DataFrame:
     frame = pd.read_parquet(target)
     for column in INDEX_COLUMNS:
         if column not in frame.columns:
+            if column in BACKFILLED_COLUMNS:
+                frame[column] = None
+                continue
             raise DataError(f'document index {target} is missing column {column!r}')
     return frame
 

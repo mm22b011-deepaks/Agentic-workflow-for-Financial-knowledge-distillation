@@ -56,6 +56,7 @@ class Disclosure:
     form: str
     exhibit_type: str
     document: str
+    items: str = ''
 
 
 def user_agent(config: Config) -> str:
@@ -204,6 +205,7 @@ def fetch_disclosures(
                     form=form,
                     exhibit_type=document_type,
                     document=filename,
+                    items=item_text,
                 )
             )
     return found
@@ -299,6 +301,9 @@ def ingest_edgar(
                             'sha256': file_sha256(path),
                             'chars': len(text),
                             'downloaded_at': datetime.now(timezone.utc).isoformat(),
+                            # The earnings-item proof travels with the row so extraction
+                            # can refuse anything that was not a 2.02 filing.
+                            'items': disclosure.items,
                         }
                     )
             except (httpx.HTTPError, DataError) as exc:

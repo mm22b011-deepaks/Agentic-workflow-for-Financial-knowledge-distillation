@@ -29,8 +29,8 @@ FORBIDDEN_COLUMNS = ('ticker', 'cik', 'document_id', 'company_name')
 TONE_SCORES = {'confident': 1.0, 'neutral': 0.0, 'cautious': -1.0}
 SUMMARY_COLUMNS = (
     'as_of_date',
-    'fiscal_year',
-    'fiscal_quarter',
+    'season_year',
+    'season_quarter',
     'n_reported',
     'n_expected',
     'share_reported',
@@ -48,10 +48,13 @@ BASE_METRICS = (
 
 @dataclass(frozen=True)
 class DocumentMetrics:
-    """Per-document metrics plus how many rows the review queue removed."""
+    """Per-document metrics, with review-queue membership carried as a column.
+
+    Rows are kept rather than dropped so the exclusion can be counted per as-of date;
+    dropping them here would make one number describe every date in the season.
+    """
 
     frame: pd.DataFrame
-    excluded_for_review: int
 
 
 def output_columns(config: Config) -> list[str]:
@@ -115,18 +118,58 @@ def _review_excluded(config: Config, extractions: pd.DataFrame) -> set[str]:
     return {str(value) for value in queue['document_id'].dropna()}
 
 
+def collapse_to_companies(
+    frame: pd.DataFrame, rule: str = 'max_confidence'
+) -> tuple[pd.DataFrame, int]:
+    """Return one row per (cik, season), collapsing duplicate reports.
+
+    `frame` must already carry `season_year`, `season_quarter` and `confidence`.
+    Two models extracting the same document, or two exhibits from one filing, are two
+    rows describing one company's one quarter; counting both inflates `n_reported` and
+    lets a single company pull a printed share toward itself. The surviving row is
+    chosen by the configured rule, never by row order.
+
+    Returns the collapsed frame and how many rows were dropped as duplicates.
+    """
+    if frame.empty:
+        return frame, 0
+    key = ['cik', 'season_year', 'season_quarter']
+    ordered = frame.sort_values(
+        [*key, 'confidence', 'document_id'], ascending=[True, True, True, False, True]
+    )
+    if rule == 'max_confidence':
+        kept = ordered.drop_duplicates(subset=key, keep='first')
+    elif rule == 'first_document':
+        kept = ordered.drop_duplicates(subset=key, keep='last')
+    else:
+        raise DataError(f'unknown aggregation.dedupe_rule {rule!r}')
+    return kept.reset_index(drop=True), int(len(frame) - len(kept))
+
+
 def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentMetrics:
     """Compute per-document surprise, growth, guidance and tone, in code."""
     if extractions.empty:
-        return DocumentMetrics(pd.DataFrame(columns=['document_id']), 0)
+        return DocumentMetrics(pd.DataFrame(columns=['document_id']))
 
+    if 'cik' not in extractions.columns:
+        raise DataError(
+            'extractions must carry a cik column: the company count and the '
+            '(company, season) collapse both key on it'
+        )
     queued = _review_excluded(config, extractions)
     frame = extractions.copy()
     frame['document_id'] = frame['document_id'].astype(str)
-    frame = frame[~frame['document_id'].isin(queued)].reset_index(drop=True)
-    excluded = int(len(extractions) - len(frame))
+    # CIKs arrive as '2', '0000000002' and sometimes an int; one spelling only, or the
+    # same company would be counted as two.
+    frame['cik'] = frame['cik'].astype('string').str.strip().str.zfill(10)
+    # A queued document is marked, not deleted: an as-of date before the queue existed
+    # must not be told that a company was excluded from it.
+    frame['in_review'] = frame['document_id'].isin(queued)
+    frame['confidence'] = pd.to_numeric(
+        frame['confidence'] if 'confidence' in frame.columns else 0.0, errors='coerce'
+    )
     if frame.empty:
-        return DocumentMetrics(frame, excluded)
+        return DocumentMetrics(frame)
 
     frame['report_date'] = pd.to_datetime(frame['report_date'], errors='coerce')
     reported = pd.to_numeric(frame['reported_eps'], errors='coerce')
@@ -167,9 +210,11 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
         frame[f'theme_{theme}_up'] = values.astype('string').str.lower().eq('up').astype(float)
 
     seasons = [season_of(value) for value in frame['report_date']]
-    frame['fiscal_year'] = [item[0] for item in seasons]
-    frame['fiscal_quarter'] = [item[1] for item in seasons]
-    return DocumentMetrics(frame, excluded)
+    # These are calendar seasons derived from the filing date, not the company's own
+    # fiscal year (which the record also holds): the column name has to say which.
+    frame['season_year'] = [item[0] for item in seasons]
+    frame['season_quarter'] = [item[1] for item in seasons]
+    return DocumentMetrics(frame)
 
 
 def _weighted_mean(values: pd.Series, weights: pd.Series) -> float:
@@ -201,7 +246,7 @@ def aggregate_index(
     extractions: pd.DataFrame,
     constituents_path: str | None = None,
 ) -> pd.DataFrame:
-    """Return one index-level row per (fiscal_year, fiscal_quarter, as_of_date)."""
+    """Return one index-level row per (season_year, season_quarter, as_of_date)."""
     columns = output_columns(config)
     if extractions.empty:
         return pd.DataFrame({column: pd.Series(dtype='object') for column in columns})
@@ -217,17 +262,24 @@ def aggregate_index(
     minimum = int(config.aggregation.min_constituents)
     rows: list[dict[str, object]] = []
 
-    season_keys = frame[['fiscal_year', 'fiscal_quarter']].dropna().drop_duplicates()
+    season_keys = frame[['season_year', 'season_quarter']].dropna().drop_duplicates()
     for year, quarter in season_keys.itertuples(index=False, name=None):
-        season = frame[(frame['fiscal_year'] == year) & (frame['fiscal_quarter'] == quarter)]
+        season = frame[(frame['season_year'] == year) & (frame['season_quarter'] == quarter)]
         for as_of in sorted(season['report_date'].dropna().unique()):
             stamp = pd.Timestamp(as_of)
             reported_docs = season[season['report_date'] <= stamp]
             members = active_on(constituents, stamp)
+            # The queue is consulted at this date, so one company excluded later does
+            # not appear as excluded from every earlier date in the season.
+            excluded = int(reported_docs['in_review'].sum())
+            counted = reported_docs[~reported_docs['in_review']]
+            counted, _duplicate_rows = collapse_to_companies(
+                counted, str(config.aggregation.dedupe_rule)
+            )
 
             # Identifiers are used here only to join weights; they never reach the output.
             if config.aggregation.weighting == 'equal':
-                weights = pd.Series(1.0, index=reported_docs.index)
+                weights = pd.Series(1.0, index=counted.index)
             else:
                 ticker_by_cik = dict(
                     zip(
@@ -236,19 +288,28 @@ def aggregate_index(
                         strict=True,
                     )
                 )
-                tickers = reported_docs['cik'].astype(str).str.zfill(10).map(ticker_by_cik)
-                weights = _row_weights(config, reported_docs, tickers)
+                tickers = counted['cik'].astype(str).str.zfill(10).map(ticker_by_cik)
+                weights = _row_weights(config, counted, tickers)
 
-            n_reported = len(reported_docs)
+            # One company reports one quarter once, so the company count, not the row
+            # count, is what a share can legitimately be printed against.
+            n_reported = int(counted['cik'].nunique())
             n_expected = len(members)
+            share = (n_reported / n_expected) if n_expected else float('nan')
+            if n_expected and n_reported > n_expected:
+                raise DataError(
+                    f'share_reported would exceed 1 at as_of={stamp.date()}: '
+                    f'{n_reported} reported companies against {n_expected} members; '
+                    'the constituents file does not cover the reports being aggregated'
+                )
             row: dict[str, object] = {
                 'as_of_date': stamp,
-                'fiscal_year': year,
-                'fiscal_quarter': quarter,
+                'season_year': year,
+                'season_quarter': quarter,
                 'n_reported': n_reported,
                 'n_expected': n_expected,
-                'share_reported': (n_reported / n_expected) if n_expected else float('nan'),
-                'n_review_excluded': int(metrics.excluded_for_review),
+                'share_reported': share,
+                'n_review_excluded': excluded,
             }
             suppressed = n_reported < minimum
             row['suppressed'] = bool(suppressed)
@@ -258,16 +319,16 @@ def aggregate_index(
                 row.update({name: float('nan') for name in BASE_METRICS})
                 row.update({f'theme_{t}_share': float('nan') for t in config.extraction.themes})
             else:
-                beats = reported_docs['beat']
+                beats = counted['beat']
                 graded = beats[beats.notna()]
                 row['beat_rate'] = (
                     _weighted_mean((graded > 0).astype(float), weights.loc[graded.index])
                     if not graded.empty
                     else float('nan')
                 )
-                row['eps_growth_agg'] = _weighted_mean(reported_docs['eps_growth'], weights)
-                raise_share = _weighted_mean(reported_docs['guidance_raised'], weights)
-                lower_share = _weighted_mean(reported_docs['guidance_lowered'], weights)
+                row['eps_growth_agg'] = _weighted_mean(counted['eps_growth'], weights)
+                raise_share = _weighted_mean(counted['guidance_raised'], weights)
+                lower_share = _weighted_mean(counted['guidance_lowered'], weights)
                 row['guidance_raise_share'] = raise_share
                 row['guidance_lower_share'] = lower_share
                 denominator = (raise_share if pd.notna(raise_share) else 0.0) + (
@@ -276,10 +337,10 @@ def aggregate_index(
                 row['guidance_ratio'] = (
                     float(raise_share) / denominator if denominator > 0 else float('nan')
                 )
-                row['tone_score_mean'] = _weighted_mean(reported_docs['tone_score'], weights)
+                row['tone_score_mean'] = _weighted_mean(counted['tone_score'], weights)
                 for theme in config.extraction.themes:
                     row[f'theme_{theme}_share'] = _weighted_mean(
-                        reported_docs[f'theme_{theme}_up'], weights
+                        counted[f'theme_{theme}_up'], weights
                     )
             rows.append(row)
 

@@ -232,9 +232,18 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     ok = sum(1 for item in outcomes if item.status == 'ok')
     failed = sum(1 for item in outcomes if item.status == 'failed')
     review = sum(1 for item in outcomes if item.review_reasons)
-    LOGGER.info('extracted: %d ok, %d failed, %d flagged for review', ok, failed, review)
+    empty = sum(1 for item in outcomes if 'empty_extraction' in item.review_reasons)
+    LOGGER.info(
+        'extracted: %d ok, %d failed, %d flagged for review (%d empty extractions)',
+        ok,
+        failed,
+        review,
+        empty,
+    )
     combined = consolidate(config, models)
-    manifest.notes = f'{ok} ok, {failed} failed, {review} flagged; {len(combined)} rows'
+    manifest.notes = (
+        f'{ok} ok, {failed} failed, {review} flagged ({empty} empty); {len(combined)} rows'
+    )
     _record_run(config, 'extract', [str(index_path)], manifest)
     LOGGER.info('consolidated %d rows', len(combined))
     return 0

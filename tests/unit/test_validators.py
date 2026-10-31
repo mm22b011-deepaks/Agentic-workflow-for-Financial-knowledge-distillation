@@ -132,3 +132,25 @@ def test_clean_record_not_queued(config: Config) -> None:
     issues, validated = validate_record(_record(), SOURCE, config)
     assert issues == []
     assert needs_review(validated, issues, config) == []
+
+
+def test_all_null_earnings_record_flagged_empty_extraction(config: Config) -> None:
+    """An earnings release with neither EPS nor revenue is not an honest pair of nulls."""
+    from nowcast.extraction.schema import NullReason
+
+    empty = _record(
+        reported_eps={'value': None, 'null_reason': NullReason.not_stated},
+        revenue={'value': None, 'null_reason': NullReason.not_stated},
+    )
+    issues, validated = validate_record(empty, SOURCE, config)
+    reasons = needs_review(validated, issues, config)
+    assert 'empty_extraction' in reasons
+    # It is its own reason, not the per-field not_stated bookkeeping.
+    assert not any(reason.startswith('null_reason_missing') for reason in reasons)
+
+
+def test_partial_record_is_not_empty_extraction(config: Config) -> None:
+    """One core number is enough to prove the document was an earnings release."""
+    partial = _record(revenue={'value': None, 'null_reason': 'not_stated'})
+    issues, validated = validate_record(partial, SOURCE, config)
+    assert 'empty_extraction' not in needs_review(validated, issues, config)

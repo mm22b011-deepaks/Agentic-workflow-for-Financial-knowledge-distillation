@@ -50,6 +50,9 @@ def _manifest(tmp_path: Path) -> Path:
             'document_type': '8-K-EX99',
             'path': str(FIXTURES / f'doc-fixture-{index:03d}.htm'),
             'source': 'fixture',
+            # These are earnings releases, so the index must say so: extraction now
+            # refuses a row whose items do not include the configured earnings item.
+            'items': '2.02,9.01',
         }
         for index, date in ((1, '2025-04-24'), (2, '2025-07-25'), (3, '2025-10-24'))
     ]

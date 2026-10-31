@@ -202,10 +202,10 @@ def test_guidance_ratio_value(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
     constituents = _constituents(tmp_path)
     rows = [
-        _compass(document_id='a', guidance_direction='raised'),
-        _compass(document_id='b', guidance_direction='raised'),
-        _compass(document_id='c', guidance_direction='lowered'),
-        _compass(document_id='d', guidance_direction='lowered'),
+        _compass(document_id='a', cik='0000000001', guidance_direction='raised'),
+        _compass(document_id='b', cik='0000000002', guidance_direction='raised'),
+        _compass(document_id='c', cik='0000000003', guidance_direction='lowered'),
+        _compass(document_id='d', cik='0000000004', guidance_direction='lowered'),
     ]
     frame = aggregate_index(config, _extractions(rows), str(constituents))
     assert frame.loc[0, 'guidance_ratio'] == pytest.approx(0.5)
@@ -247,14 +247,110 @@ def test_review_queue_documents_are_excluded(
     ).to_parquet(queue_path, index=False)
 
     rows = [
-        _compass(document_id='bad', reported_eps=100.0),
-        _compass(document_id='good', reported_eps=1.0),
+        _compass(document_id='bad', cik='0000000001', reported_eps=100.0),
+        _compass(document_id='good', cik='0000000002', reported_eps=1.0),
     ]
     frame = aggregate_index(config, _extractions(rows), str(constituents))
     assert frame.loc[0, 'n_reported'] == 1
     assert frame.loc[0, 'n_review_excluded'] == 1
     # The 100.0 outlier would have wrecked beat_rate had it been counted.
     assert frame.loc[0, 'beat_rate'] == pytest.approx(0.0)
+
+
+def test_two_models_do_not_double_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """One company reporting once through two models is still one reported company."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path)
+    rows = [
+        _compass(document_id='doc-model-a', cik='0000000001', confidence=0.6),
+        _compass(document_id='doc-model-b', cik='0000000001', confidence=0.9),
+        _compass(document_id='doc-other', cik='0000000002'),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_reported'] == 2
+    assert frame.loc[0, 'share_reported'] == pytest.approx(0.5)
+
+
+def test_two_exhibits_same_filing_count_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two exhibits from one filing describe one quarter of one company."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path)
+    rows = [
+        _compass(document_id='exhibit-99-1', cik='0000000001', reported_eps=1.0),
+        _compass(document_id='exhibit-99-2', cik='0000000001', reported_eps=1.0, confidence=0.9),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_reported'] == 1
+    assert frame.loc[0, 'share_reported'] == pytest.approx(0.25)
+
+
+def test_collapse_keeps_the_most_confident_row() -> None:
+    """The dedupe rule is applied explicitly, not by row order."""
+    from nowcast.aggregation.aggregate import collapse_to_companies
+
+    frame = pd.DataFrame(
+        [
+            {
+                'cik': '0000000001',
+                'season_year': 2025,
+                'season_quarter': 2,
+                'document_id': 'low',
+                'confidence': 0.2,
+            },
+            {
+                'cik': '0000000001',
+                'season_year': 2025,
+                'season_quarter': 2,
+                'document_id': 'high',
+                'confidence': 0.9,
+            },
+        ]
+    )
+    kept, dropped = collapse_to_companies(frame, 'max_confidence')
+    assert list(kept['document_id']) == ['high']
+    assert dropped == 1
+
+
+def test_share_reported_never_exceeds_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """More reporting companies than active members is a data error, not a share above 1."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path, count=2)
+    rows = [_compass(document_id=f'doc-{index}', cik=f'{index + 1:010d}') for index in range(3)]
+    with pytest.raises(DataError, match='share_reported would exceed 1'):
+        aggregate_index(config, _extractions(rows), str(constituents))
+
+
+def test_review_excluded_is_per_asof(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A document queued for review is excluded only from the dates on or after it."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path)
+    queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [{'document_id': 'late', 'field': 'reported_eps', 'reason': 'low_confidence', 'model': 'm'}]
+    ).to_parquet(queue_path, index=False)
+
+    rows = [
+        _compass(document_id='early', cik='0000000001', report_date='2025-04-15'),
+        _compass(document_id='late', cik='0000000002', report_date='2025-04-20'),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents)).reset_index(drop=True)
+    assert frame['as_of_date'].tolist() == [pd.Timestamp('2025-04-15'), pd.Timestamp('2025-04-20')]
+    # On 2025-04-15 the queued document had not even reported; it is not excluded from it.
+    assert frame['n_review_excluded'].tolist() == [0, 1]
+    assert frame['n_reported'].tolist() == [1, 1]
+
+
+def test_season_column_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The season columns say `season_`, because they are calendar seasons."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    frame = aggregate_index(config, _extractions([_compass()]), str(_constituents(tmp_path)))
+    assert {'season_year', 'season_quarter'}.issubset(frame.columns)
+    assert not {'fiscal_year', 'fiscal_quarter'}.intersection(frame.columns)
+    assert frame.loc[0, 'season_year'] == 2025
+    assert frame.loc[0, 'season_quarter'] == 2
 
 
 def test_season_of_uses_calendar_quarters() -> None:
@@ -354,8 +450,8 @@ def test_output_columns_exact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     frame = aggregate_index(config, _extractions([_compass()]), str(constituents))
     assert list(frame.columns) == [
         'as_of_date',
-        'fiscal_year',
-        'fiscal_quarter',
+        'season_year',
+        'season_quarter',
         'n_reported',
         'n_expected',
         'share_reported',
@@ -377,9 +473,9 @@ def test_tone_score_mapping(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
     constituents = _constituents(tmp_path)
     rows = [
-        _compass(document_id='a', tone='confident'),
-        _compass(document_id='b', tone='cautious'),
-        _compass(document_id='c', tone='neutral'),
+        _compass(document_id='a', cik='0000000001', tone='confident'),
+        _compass(document_id='b', cik='0000000002', tone='cautious'),
+        _compass(document_id='c', cik='0000000003', tone='neutral'),
     ]
     frame = aggregate_index(config, _extractions(rows), str(constituents))
     assert frame.loc[0, 'tone_score_mean'] == pytest.approx(0.0)

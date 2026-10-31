@@ -100,6 +100,9 @@ aggregation:
   weights_csv: ''
   min_constituents: 10
   winsorize_pct: 0.05
+  # One company's quarter may arrive as two rows (two models, or two exhibits in one
+  # filing). Reduced by this rule before any count or metric sees it.
+  dedupe_rule: max_confidence
 
 nowcast:
   min_documents: 3
