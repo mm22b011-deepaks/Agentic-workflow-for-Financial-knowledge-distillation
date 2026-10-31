@@ -305,3 +305,67 @@ def test_index_written_before_items_column_is_not_extracted(config: Config, tmp_
         ]
     ).to_parquet(path, index=False)
     assert load_documents(config, path) == []
+
+
+def test_runner_survives_missing_raw_file_and_write_error(config: Config, tmp_path: Path) -> None:
+    """A missing raw file and an unwritable result both fail one document, not the run."""
+    documents = _documents(tmp_path, count=3)
+    documents[0].raw_path = tmp_path / 'gone.txt'  # never written
+    caller = CountingFakeCaller()
+
+    original = runner._write_result
+    writes: list[str] = []
+
+    def failing_write(path: Path, payload: dict[str, object]) -> None:
+        if path.name.startswith('doc2'):
+            raise OSError('disk full')
+        writes.append(path.name)
+        original(path, payload)
+
+    runner._write_result = failing_write  # type: ignore[assignment]
+    try:
+        outcomes = _run(config, documents, caller)
+    finally:
+        runner._write_result = original  # type: ignore[assignment]
+
+    statuses = {outcome.document_id: outcome.status for outcome in outcomes}
+    assert statuses == {'doc0': 'failed', 'doc1': 'ok', 'doc2': 'failed'}
+    assert {outcome.document_id for outcome in outcomes if outcome.status == 'ok'} == {'doc1'}
+    queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
+    assert 'document_error' in set(queue['reason'])
+
+
+def test_changing_threshold_invalidates_or_revalidates(
+    config: Config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Changing a validation setting or the text cut must not resume an old record."""
+    import dataclasses
+
+    from nowcast.extraction.runner import fingerprint
+
+    document = _documents(tmp_path, count=1)[0]
+    base = fingerprint(config, document, 'model:free', 'prompt-digest')
+
+    def changed(section: str, **updates: object) -> object:
+        return dataclasses.replace(
+            config, **{section: dataclasses.replace(getattr(config, section), **updates)}
+        )
+
+    variants = {
+        'max_doc_chars': changed('extraction', max_doc_chars=12000),
+        'min_confidence': changed('extraction', min_confidence=0.7),
+        'quote_match_min_ratio': changed('extraction', quote_match_min_ratio=0.5),
+        'confidence_penalty_on_issue': changed('extraction', confidence_penalty_on_issue=0.5),
+        'eps_tolerance_abs': changed('extraction', eps_tolerance_abs=0.05),
+        'max_evidence_words': changed('extraction', max_evidence_words=10),
+        'themes': changed('extraction', themes=('demand',)),
+        'section_patterns': changed('parsing', section_patterns={'mda': 'x'}),
+    }
+    for name, variant in variants.items():
+        digest = fingerprint(variant, document, 'model:free', 'prompt-digest')  # type: ignore[arg-type]
+        assert digest != base, f'changing {name} did not invalidate the fingerprint'
+
+    # The same settings on a copy must produce the same fingerprint: the check above
+    # would pass even if the digest were random.
+    same = changed('extraction', max_doc_chars=int(config.extraction.max_doc_chars))
+    assert fingerprint(same, document, 'model:free', 'prompt-digest') == base  # type: ignore[arg-type]
