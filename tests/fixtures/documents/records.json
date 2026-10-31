@@ -1,0 +1,166 @@
+{
+  "doc-fixture-001": {
+    "schema_version": "v1",
+    "document_id": "doc-fixture-001",
+    "fiscal_year": 2025,
+    "fiscal_quarter": 1,
+    "currency": "USD",
+    "units": "USD",
+    "reported_eps": {
+      "value": 0.55,
+      "evidence_quote": "GAAP diluted earnings per share were $0.55",
+      "confidence": 0.95
+    },
+    "prior_year_eps": {
+      "value": 0.48,
+      "evidence_quote": "compared with $0.48 in the prior year quarter",
+      "confidence": 0.9
+    },
+    "consensus_eps": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "eps_basis": {
+      "value": "gaap",
+      "evidence_quote": "GAAP diluted earnings per share",
+      "confidence": 0.9
+    },
+    "revenue": {
+      "value": 1200000000.0,
+      "evidence_quote": "Revenue was $1.20 billion",
+      "confidence": 0.9
+    },
+    "revenue_yoy_growth": {
+      "value": 0.08,
+      "evidence_quote": "up 8% from the prior year quarter",
+      "confidence": 0.85
+    },
+    "guidance_direction": {
+      "value": "maintained",
+      "evidence_quote": "expects second quarter revenue growth of 6% to 8%",
+      "confidence": 0.7
+    },
+    "guidance_metric": {
+      "value": "revenue",
+      "evidence_quote": "second quarter revenue growth",
+      "confidence": 0.8
+    },
+    "tone": {
+      "value": "confident",
+      "evidence_quote": "reported financial results",
+      "confidence": 0.6
+    },
+    "theme_mentions": {
+      "demand": {
+        "mentioned": true,
+        "direction": "up",
+        "evidence_quote": "up 8% from the prior year quarter",
+        "confidence": 0.8
+      },
+      "pricing": {
+        "mentioned": false,
+        "confidence": 0.0
+      }
+    }
+  },
+  "doc-fixture-002": {
+    "schema_version": "v1",
+    "document_id": "doc-fixture-002",
+    "fiscal_year": 2025,
+    "fiscal_quarter": 2,
+    "currency": "USD",
+    "units": "USD",
+    "reported_eps": {
+      "value": 1.05,
+      "evidence_quote": "or $1.05 per diluted share",
+      "confidence": 0.9
+    },
+    "prior_year_eps": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "consensus_eps": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "eps_basis": {
+      "value": "gaap",
+      "evidence_quote": "net income of $210 million",
+      "confidence": 0.6
+    },
+    "revenue": {
+      "value": 3400000000.0,
+      "evidence_quote": "Net sales totaled $3.4 billion",
+      "confidence": 0.9
+    },
+    "guidance_direction": {
+      "value": "raised",
+      "evidence_quote": "raised its full-year guidance",
+      "confidence": 0.95
+    },
+    "guidance_metric": {
+      "value": "operating margin",
+      "evidence_quote": "guidance for adjusted operating margin",
+      "confidence": 0.8
+    },
+    "tone": {
+      "value": "confident",
+      "evidence_quote": "raised its full-year guidance",
+      "confidence": 0.7
+    },
+    "theme_mentions": {
+      "pricing": {
+        "mentioned": true,
+        "direction": "up",
+        "evidence_quote": "adjusted operating margin",
+        "confidence": 0.6
+      }
+    }
+  },
+  "doc-fixture-003": {
+    "schema_version": "v1",
+    "document_id": "doc-fixture-003",
+    "fiscal_year": 2025,
+    "fiscal_quarter": 3,
+    "currency": "USD",
+    "units": "USD",
+    "reported_eps": {
+      "value": -0.12,
+      "evidence_quote": "Diluted earnings per share was $(0.12)",
+      "confidence": 0.9
+    },
+    "prior_year_eps": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "consensus_eps": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "eps_basis": {
+      "value": "gaap",
+      "evidence_quote": "Diluted earnings per share",
+      "confidence": 0.7
+    },
+    "revenue": {
+      "value": 780000000.0,
+      "evidence_quote": "revenue of $780 million",
+      "confidence": 0.9
+    },
+    "guidance_direction": {
+      "null_reason": "not_stated",
+      "confidence": 0.0
+    },
+    "tone": {
+      "value": "cautious",
+      "evidence_quote": "Diluted earnings per share was $(0.12)",
+      "confidence": 0.6
+    },
+    "theme_mentions": {
+      "demand": {
+        "mentioned": false,
+        "confidence": 0.0
+      }
+    }
+  }
+}
