@@ -1,0 +1,115 @@
+runtime:
+  max_concurrency: 4
+  seed: 7
+  log_level: INFO
+  data_dir_env: DATA_DIR
+
+paths:
+  project_dir: '.'
+  data_dir: data
+  raw_dir: raw
+  cache_dir: .cache/llm
+  extractions_dir: extractions
+  aggregates_dir: aggregates
+  reports_dir: reports
+  manifests_dir: manifests
+  prompts_dir: prompts
+
+data:
+  start_date: '2025-01-01'
+  end_date: '2026-10-31'
+  constituents_csv: inputs/constituents.csv
+  local_manifest_csv: inputs/local_manifest.csv
+  labels_csv: inputs/labels.csv
+  consensus_csv: inputs/consensus.csv
+  weights_csv: inputs/weights.csv
+  sec_user_agent_env: SEC_USER_AGENT
+  sec_max_requests_per_sec: 8.0
+  edgar_submissions_url_template: 'https://data.sec.gov/submissions/CIK{cik_padded}.json'
+  edgar_archive_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{filename}'
+  edgar_index_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/index.json'
+  edgar_index_headers_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession}-index-headers.html'
+  edgar_forms:
+    - 8-K
+  edgar_earnings_items:
+    - '2.02'
+  edgar_lookback_days: 730
+  edgar_max_documents: 100
+  edgar_docs_per_cik: 3
+
+parsing:
+  min_section_chars: 200
+  section_patterns: {}
+
+llm:
+  base_url: 'https://openrouter.ai/api/v1'
+  api_key_env: OPENROUTER_API_KEY
+  models:
+    - 'nvidia/nemotron-3.5-lightning:free'
+    - 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
+  timeout_seconds: 120.0
+  temperature: 0.0
+  max_tokens: 8192
+  reasoning_effort: low
+  max_reasoning_tokens: 3000
+  retry_attempts: 3
+  retry_backoff_seconds: 2.0
+  retry_max_wait_seconds: 120.0
+  app_name: index-earnings-nowcast
+
+cache:
+  enabled: true
+  dir: .cache/llm
+  ttl_days: 30
+
+budget:
+  max_usd: 0.05
+  ledger_path: manifests/ledger.parquet
+
+extraction:
+  schema_version: v1
+  max_doc_chars: 24000
+  max_repairs: 2
+  quote_match_min_ratio: 0.85
+  confidence_penalty_on_issue: 0.7
+  min_confidence: 0.5
+  eps_tolerance_abs: 0.02
+  max_evidence_words: 25
+  themes:
+    - demand
+    - pricing
+    - margins
+    - headcount
+    - supply_chain
+    - ai_investment
+  review_queue_path: extractions/review_queue.parquet
+
+nowcast:
+  min_documents: 3
+  min_observations: 3
+
+reporting:
+  report_path: reports/report.md
+  top_n: 10
+
+universe:
+  source: wikipedia_changes
+  current_table_url: 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+  # The add/remove table is not on the current-constituents page; it lives on
+  # "Historical components of the S&P 500" as a grouped (two-level) table.
+  changes_table_url: 'https://en.wikipedia.org/wiki/Historical_components_of_the_S%26P_500'
+  historical_csv_path_or_url: ''
+  historical_url_template: ''
+  sec_ticker_map_url: 'https://www.sec.gov/files/company_tickers.json'
+  cik_overrides_csv: inputs/cik_overrides.csv
+  http_user_agent_env: SEC_USER_AGENT
+  expected_members: 500
+  member_count_tolerance: 8
+  min_cik_coverage: 0.98
+  as_of_sample_freq: QS
+  subset_n: 0
+  subset_seed: 42
+  avg_tokens_per_doc_in: 6000
+  avg_tokens_per_doc_out: 800
+  licence_note: ''
+  refresh: false

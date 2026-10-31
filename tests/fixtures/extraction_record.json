@@ -1,0 +1,63 @@
+{
+  "schema_version": "v1",
+  "document_id": "doc-1",
+  "fiscal_year": 2026,
+  "fiscal_quarter": 1,
+  "currency": "USD",
+  "units": "USD",
+  "reported_eps": {
+    "value": 0.55,
+    "null_reason": null,
+    "evidence_quote": "earnings per share were $0.55",
+    "confidence": 0.9
+  },
+  "prior_year_eps": {
+    "value": null,
+    "null_reason": "not_stated",
+    "evidence_quote": null,
+    "confidence": 0.0
+  },
+  "consensus_eps": {
+    "value": null,
+    "null_reason": "not_stated",
+    "evidence_quote": null,
+    "confidence": 0.0
+  },
+  "eps_basis": {
+    "value": "gaap",
+    "null_reason": null,
+    "evidence_quote": "GAAP earnings per share",
+    "confidence": 0.9
+  },
+  "revenue": {
+    "value": 1.2,
+    "null_reason": null,
+    "evidence_quote": "Revenue was $1.20 billion",
+    "confidence": 0.9
+  },
+  "revenue_yoy_growth": {
+    "value": null,
+    "null_reason": "not_stated",
+    "evidence_quote": null,
+    "confidence": 0.0
+  },
+  "guidance_direction": {
+    "value": "lowered",
+    "null_reason": null,
+    "evidence_quote": "Guidance was cut",
+    "confidence": 0.8
+  },
+  "guidance_metric": {
+    "value": null,
+    "null_reason": "not_stated",
+    "evidence_quote": null,
+    "confidence": 0.0
+  },
+  "tone": {
+    "value": "cautious",
+    "null_reason": null,
+    "evidence_quote": "Guidance was cut",
+    "confidence": 0.6
+  },
+  "theme_mentions": {}
+}

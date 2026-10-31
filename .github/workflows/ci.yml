@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format check
+        run: ruff format --check .
+
+      - name: Type check
+        run: mypy src
+
+      - name: Tests
+        run: pytest -q
+
+      - name: No placeholders, URLs, absolute paths or prints in src
+        run: |
+          set -e
+          ! grep -rnE 'TODO|FIXME|NotImplementedError' src
+          ! grep -rnE '/content|/home/|C:' src
+          ! grep -rnE 'print\(' src
+
+  notebook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]' nbformat
+      - name: Notebook is valid JSON and has no outputs committed
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          path = pathlib.Path('notebooks/00_colab_bootstrap.ipynb')
+          body = json.loads(path.read_text(encoding='utf-8'))
+          cells = body.get('cells', [])
+          assert cells, 'notebook has no cells'
+          noisy = [c for c in cells if c.get('outputs')]
+          assert not noisy, f'{len(noisy)} notebook cells carry committed outputs'
+          print(f'notebook OK: {len(cells)} cells, no outputs')
+          PY

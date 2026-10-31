@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/
+raw/
+extractions/
+aggregates/
+reports/
+manifests/
+.env
+*.parquet
+# Project-local Claude settings are machine-specific
+.claude/
+
+# Editable-install metadata
+*.egg-info/
