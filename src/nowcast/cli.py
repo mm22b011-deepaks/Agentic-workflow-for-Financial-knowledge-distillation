@@ -144,6 +144,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     from nowcast.ingestion.constituents import cik_list
     from nowcast.ingestion.doc_index import load_index, upsert_rows, write_index
     from nowcast.ingestion.edgar import IngestReport, ingest_edgar
+    from nowcast.ingestion.rebuild import index_path
     from nowcast.ingestion.universe.builder import _resolve_input
 
     config = _load(args)
@@ -176,10 +177,10 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         # thing the file can say, and losing it to an exception would be absurd.
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report.as_dict(), indent=2), encoding='utf-8')
-    index_path = data_root(config) / 'document_index.parquet'
-    existing = load_index(index_path)
+    target_index = index_path(config)
+    existing = load_index(target_index)
     merged = upsert_rows(existing, rows)
-    write_index(merged, index_path)
+    write_index(merged, target_index)
     summary = {
         'new_rows': len(rows),
         'index_rows': len(merged),
@@ -195,7 +196,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     target.write_text(json.dumps(summary, indent=2), encoding='utf-8')
     manifest.notes = f'indexed {len(rows)} new rows, {len(merged)} total'
     _record_run(config, 'ingest', [str(constituents)], manifest)
-    LOGGER.info('indexed %d new documents (%d total) -> %s', len(rows), len(merged), index_path)
+    LOGGER.info('indexed %d new documents (%d total) -> %s', len(rows), len(merged), target_index)
     return 0
 
 
@@ -204,6 +205,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     import asyncio
 
     from nowcast.extraction.runner import consolidate, load_documents, run_extraction
+    from nowcast.ingestion.rebuild import index_path
     from nowcast.llm.composition import make_caller
     from nowcast.llm.ledger import BudgetLedger
 
@@ -211,10 +213,10 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     validate_config(config, strict=True)
     manifest = start_manifest(config, stage='extract')
     manifest.prompt_hashes = _prompt_fingerprints(config)
-    index_path = data_root(config) / 'document_index.parquet'
-    if not index_path.is_file():
-        raise DataError(f'no document index at {index_path}; run ingest first')
-    documents = load_documents(config, index_path)
+    source_index = index_path(config)
+    if not source_index.is_file():
+        raise DataError(f'no document index at {source_index}; run ingest or rebuild-index first')
+    documents = load_documents(config, source_index)
     limit = int(args.limit) if args.limit else len(documents)
     documents = documents[:limit]
     if not documents:
@@ -256,8 +258,48 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     manifest.notes = (
         f'{ok} ok, {failed} failed, {review} flagged ({empty} empty); {len(combined)} rows'
     )
-    _record_run(config, 'extract', [str(index_path)], manifest)
+    _record_run(config, 'extract', [str(source_index)], manifest)
     LOGGER.info('consolidated %d rows', len(combined))
+    return 0
+
+
+def _cmd_rebuild_index(args: argparse.Namespace) -> int:
+    """Validate an existing index and write a clean copy to data.document_index."""
+    from nowcast.ingestion.doc_index import load_index
+    from nowcast.ingestion.rebuild import (
+        default_source,
+        rebuild_index,
+        write_rebuild_report,
+    )
+
+    config = _load(args)
+    validate_config(config, strict=True)
+    chosen = getattr(args, 'source', None)
+    source = Path(chosen) if chosen else default_source(config)
+    if not source.is_file():
+        raise DataError(f'no index to rebuild at {source}')
+    frame = load_index(source)
+    report = rebuild_index(config, frame, source_path=source)
+    report_file = write_rebuild_report(config, report)
+    LOGGER.info(
+        'rebuilt %d rows from %s; %d kept, %d dropped; report at %s',
+        report.source_rows,
+        source,
+        report.kept_rows,
+        len(report.dropped_documents),
+        report_file,
+    )
+    if report.kept_rows == 0 and report.source_rows > 0:
+        raise DataError(
+            f'rebuild kept none of {report.source_rows} rows: the source index carries no '
+            f'2.02 text rows inside the window; see {report_file}'
+        )
+    if report.superseded_extractions or report.superseded_queue_rows:
+        LOGGER.info(
+            'moved %d extraction results and %d review rows to superseded/',
+            len(report.superseded_extractions),
+            report.superseded_queue_rows,
+        )
     return 0
 
 
@@ -283,6 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
         'build-constituents': (_cmd_build_constituents, 'build the point-in-time constituents CSV'),
         'estimate-scope': (_cmd_estimate_scope, 'estimate documents and tokens, offline'),
         'ingest': (_cmd_ingest, 'download and index earnings documents'),
+        'rebuild-index': (_cmd_rebuild_index, 'validate an index into data.document_index'),
         'extract': (_cmd_extract, 'run LLM extraction over indexed documents'),
         'run-all': (_cmd_run_all, 'run every stage in order'),
     }
@@ -291,6 +334,10 @@ def build_parser() -> argparse.ArgumentParser:
         _add_common(sub)
         if name == 'extract':
             sub.add_argument('--limit', type=int, default=0, help='only the first N documents')
+        if name == 'rebuild-index':
+            sub.add_argument(
+                '--source', default='', help='index to validate (default: the pre-v2 index)'
+            )
         if name == 'validate-config':
             sub.add_argument(
                 '--strict',
