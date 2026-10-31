@@ -33,6 +33,9 @@ def _config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **overrides: object
         'extraction.review_queue_path': 'extractions/review_queue.parquet',
         'aggregation.min_constituents': 2,
         'aggregation.winsorize_pct': 0.05,
+        # These tests are about the company guardrail, not the observation guardrail;
+        # the observation minimum has its own tests.
+        'aggregation.min_observations': 1,
     }
     values.update(overrides)
     return load_config(REPO / 'configs' / 'config.yaml', overrides=values)
@@ -61,6 +64,10 @@ def _extractions(rows: list[dict[str, object]]) -> pd.DataFrame:
         'guidance_direction': None,
         'tone': 'neutral',
         'theme_demand_direction': None,
+        'model': 'fake/model:free',
+        # consolidate writes this; dedupe keying on a column that does not exist is
+        # exactly the defect F5 describes.
+        'record_confidence': 0.9,
     }
     return pd.DataFrame([{**defaults, **row} for row in rows])
 
@@ -243,7 +250,14 @@ def test_review_queue_documents_are_excluded(
     queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
     queue_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
-        [{'document_id': 'bad', 'field': 'reported_eps', 'reason': 'low_confidence', 'model': 'm'}]
+        [
+            {
+                'document_id': 'bad',
+                'field': 'reported_eps',
+                'reason': 'low_confidence',
+                'model': 'fake/model:free',
+            }
+        ]
     ).to_parquet(queue_path, index=False)
 
     rows = [
@@ -262,8 +276,8 @@ def test_two_models_do_not_double_count(tmp_path: Path, monkeypatch: pytest.Monk
     config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
     constituents = _constituents(tmp_path)
     rows = [
-        _compass(document_id='doc-model-a', cik='0000000001', confidence=0.6),
-        _compass(document_id='doc-model-b', cik='0000000001', confidence=0.9),
+        _compass(document_id='doc-model-a', cik='0000000001', record_confidence=0.6),
+        _compass(document_id='doc-model-b', cik='0000000001', record_confidence=0.9),
         _compass(document_id='doc-other', cik='0000000002'),
     ]
     frame = aggregate_index(config, _extractions(rows), str(constituents))
@@ -279,7 +293,9 @@ def test_two_exhibits_same_filing_count_once(
     constituents = _constituents(tmp_path)
     rows = [
         _compass(document_id='exhibit-99-1', cik='0000000001', reported_eps=1.0),
-        _compass(document_id='exhibit-99-2', cik='0000000001', reported_eps=1.0, confidence=0.9),
+        _compass(
+            document_id='exhibit-99-2', cik='0000000001', reported_eps=1.0, record_confidence=0.9
+        ),
     ]
     frame = aggregate_index(config, _extractions(rows), str(constituents))
     assert frame.loc[0, 'n_reported'] == 1
@@ -294,11 +310,29 @@ def test_duplicate_rows_do_not_weight_one_company_twice(
     Counting distinct CIKs alone would still average the duplicate's EPS growth into the
     index, letting one company pull the aggregate toward itself by reporting twice.
     """
-    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 2})
+    # Winsorising is off here: with three observations a 200% growth is clipped by the
+    # as-of clip, which is the correct behaviour but would mask what this test measures.
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 2, 'aggregation.winsorize_pct': 0.0},
+    )
     constituents = _constituents(tmp_path)
     rows = [
-        _compass(document_id='a1', cik='0000000001', prior_year_eps=1.0, reported_eps=3.0),
-        _compass(document_id='a2', cik='0000000001', prior_year_eps=1.0, reported_eps=3.0),
+        _compass(
+            document_id='a1',
+            cik='0000000001',
+            prior_year_eps=1.0,
+            reported_eps=3.0,
+            record_confidence=0.9,
+        ),
+        _compass(
+            document_id='a2',
+            cik='0000000001',
+            prior_year_eps=1.0,
+            reported_eps=3.0,
+            record_confidence=0.2,
+        ),
         _compass(document_id='b1', cik='0000000002', prior_year_eps=1.0, reported_eps=1.0),
         _compass(document_id='c1', cik='0000000003', prior_year_eps=1.0, reported_eps=1.0),
     ]
@@ -352,7 +386,14 @@ def test_review_excluded_is_per_asof(tmp_path: Path, monkeypatch: pytest.MonkeyP
     queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
     queue_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
-        [{'document_id': 'late', 'field': 'reported_eps', 'reason': 'low_confidence', 'model': 'm'}]
+        [
+            {
+                'document_id': 'late',
+                'field': 'reported_eps',
+                'reason': 'low_confidence',
+                'model': 'fake/model:free',
+            }
+        ]
     ).to_parquet(queue_path, index=False)
 
     rows = [
@@ -479,14 +520,30 @@ def test_output_columns_exact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         'n_expected',
         'share_reported',
         'n_review_excluded',
+        'share_of_cohort',
+        'share_of_index',
+        'theme_demand_share',
+        'theme_pricing_share',
         'beat_rate',
         'eps_growth_agg',
         'guidance_raise_share',
         'guidance_lower_share',
         'guidance_ratio',
         'tone_score_mean',
-        'theme_demand_share',
-        'theme_pricing_share',
+        'n_obs_beat',
+        'n_obs_growth',
+        'n_obs_guidance',
+        'n_obs_tone',
+        'n_obs_theme_demand',
+        'n_obs_theme_pricing',
+        'metric_status_beat_rate',
+        'metric_status_eps_growth_agg',
+        'metric_status_guidance_raise_share',
+        'metric_status_guidance_lower_share',
+        'metric_status_guidance_ratio',
+        'metric_status_tone_score_mean',
+        'metric_status_theme_demand_share',
+        'metric_status_theme_pricing_share',
         'suppressed',
     ]
 
@@ -515,3 +572,319 @@ def test_equal_weighting_ignores_missing_weights_file(
             0, 'beat_rate'
         ]
     )
+
+
+def test_metric_suppressed_when_few_observations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Twelve companies and one consensus figure is not a beat rate."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 2, 'aggregation.min_observations': 5},
+    )
+    constituents = _constituents(tmp_path, count=12)
+    rows = [
+        _compass(
+            document_id=f'doc-{index}',
+            cik=f'{index + 1:010d}',
+            consensus_eps=1.0 if index == 0 else None,
+        )
+        for index in range(12)
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_reported'] == 12
+    assert frame.loc[0, 'n_obs_beat'] == 1
+    assert pd.isna(frame.loc[0, 'beat_rate'])
+    assert frame.loc[0, 'metric_status_beat_rate'] == 'insufficient_observations'
+    # Growth is observed by all twelve, so it is computed.
+    assert frame.loc[0, 'n_obs_growth'] == 12
+    assert pd.notna(frame.loc[0, 'eps_growth_agg'])
+    assert frame.loc[0, 'metric_status_eps_growth_agg'] == 'ok'
+
+
+def test_no_metric_computed_from_fewer_than_min(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No metric value exists without at least min_observations observations behind it."""
+    minimum = 4
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 2, 'aggregation.min_observations': minimum},
+    )
+    constituents = _constituents(tmp_path, count=8)
+    rows = [
+        _compass(
+            document_id=f'doc-{index}',
+            cik=f'{index + 1:010d}',
+            consensus_eps=1.0 if index < 2 else None,
+            guidance_direction='raised' if index < 2 else None,
+        )
+        for index in range(8)
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    for name in ('beat_rate', 'guidance_raise_share', 'guidance_ratio'):
+        assert pd.isna(frame.loc[0, name]), name
+        assert frame.loc[0, f'metric_status_{name}'] == 'insufficient_observations'
+
+
+def test_winsorize_uses_only_documents_public_by_asof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A later document must not change an earlier as-of value."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.winsorize_pct': 0.2},
+    )
+    constituents = _constituents(tmp_path, count=6)
+    rows = [
+        _compass(
+            document_id='a',
+            cik='0000000001',
+            report_date='2025-04-10',
+            prior_year_eps=1.0,
+            reported_eps=2.0,
+        ),
+        _compass(
+            document_id='b',
+            cik='0000000002',
+            report_date='2025-04-10',
+            prior_year_eps=1.0,
+            reported_eps=2.0,
+        ),
+        _compass(
+            document_id='c',
+            cik='0000000003',
+            report_date='2025-04-10',
+            prior_year_eps=1.0,
+            reported_eps=2.5,
+        ),
+    ]
+    early = aggregate_index(config, _extractions(rows), str(constituents))
+    later = [
+        *rows,
+        _compass(
+            document_id='late',
+            cik='0000000004',
+            report_date='2025-04-20',
+            prior_year_eps=1.0,
+            reported_eps=100.0,
+        ),
+    ]
+    full = aggregate_index(config, _extractions(later), str(constituents))
+    first = early.iloc[0]['eps_growth_agg']
+    same_date = full[full['as_of_date'] == early.iloc[0]['as_of_date']].iloc[0]['eps_growth_agg']
+    assert first == pytest.approx(same_date)
+
+
+def test_asof_value_unchanged_by_later_documents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Appending a later outlier leaves every earlier row byte-identical."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path, count=6)
+    rows = [
+        _compass(document_id=f'doc-{index}', cik=f'{index + 1:010d}', report_date='2025-04-10')
+        for index in range(3)
+    ]
+    before = aggregate_index(config, _extractions(rows), str(constituents))
+    after = aggregate_index(
+        config,
+        _extractions(
+            [
+                *rows,
+                _compass(
+                    document_id='outlier',
+                    cik='0000000006',
+                    report_date='2025-04-20',
+                    reported_eps=99.0,
+                    prior_year_eps=0.5,
+                ),
+            ]
+        ),
+        str(constituents),
+    )
+    earlier = after[after['as_of_date'] == before['as_of_date'].iloc[0]].reset_index(drop=True)
+    pd.testing.assert_frame_equal(
+        before.reset_index(drop=True).drop(columns=['share_of_cohort', 'share_of_index']),
+        earlier.drop(columns=['share_of_cohort', 'share_of_index']),
+    )
+
+
+def test_share_reported_uses_sampled_cohort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The share is measured against the sampled cohort, not all ~500 members."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path, count=8)
+    manifests = tmp_path / 'data' / 'manifests'
+    manifests.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({'cik': ['0000000001', '0000000002'], 'season': ['2025Q2', '2025Q2']}).to_csv(
+        manifests / 'cohort.csv', index=False
+    )
+    rows = [
+        _compass(document_id='a', cik='0000000001'),
+        _compass(document_id='b', cik='0000000002'),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_expected'] == 2
+    assert frame.loc[0, 'share_reported'] == pytest.approx(1.0)
+    assert frame.loc[0, 'share_of_index'] == pytest.approx(2 / 8)
+
+
+def test_one_model_flag_does_not_exclude_other_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A queue row about one model must not remove another model's good record."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    _constituents(tmp_path)
+    queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                'document_id': 'doc-1',
+                'field': 'record',
+                'reason': 'low_confidence',
+                'model': 'bad/model:free',
+            }
+        ]
+    ).to_parquet(queue_path, index=False)
+    rows = [
+        _compass(document_id='doc-1', cik='0000000001', model='bad/model:free'),
+        _compass(
+            document_id='doc-1', cik='0000000001', model='good/model:free', record_confidence=0.99
+        ),
+    ]
+    metrics = per_document_metrics(config, _extractions(rows))
+    flags = metrics.frame.set_index('model')['in_review']
+    assert bool(flags['bad/model:free']) is True
+    assert bool(flags['good/model:free']) is False
+
+
+def test_zeroed_confidence_falls_back_to_highest_document_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no confidence at all, every duplicate ties and the id decides, not row order."""
+    from nowcast.aggregation.aggregate import collapse_to_companies
+
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.dedupe_rule': 'max_confidence', 'aggregation.min_constituents': 1},
+    )
+    _constituents(tmp_path)
+    rows = [
+        _compass(
+            document_id='zzz',
+            cik='0000000001',
+            prior_year_eps=1.0,
+            reported_eps=3.0,
+            record_confidence=0.0,
+        ),
+        _compass(
+            document_id='aaa',
+            cik='0000000001',
+            prior_year_eps=1.0,
+            reported_eps=1.0,
+            record_confidence=0.0,
+        ),
+    ]
+    metrics = per_document_metrics(config, _extractions(rows))
+    kept, dropped = collapse_to_companies(metrics.frame, 'max_confidence')
+    # Identical confidence: the tie-break is deterministic, not whichever row came first.
+    assert dropped == 1
+    assert list(kept['document_id']) == ['aaa']
+
+
+def test_missing_confidence_column_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """max_confidence dedupe without a confidence column is an error, not a silent id sort."""
+    config = _config(tmp_path, monkeypatch)
+    frame = _extractions([_compass()]).drop(columns=['record_confidence'])
+    with pytest.raises(DataError, match='record_confidence'):
+        per_document_metrics(config, frame)
+
+
+def test_unknown_tone_is_counted_not_silently_dropped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A tone outside the vocabulary is logged by value, and scores NaN."""
+    config = _config(tmp_path, monkeypatch)
+    with caplog.at_level('WARNING'):
+        metrics = per_document_metrics(config, _extractions([_compass(tone='ecstatic')]))
+    assert pd.isna(metrics.frame.loc[0, 'tone_score'])
+    assert any('unknown tone' in record.getMessage() for record in caplog.records)
+
+
+def test_cohort_is_per_season(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A company sampled for another quarter is not expected to have reported this one."""
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path, count=8)
+    manifests = tmp_path / 'data' / 'manifests'
+    manifests.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {'cik': '0000000001', 'season': '2025Q2'},
+            {'cik': '0000000002', 'season': '2025Q2'},
+            # Two more sampled only for a different season.
+            {'cik': '0000000003', 'season': '2025Q3'},
+            {'cik': '0000000004', 'season': '2025Q3'},
+        ]
+    ).to_csv(manifests / 'cohort.csv', index=False)
+    rows = [
+        _compass(document_id='a', cik='0000000001', report_date='2025-04-20'),
+        _compass(document_id='b', cik='0000000002', report_date='2025-04-20'),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_expected'] == 2
+    assert frame.loc[0, 'share_reported'] == pytest.approx(1.0)
+
+
+def test_dedupe_uses_confidence_when_duplicates_disagree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two documents for one company with different figures: the confident one wins.
+
+    The other duplicate tests give both rows the same numbers, so they pass whichever
+    row survives. Here the surviving row is observable in the aggregate.
+    """
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{
+            'aggregation.min_constituents': 1,
+            'aggregation.min_observations': 1,
+            'aggregation.winsorize_pct': 0.0,
+        },
+    )
+    constituents = _constituents(tmp_path)
+    rows = [
+        # Low confidence says a miss; high confidence says a beat. The aggregate reports
+        # whichever survived the collapse, so this distinguishes the two rules.
+        # Ids chosen so the id tie-break would pick the WRONG row: 'aaa' sorts first and
+        # carries the low-confidence miss, 'zzz' carries the confident beat.
+        _compass(
+            document_id='aaa-miss',
+            cik='0000000001',
+            reported_eps=0.5,
+            consensus_eps=1.0,
+            record_confidence=0.2,
+        ),
+        _compass(
+            document_id='zzz-beat',
+            cik='0000000001',
+            reported_eps=2.0,
+            consensus_eps=1.0,
+            record_confidence=0.9,
+        ),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_reported'] == 1
+    # The high-confidence row is a beat; the low-confidence one is a miss.
+    assert frame.loc[0, 'beat_rate'] == pytest.approx(1.0)

@@ -1,0 +1,4 @@
+Superseded: see phase_R0.txt sections 4b, 6 and 7.
+
+This placeholder was written while the mutation check was mid-run. It is kept only so the
+file's history shows nothing was quietly dropped; the real results are in phase_R0.txt.

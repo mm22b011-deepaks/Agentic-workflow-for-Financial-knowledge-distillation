@@ -83,7 +83,9 @@ class CountingFakeCaller:
         self.fail_document = fail_document
         self.calls: list[str] = []
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> object:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> object:
         from nowcast.llm.caller import LLMResult
 
         content = '\n'.join(message['content'] for message in messages)
@@ -150,7 +152,9 @@ def test_runner_stops_on_budget_and_keeps_results(config: Config, tmp_path: Path
     processed: list[str] = []
 
     class BudgetCaller(CountingFakeCaller):
-        def complete(self, model: str, messages: list[dict[str, str]]) -> object:
+        def complete(
+            self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+        ) -> object:
             if len(processed) >= 1:
                 raise BudgetExceeded('cap reached')
             result = super().complete(model, messages)
@@ -370,3 +374,98 @@ def test_changing_threshold_invalidates_or_revalidates(
     # would pass even if the digest were random.
     same = changed('extraction', max_doc_chars=int(config.extraction.max_doc_chars))
     assert fingerprint(same, document, 'model:free', 'prompt-digest') == base  # type: ignore[arg-type]
+
+
+def test_rerun_clears_stale_queue_rows(config: Config, tmp_path: Path) -> None:
+    """A document that passes on a later run loses its old review rows."""
+    queue_path = resolve_data_path(config, config.extraction.review_queue_path)
+    documents = _documents(tmp_path, count=1)
+    _run(config, documents, CountingFakeCaller(fail_document='doc0'))
+    assert len(load_queue(queue_path)) == 1
+
+    later = _documents(tmp_path, count=1)
+    later[0].sha256 = 'different-hash'  # a fingerprint change forces a re-extraction
+    outcomes = _run(config, later, CountingFakeCaller())
+    assert outcomes[0].status == 'ok'
+    assert load_queue(queue_path).empty
+
+
+def test_one_model_flag_does_not_exclude_other_model(config: Config, tmp_path: Path) -> None:
+    """Two models on one document keep separate queue rows."""
+    documents = _documents(tmp_path, count=1)
+    callers = {
+        'model-a:free': CountingFakeCaller(fail_document='doc0'),
+        'model-b:free': CountingFakeCaller(),
+    }
+    asyncio.run(
+        run_extraction(
+            config,
+            documents,
+            caller_factory=lambda model: callers[model],
+            models=['model-a:free', 'model-b:free'],
+            queue_path=resolve_data_path(config, config.extraction.review_queue_path),
+        )
+    )
+    queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
+    flagged = set(queue['model'])
+    assert 'model-a:free' in flagged
+    pairs = set(zip(queue['document_id'], queue['model'], strict=True))
+    assert ('doc0', 'model-b:free') not in pairs
+
+
+def test_consolidate_survives_a_corrupt_result_file(config: Config, tmp_path: Path) -> None:
+    """One unreadable result must not abort consolidation after the run."""
+    documents = _documents(tmp_path, count=2)
+    _run(config, documents, CountingFakeCaller())
+    model_dir = extractions_dir(config) / runner.model_slug(config.llm.models[0])
+    (model_dir / 'broken.json').write_text('{"document_id": "broken", "rec', encoding='utf-8')
+
+    frame = runner.consolidate(config, [config.llm.models[0]])
+    assert len(frame) == 2
+    assert runner.skipped_result_count() >= 1
+
+
+def test_dedupe_prefers_higher_confidence_from_real_consolidate_output(
+    config: Config, tmp_path: Path
+) -> None:
+    """The dedupe key comes from consolidate's own output, not a hand-built frame."""
+    sources = {
+        'doc0': 'Revenue was $1.20 billion. GAAP earnings per share were $0.55. Guidance was cut.',
+        'doc1': 'Revenue was $1.20 billion. GAAP earnings per share were $0.35. Guidance was cut.',
+    }
+
+    class PerDocument(CountingFakeCaller):
+        def complete(self, model, messages, max_tokens=None):
+            text = '\n'.join(message['content'] for message in messages)
+            if 'doc1' in text:
+                payload = json.loads(REPLY)
+                payload['reported_eps'] = {
+                    'value': 0.35,
+                    'evidence_quote': 'earnings per share were $0.35',
+                    'confidence': 0.1,
+                }
+                from nowcast.llm.caller import LLMResult
+
+                return LLMResult(text=json.dumps(payload), model=model)
+            return super().complete(model, messages, max_tokens=max_tokens)
+
+    for name, body in sources.items():
+        path = tmp_path / f'{name}.txt'
+        path.write_text(body, encoding='utf-8')
+    documents = [
+        runner.Document(
+            document_id=name,
+            cik='0000000001',
+            report_date='2026-01-15',
+            document_type='EX-99',
+            raw_path=tmp_path / f'{name}.txt',
+            sha256=f'h-{name}',
+        )
+        for name in sources
+    ]
+    _run(config, documents, PerDocument())
+    frame = runner.consolidate(config, [config.llm.models[0]])
+    assert 'record_confidence' in frame.columns
+    assert frame['record_confidence'].notna().all()
+    best = frame.sort_values('record_confidence', ascending=False).iloc[0]
+    assert best['reported_eps'] == pytest.approx(0.55)

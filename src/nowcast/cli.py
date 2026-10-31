@@ -8,8 +8,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from nowcast.config import (
     Config,
+    aggregates_dir,
     data_root,
     load_config,
     manifests_dir,
@@ -163,12 +166,18 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     # companies — a sample of the alphabet, not of the index.
     sample = season_sample(config, frame)
     ciks = list(sample.ciks)
+    # Say what the cap will actually cover: a cap of 100 documents at 3 per company
+    # visits at most 34 companies, whichever 519 were sampled.
+    visitable = min(len(ciks), -(-limit // per_cik) if per_cik else len(ciks))
     LOGGER.info(
-        'ingesting for %d companies sampled across %s (cap %d documents, %d per company)',
+        'ingesting %d sampled companies, up to %d will be visited '
+        '(cap %d documents, %d per company) across %s; seasons %s',
         len(ciks),
-        f'{config.data.start_date}..{config.data.end_date}',
+        visitable,
         limit,
         per_cik,
+        f'{config.data.start_date}..{config.data.end_date}',
+        ', '.join(sample.seasons),
     )
     report = IngestReport()
     report_path = manifests_dir(config) / 'ingest_report.json'
@@ -203,6 +212,19 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     }
     target = manifests_dir(config) / 'ingest_summary.json'
     target.write_text(json.dumps(summary, indent=2), encoding='utf-8')
+    # The cohort is the denominator aggregation measures a share against: the companies
+    # this run set out to sample, per season. CIKs only; it never enters a report.
+    cohort_rows = [
+        {'cik': cik.zfill(10), 'season': season} for season in sample.seasons for cik in sample.ciks
+    ]
+    pd.DataFrame(cohort_rows).to_csv(manifests_dir(config) / 'cohort.csv', index=False)
+    small = [
+        season
+        for season in sample.seasons
+        if len(sample.ciks) < int(config.aggregation.min_constituents)
+    ]
+    for season in small:
+        LOGGER.warning('cohort_too_small:%s (%d companies)', season, len(sample.ciks))
     manifest.notes = f'indexed {len(rows)} new rows, {len(merged)} total'
     manifest.sample = sample.as_dict()
     _record_run(config, 'ingest', [str(constituents)], manifest)
@@ -227,8 +249,18 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     if not source_index.is_file():
         raise DataError(f'no document index at {source_index}; run ingest or rebuild-index first')
     documents = load_documents(config, source_index)
-    limit = int(args.limit) if args.limit else len(documents)
-    documents = documents[:limit]
+    # `--limit` is the index head — the oldest filings of a few companies. `--sample`
+    # takes one document per company first, spread across seasons, so a capped run
+    # describes the index rather than the alphabet.
+    if args.sample:
+        from nowcast.extraction.selection import describe, stratified_sample
+
+        seeds = int(args.seed) if args.seed is not None else int(config.aggregation.sample_seed)
+        documents = stratified_sample(documents, int(args.sample), seeds)
+        LOGGER.info('sampled %s seed=%d', describe(documents), seeds)
+    elif args.limit:
+        LOGGER.warning('--limit takes the head of the index, which is not a representative sample')
+        documents = documents[: int(args.limit)]
     if not documents:
         LOGGER.info('no documents to extract')
         return 0
@@ -313,9 +345,70 @@ def _cmd_rebuild_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_aggregate(args: argparse.Namespace) -> int:
+    """Aggregate consolidated extractions into index-level rows, privacy check first."""
+    from nowcast.aggregation.aggregate import aggregate_index, assert_index_level_only
+    from nowcast.extraction.runner import consolidated_path
+    from nowcast.ingestion.constituents import load_constituents
+
+    config = _load(args)
+    validate_config(config, strict=True)
+    manifest = start_manifest(config, stage='aggregate')
+    source = consolidated_path(config)
+    if not source.is_file():
+        raise DataError(f'no consolidated extractions at {source}; run extract first')
+    frame = pd.read_parquet(source)
+    constituents_path = resolve_data_path(config, config.data.constituents_csv)
+    constituents = load_constituents(constituents_path)
+    aggregate = aggregate_index(config, frame, str(constituents_path))
+    # The guardrail runs before the write, not after: a file that exists has been read.
+    assert_index_level_only(aggregate, constituents)
+    target = aggregates_dir(config) / 'index_aggregates.parquet'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    aggregate.to_parquet(target, index=False)
+    aggregate.to_csv(target.with_suffix('.csv'), index=False)
+    unsuppressed = int((~aggregate['suppressed']).sum()) if not aggregate.empty else 0
+    manifest.notes = f'{len(aggregate)} rows, {unsuppressed} unsuppressed'
+    _record_run(config, 'aggregate', [str(source)], manifest)
+    LOGGER.info('aggregated %d rows (%d unsuppressed) -> %s', len(aggregate), unsuppressed, target)
+    return 0
+
+
+def _cmd_model_bakeoff(args: argparse.Namespace) -> int:
+    """Measure every configured free model on the same real releases."""
+    from nowcast.extraction.bakeoff import run_bakeoff
+    from nowcast.ingestion.rebuild import index_path
+
+    config = _load(args)
+    validate_config(config, strict=True)
+    source = index_path(config)
+    if not source.is_file():
+        raise DataError(f'no document index at {source}; run rebuild-index first')
+    models = args.model or list(config.llm.models)
+    table = run_bakeoff(config, models, source, int(args.sample))
+    target = manifests_dir(config) / 'bakeoff.json'
+    target.write_text(json.dumps(table, indent=2), encoding='utf-8')
+    for row in table['models']:
+        LOGGER.info('bakeoff %s', json.dumps(row))
+    LOGGER.info('bakeoff written: %s', target)
+    return 0
+
+
+def _not_implemented(name: str) -> int:
+    """Refuse a stage that Gate R0 has not reached yet, and say so."""
+    LOGGER.error('%s is not implemented; Gate R0 must be green first', name)
+    return 2
+
+
 def _cmd_run_all(args: argparse.Namespace) -> int:
-    """Run validate-config, build-constituents, ingest and extract in order."""
-    steps = (_cmd_validate_config, _cmd_build_constituents, _cmd_ingest, _cmd_extract)
+    """Run validate-config, build-constituents, ingest, extract and aggregate in order."""
+    steps = (
+        _cmd_validate_config,
+        _cmd_build_constituents,
+        _cmd_ingest,
+        _cmd_extract,
+        _cmd_aggregate,
+    )
     for step in steps:
         code = step(args)
         if code != 0:
@@ -337,6 +430,8 @@ def build_parser() -> argparse.ArgumentParser:
         'ingest': (_cmd_ingest, 'download and index earnings documents'),
         'rebuild-index': (_cmd_rebuild_index, 'validate an index into data.document_index'),
         'extract': (_cmd_extract, 'run LLM extraction over indexed documents'),
+        'aggregate': (_cmd_aggregate, 'aggregate extractions into index-level rows'),
+        'model-bakeoff': (_cmd_model_bakeoff, 'measure every configured model on one sample'),
         'run-all': (_cmd_run_all, 'run every stage in order'),
     }
     for name, (handler, help_text) in common.items():
@@ -344,10 +439,22 @@ def build_parser() -> argparse.ArgumentParser:
         _add_common(sub)
         if name == 'extract':
             sub.add_argument('--limit', type=int, default=0, help='only the first N documents')
+            sub.add_argument(
+                '--sample',
+                type=int,
+                default=0,
+                help='N documents, one per company first and spread across seasons',
+            )
+            sub.add_argument('--seed', type=int, default=None, help='seed for --sample')
         if name == 'rebuild-index':
             sub.add_argument(
                 '--source', default='', help='index to validate (default: the pre-v2 index)'
             )
+        if name == 'model-bakeoff':
+            sub.add_argument(
+                '--sample', type=int, default=10, help='documents each model is measured on'
+            )
+            sub.add_argument('--model', action='append', default=[], help='model (repeatable)')
         if name == 'validate-config':
             sub.add_argument(
                 '--strict',

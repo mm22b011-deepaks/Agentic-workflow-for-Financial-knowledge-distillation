@@ -87,10 +87,16 @@ class DataConfig:
     sec_user_agent_env: str = 'SEC_USER_AGENT'
     sec_max_requests_per_sec: float = 8.0
     sec_abort_after_blocked: int = 5
+    # The SEC client has its own timeout: borrowing the LLM one made a slow filing page
+    # wait as long as a reasoning model.
+    sec_timeout_seconds: float = 30.0
     edgar_submissions_url_template: str = ''
     edgar_archive_url_template: str = ''
     edgar_index_url_template: str = ''
     edgar_index_headers_url_template: str = ''
+    # Paginated submissions ("filings.files") are only needed when the recent feed does
+    # not reach the window start; the template names the path, never a full URL.
+    edgar_filing_files_url_template: str = ''
     edgar_forms: tuple[str, ...] = ()
     edgar_document_suffixes: tuple[str, ...] = ()
     edgar_earnings_items: tuple[str, ...] = ()
@@ -123,20 +129,38 @@ class LLMConfig:
     # The ceiling a truncated completion may be retried up to. Kept in config because
     # the usable value is a property of the provider tier, not of this code.
     max_tokens_ceiling: int = 32768
+    # Exactly one reasoning control may be set: 'effort' (low/medium/high) or a token
+    # cap. Setting both made one of them dead without saying so.
+    reasoning_control: str = 'effort'
     reasoning_effort: str = 'low'
-    max_reasoning_tokens: int = 3000
+    max_reasoning_tokens: int = 0
+    # OpenRouter's models endpoint, used to ask what a model actually supports. The
+    # parameters are read from the provider, never assumed.
+    models_url: str = ''
     retry_attempts: int = 3
     retry_backoff_seconds: float = 2.0
     retry_max_wait_seconds: float = 120.0
     app_name: str = ''
+    referer_url: str = ''
+
+    def reasoning_params(self) -> dict[str, Any]:
+        """Return the provider's `reasoning` object, or {} when none is configured."""
+        if self.reasoning_control == 'effort' and self.reasoning_effort:
+            return {'effort': self.reasoning_effort}
+        if self.reasoning_control == 'max_tokens' and self.max_reasoning_tokens > 0:
+            return {'max_tokens': int(self.max_reasoning_tokens)}
+        return {}
 
 
 @dataclass(frozen=True)
 class CacheConfig:
-    """Response cache settings."""
+    """Response cache settings.
+
+    The directory is `paths.cache_dir`; a second `cache.dir` key was never read and let
+    two answers to "where is the cache" coexist.
+    """
 
     enabled: bool = True
-    dir: str = '.cache/llm'
     ttl_days: int = 30
 
 
@@ -162,6 +186,24 @@ class ExtractionConfig:
     max_evidence_words: int = 25
     themes: tuple[str, ...] = ()
     review_queue_path: str = ''
+    # Vocabularies live here so the prompt, the validators and the aggregator read one
+    # list: a prompt offering a value the code rejects teaches the model to fail.
+    eps_basis_vocab: tuple[str, ...] = ()
+    guidance_direction_vocab: tuple[str, ...] = ()
+    tone_vocab: tuple[str, ...] = ()
+    tone_scores: dict[str, float] = field(default_factory=dict)
+    review_reason_codes: tuple[str, ...] = ()
+    # Interim packer (before R2): the head of the release plus windows around these
+    # phrases, in document order.
+    pack_phrases: tuple[str, ...] = ()
+
+    def vocab(self, name: str) -> tuple[str, ...]:
+        """Return one configured vocabulary by field name; () for a free-text field."""
+        return {
+            'eps_basis': self.eps_basis_vocab,
+            'guidance_direction': self.guidance_direction_vocab,
+            'tone': self.tone_vocab,
+        }.get(name, ())
 
 
 @dataclass(frozen=True)
@@ -175,6 +217,10 @@ class AggregationConfig:
     # How a (company, season) reported more than once is reduced to one observation:
     # the row with the highest stored confidence, or the earliest document id.
     dedupe_rule: str = 'max_confidence'
+    # A metric observed by fewer companies than this is reported as NaN with a status,
+    # not computed: one company's figure is that company's result.
+    min_observations: int = 10
+    sample_seed: int = 42
 
 
 @dataclass(frozen=True)
@@ -384,7 +430,26 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
         cache=CacheConfig(**cache),
         budget=BudgetConfig(**budget),
         extraction=ExtractionConfig(
-            **{**extraction, 'themes': _tuple(extraction.get('themes'), 'extraction.themes')}
+            **{
+                **extraction,
+                'themes': _tuple(extraction.get('themes'), 'extraction.themes'),
+                'eps_basis_vocab': _tuple(
+                    extraction.get('eps_basis_vocab'), 'extraction.eps_basis_vocab'
+                ),
+                'guidance_direction_vocab': _tuple(
+                    extraction.get('guidance_direction_vocab'),
+                    'extraction.guidance_direction_vocab',
+                ),
+                'tone_vocab': _tuple(extraction.get('tone_vocab'), 'extraction.tone_vocab'),
+                'review_reason_codes': _tuple(
+                    extraction.get('review_reason_codes'), 'extraction.review_reason_codes'
+                ),
+                'pack_phrases': _tuple(extraction.get('pack_phrases'), 'extraction.pack_phrases'),
+                'tone_scores': {
+                    str(key): float(value)
+                    for key, value in (extraction.get('tone_scores') or {}).items()
+                },
+            }
         ),
         aggregation=AggregationConfig(**aggregation),
         nowcast=NowcastConfig(**nowcast),
@@ -453,8 +518,30 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append("aggregation.dedupe_rule must be 'max_confidence' or 'first_document'")
     if config.llm.max_tokens_ceiling < config.llm.max_tokens:
         problems.append('llm.max_tokens_ceiling must be >= llm.max_tokens')
+    if config.llm.reasoning_control not in {'effort', 'max_tokens', 'none'}:
+        problems.append("llm.reasoning_control must be 'effort', 'max_tokens' or 'none'")
+    if config.llm.reasoning_control == 'effort' and config.llm.max_reasoning_tokens:
+        # Two controls and one branch is how the dead setting happened the first time.
+        problems.append(
+            'llm.max_reasoning_tokens must be 0 when llm.reasoning_control is effort '
+            '(choose one reasoning control)'
+        )
+    if config.llm.reasoning_control == 'max_tokens' and config.llm.max_reasoning_tokens <= 0:
+        problems.append('llm.max_reasoning_tokens must be > 0 when reasoning_control is max_tokens')
+    if config.llm.referer_url and not config.llm.referer_url.startswith(('http://', 'https://')):
+        problems.append('llm.referer_url must be a URL (OpenRouter reads HTTP-Referer as one)')
     if config.extraction.max_doc_chars <= 0:
         problems.append('extraction.max_doc_chars must be > 0')
+    for name in ('eps_basis', 'guidance_direction', 'tone'):
+        if not config.extraction.vocab(name):
+            problems.append(f'extraction.{name}_vocab must list at least one value')
+    missing_scores = sorted(set(config.extraction.tone_vocab) - set(config.extraction.tone_scores))
+    if missing_scores:
+        problems.append(
+            f'extraction.tone_scores is missing a score for: {", ".join(missing_scores)}'
+        )
+    if config.aggregation.min_observations < 1:
+        problems.append('aggregation.min_observations must be >= 1')
     if problems and strict:
         raise ConfigError('config validation failed: ' + '; '.join(problems))
     return problems

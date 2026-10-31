@@ -1,12 +1,18 @@
-"""Live smoke test: one tiny call to each configured model through OpenRouter."""
+"""Live smoke test: one tiny call to each configured model through OpenRouter.
+
+Reports where the API key came from (environment, `.env`, or nowhere) and a short
+fingerprint of it — never the key itself. A 401 here is almost always an exported key
+shadowing the one in `.env`: run `unset OPENROUTER_API_KEY` and try again.
+"""
 
 from __future__ import annotations
 
 import argparse
 import logging
 
-from _bootstrap import setup
+from _bootstrap import ROOT, setup
 
+from nowcast.envfile import key_provenance
 from nowcast.llm.caller import LLMCaller
 
 LOGGER = logging.getLogger('nowcast.scripts.smoke_llm')
@@ -20,6 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     config = setup()
+    provenance = key_provenance(config.llm.api_key_env, (ROOT / '.env',))
+    LOGGER.info('api key: %s', provenance)
+    if provenance['source'] == 'missing':
+        return 2
     models = args.model or list(config.llm.models)
     failures = 0
     with LLMCaller(config.llm) as caller:

@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 
 from nowcast.config import Config, cache_dir, extractions_dir, prompts_dir, resolve_data_path
-from nowcast.errors import BudgetExceeded, TruncatedCompletion
+from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, TruncatedCompletion
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.units import normalise_record
@@ -23,6 +23,7 @@ from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
 from nowcast.llm.structured import extract_structured
 from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
+from nowcast.parsing.packing import pack
 from nowcast.parsing.sections import pick_sections
 
 LOGGER = logging.getLogger(__name__)
@@ -62,6 +63,10 @@ class DocumentText:
     text: str
     chars_total: int
     chars_sent: int
+    windows_used: int = 0
+    # The converted text before the cut. Kept so a measurement does not have to parse
+    # the same document a second time just to ask what was left out.
+    source_text: str = ''
 
     @property
     def truncated(self) -> bool:
@@ -146,8 +151,14 @@ def prepare_text(config: Config, document: Document) -> DocumentText:
         text = pick_sections(
             text, dict(config.parsing.section_patterns), list(config.parsing.section_patterns)
         )
-    sent = text[: int(config.extraction.max_doc_chars)]
-    return DocumentText(text=sent, chars_total=len(text), chars_sent=len(sent))
+    packed = pack(text, int(config.extraction.max_doc_chars), tuple(config.extraction.pack_phrases))
+    return DocumentText(
+        text=packed.text,
+        chars_total=packed.chars_total,
+        chars_sent=len(packed.text),
+        windows_used=packed.windows_used,
+        source_text=text,
+    )
 
 
 def document_text(config: Config, document: Document) -> str:
@@ -220,8 +231,10 @@ def _record_failure(
     detail: str | None,
 ) -> ExtractionOutcome:
     """Queue one failed document with its reason and return the outcome."""
-    review_queue.append_rows(
+    review_queue.replace_rows(
         queue_target,
+        document.document_id,
+        model,
         [
             {
                 'document_id': document.document_id,
@@ -296,21 +309,36 @@ async def run_extraction(
     bundle: PromptBundle = load_prompt(
         PROMPT_NAME, config.extraction.schema_version, prompts_dir(config)
     )
-    cache = ResponseCache(config.cache, cache_dir(config))
     queue_target = queue_path or resolve_data_path(config, config.extraction.review_queue_path)
     semaphore = asyncio.Semaphore(int(config.runtime.max_concurrency))
-    stop = {'budget': False}
+    stop: dict[str, object] = {'budget': False, 'auth': ''}
     outcomes: list[ExtractionOutcome] = []
     lock = asyncio.Lock()
 
+    def prompt_variables(document: Document, text: str) -> dict[str, object]:
+        """Return the template variables, including the vocabularies from config.
+
+        The prompt is not allowed to carry its own copies of these lists: a value the
+        prompt offers and the validator rejects teaches the model to fail.
+        """
+        return {
+            'document_id': document.document_id,
+            'document_text': text,
+            'max_evidence_words': config.extraction.max_evidence_words,
+            'themes': ', '.join(config.extraction.themes),
+            'schema_version': config.extraction.schema_version,
+            'eps_basis_vocab': ', '.join(config.extraction.eps_basis_vocab),
+            'guidance_direction_vocab': ', '.join(config.extraction.guidance_direction_vocab),
+            'tone_vocab': ', '.join(config.extraction.tone_vocab),
+        }
+
     def _prompt_digest() -> str:
-        return prompt_hash(
-            bundle,
-            {
-                'max_evidence_words': config.extraction.max_evidence_words,
-                'themes': str(list(config.extraction.themes)),
-            },
-        )
+        static = {
+            key: value
+            for key, value in prompt_variables(Document('', '', '', '', Path(), ''), '').items()
+            if key not in {'document_id', 'document_text'}
+        }
+        return prompt_hash(bundle, static)
 
     digest = _prompt_digest()
 
@@ -342,16 +370,15 @@ async def run_extraction(
         async with semaphore:
             if stop['budget']:
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')
+            if stop['auth']:
+                return ExtractionOutcome(
+                    document.document_id, model, 'auth_failed', error=str(stop['auth'])
+                )
             # Every model call goes through the one composition point, so retry,
             # Retry-After and the cache apply on the live path, not only in tests.
             caller = compose_caller(config, caller_factory(model))
             prepared = prepare_text(config, document)
-            variables = {
-                'document_id': document.document_id,
-                'document_text': prepared.text,
-                'max_evidence_words': config.extraction.max_evidence_words,
-                'themes': ', '.join(config.extraction.themes),
-            }
+            variables = prompt_variables(document, prepared.text)
             if prepared.truncated:
                 # A cut document is not a clean success even when the record is: the
                 # model answered about the part it was shown, not about the release.
@@ -371,7 +398,6 @@ async def run_extraction(
                     variables,
                     ExtractionRecord,
                     int(config.extraction.max_repairs),
-                    cache,
                 )
                 record: ExtractionRecord | None = (
                     parsed if isinstance(parsed, ExtractionRecord) else None
@@ -379,10 +405,16 @@ async def run_extraction(
             except BudgetExceeded:
                 stop['budget'] = True
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')
-            except TruncatedCompletion as exc:
-                # The model returned nothing within its budget. Distinct from llm_failed
-                # so the queue says what actually happened and the run summary can count it.
-                return _record_failure(queue_target, document, model, 'truncated', str(exc))
+            except AuthError as exc:
+                # A rejected credential fails every document identically: stop the run
+                # once with the real cause instead of queueing N `llm_failed` rows.
+                stop['auth'] = str(exc)
+                return ExtractionOutcome(document.document_id, model, 'auth_failed', error=str(exc))
+            except EmptyCompletion as exc:
+                # The model returned nothing. Distinct from llm_failed so the queue says
+                # what actually happened and the run summary can count it.
+                reason = 'truncated' if isinstance(exc, TruncatedCompletion) else 'llm_failed'
+                return _record_failure(queue_target, document, model, reason, str(exc))
             if record is None:
                 return _record_failure(queue_target, document, model, 'llm_failed', error)
             record = record.model_copy(
@@ -398,20 +430,26 @@ async def run_extraction(
             record = normalise_record(record)
             source = str(variables['document_text'])
             issues, record = validate_record(record, source, config)
-            reasons = needs_review(record, issues, config)
+            reasons = needs_review(record, issues, config, truncated=prepared.truncated)
             diagnostics = {
                 'chars_total': prepared.chars_total,
                 'chars_sent': prepared.chars_sent,
                 'truncated': prepared.truncated,
+                'windows_used': prepared.windows_used,
             }
-            if reasons:
-                rows = review_queue.rows_for_record(
+            # Replace, never append: a document that passed on this run must not keep a
+            # row from a run where it did not.
+            review_queue.replace_rows(
+                queue_target,
+                document.document_id,
+                model,
+                review_queue.rows_for_record(
                     document.document_id,
                     model,
                     reasons,
                     [(issue.field, issue.code) for issue in issues],
-                )
-                review_queue.append_rows(queue_target, rows)
+                ),
+            )
             _write_result(
                 target,
                 {
@@ -444,19 +482,37 @@ async def run_extraction(
 
     _flag_disagreements(config, outcomes, active_models, queue_target)
     consolidate(config, active_models)
+    if stop['auth']:
+        raise AuthError(
+            f'every call was rejected ({stop["auth"]}); the run stopped after '
+            f'{len(outcomes)} document(s) instead of queueing them one by one'
+        )
     return outcomes
 
 
+SKIPPED_RESULTS: list[str] = []
+
+
 def _load_result(config: Config, model: str, document_id: str) -> dict[str, Any] | None:
-    """Load one stored result payload, returning None when absent or unreadable."""
+    """Load one stored result payload, returning None when absent or unreadable.
+
+    A truncated or corrupted file is skipped and counted, not raised: one bad file must
+    not abort consolidation after a long extraction run.
+    """
     path = result_path(config, model, document_id)
     if not path.is_file():
         return None
     try:
         payload = json.loads(path.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError):
+        LOGGER.warning('skipping unreadable result path=%s', path)
+        SKIPPED_RESULTS.append(str(path))
         return None
-    return payload if isinstance(payload, dict) else None
+    if not isinstance(payload, dict) or 'document_id' not in payload:
+        LOGGER.warning('skipping malformed result path=%s', path)
+        SKIPPED_RESULTS.append(str(path))
+        return None
+    return payload
 
 
 def _flag_disagreements(
@@ -474,7 +530,7 @@ def _flag_disagreements(
         records = []
         for model in models:
             payload = _load_result(config, model, document_id)
-            if payload is not None:
+            if payload is not None and isinstance(payload.get('record'), dict):
                 records.append((model, payload['record']))
         if len(records) < 2:
             continue
@@ -498,8 +554,18 @@ def _flag_disagreements(
         review_queue.append_rows(queue_path, rows)
 
 
+def skipped_result_count() -> int:
+    """Return how many result files consolidation and disagreement checks skipped."""
+    return len(SKIPPED_RESULTS)
+
+
 def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
-    """Write one parquet file per model holding every stored record."""
+    """Write one parquet file per model holding every stored record.
+
+    Columns are the union over all models: a theme or diagnostic present for one model
+    and not the other must not disappear because the other model's frames were built
+    first. Missing values are None ("not measured"), never False.
+    """
     frames: list[pd.DataFrame] = []
     for model in models:
         directory = extractions_dir(config) / model_slug(model)
@@ -508,21 +574,26 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
             payload = _load_result(config, model, path.stem)
             if payload is None:
                 continue
+            record = payload.get('record')
+            if not isinstance(record, dict):
+                LOGGER.warning('skipping result without a record path=%s', path)
+                SKIPPED_RESULTS.append(str(path))
+                continue
             row = {
                 'document_id': payload['document_id'],
                 'cik': payload.get('cik'),
                 'report_date': payload.get('report_date'),
                 'document_type': payload.get('document_type'),
                 'model': model,
-                'fingerprint': payload['fingerprint'],
+                'fingerprint': payload.get('fingerprint'),
             }
-            record = payload['record']
             # Results written before H5 carry no diagnostics; recording them as None
             # is honest ("not measured"), while False would claim the text was whole.
             diagnostics = payload.get('diagnostics') or {}
             row['chars_total'] = diagnostics.get('chars_total')
             row['chars_sent'] = diagnostics.get('chars_sent')
             row['truncated'] = diagnostics.get('truncated')
+            row['windows_used'] = diagnostics.get('windows_used')
             row['fiscal_year'] = record.get('fiscal_year')
             row['fiscal_quarter'] = record.get('fiscal_quarter')
             row['currency'] = record.get('currency')
@@ -534,9 +605,15 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
             row['revenue_yoy_growth_pct'] = (record.get('revenue_yoy_growth') or {}).get('value')
             for name in ('eps_basis', 'guidance_direction', 'guidance_metric', 'tone'):
                 row[name] = (record.get(name) or {}).get('value')
-            for theme, mention in (record.get('theme_mentions') or {}).items():
+            for theme in config.extraction.themes:
+                mention = (record.get('theme_mentions') or {}).get(theme) or {}
+                # Every configured theme gets a column for every model, so the frames
+                # share a schema and a theme nobody mentioned is an explicit False.
                 row[f'theme_{theme}_mentioned'] = bool(mention.get('mentioned'))
                 row[f'theme_{theme}_direction'] = mention.get('direction')
+            # Mean confidence of the fields that carry the record. Dedupe keys on this;
+            # without it every duplicate was resolved by document id, silently.
+            row['record_confidence'] = record_confidence(record)
             rows.append(row)
         if rows:
             frame = pd.DataFrame(rows)
@@ -551,6 +628,19 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
     combined.sort_values(['model', 'document_id']).to_parquet(target, index=False)
     LOGGER.info('consolidated all models rows=%d path=%s', len(combined), target)
     return combined
+
+
+CONFIDENCE_FIELDS = ('reported_eps', 'revenue', 'guidance_direction', 'tone')
+
+
+def record_confidence(record: dict[str, Any]) -> float | None:
+    """Return the mean confidence of the non-null core fields, or None when none exist."""
+    values = [
+        float((record.get(name) or {}).get('confidence') or 0.0)
+        for name in CONFIDENCE_FIELDS
+        if (record.get(name) or {}).get('value') is not None
+    ]
+    return round(sum(values) / len(values), 4) if values else None
 
 
 CONSOLIDATED_NAME = EXTRACTION_PARQUET

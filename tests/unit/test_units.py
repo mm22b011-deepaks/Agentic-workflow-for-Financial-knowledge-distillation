@@ -118,7 +118,10 @@ def test_prepare_text_records_how_much_was_sent(config: Config, tmp_path: Path) 
     )
     prepared = runner.prepare_text(short, document)
     assert prepared.chars_total >= 500
-    assert prepared.chars_sent == 100
+    # The packer keeps the head plus any windows; here there is no phrase to find, so
+    # the head alone is sent and it never exceeds the configured limit.
+    assert prepared.chars_sent <= 100
+    assert prepared.chars_sent > 0
     assert prepared.truncated
 
     whole = dataclasses.replace(
@@ -172,7 +175,9 @@ class FakeCaller:
         """Start with no calls made."""
         self.calls = 0
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Return the canned reply."""
         self.calls += 1
         return LLMResult(text=REPLY, model=model)

@@ -69,7 +69,9 @@ class FixtureCaller:
         self.records = records
         self.calls: list[str] = []
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Echo the record whose document_id appears in the user message."""
         text = '\n'.join(message['content'] for message in messages)
         for document_id in self.records:
@@ -155,7 +157,9 @@ def test_unparseable_reply_goes_to_the_review_queue(
         def __init__(self) -> None:
             self.calls = 0
 
-        def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+        def complete(
+            self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+        ) -> LLMResult:
             self.calls += 1
             return LLMResult(text='I am unable to answer that.', model=model)
 

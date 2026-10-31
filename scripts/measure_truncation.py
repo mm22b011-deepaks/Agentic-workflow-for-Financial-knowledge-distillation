@@ -27,8 +27,6 @@ from _bootstrap import setup
 
 from nowcast.config import Config, resolve_data_path
 from nowcast.extraction.runner import Document, prepare_text
-from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
-from nowcast.parsing.sections import pick_sections
 
 LOGGER = logging.getLogger('nowcast.scripts.measure_truncation')
 TERMS = {
@@ -39,28 +37,13 @@ TERMS = {
 }
 
 
-def full_text(config: Config, document: Document) -> str:
-    """Reproduce the runner's conversion and section selection without the cut."""
-    raw = document.raw_path.read_text(encoding='utf-8', errors='replace')
-    if document.raw_path.suffix.lower() in {'.htm', '.html'}:
-        text = html_to_text(raw)
-    else:
-        text = strip_sgml_wrapper(raw)
-    if config.parsing.section_patterns:
-        text = pick_sections(
-            text, dict(config.parsing.section_patterns), list(config.parsing.section_patterns)
-        )
-    return text
-
-
 def measure(config: Config, frame: pd.DataFrame) -> dict[str, object]:
     """Return the cut statistics over every text row in the index frame."""
     documents = 0
     over_cut = 0
     chars_total = 0
     chars_dropped = 0
-    first_after = dict.fromkeys(TERMS, 0)
-    any_after = dict.fromkeys(TERMS, 0)
+    missing_from_sent = dict.fromkeys(TERMS, 0)
     over_ids: list[str] = []
     for row in frame.to_dict('records'):
         raw_path = Path(str(row['raw_path']))
@@ -79,22 +62,22 @@ def measure(config: Config, frame: pd.DataFrame) -> dict[str, object]:
             sha256=str(row['sha256']),
         )
         prepared = prepare_text(config, document)
+        text = prepared.source_text
         documents += 1
         chars_total += prepared.chars_total
+        for name, term in TERMS.items():
+            # What actually matters now that the text is packed: does the word reach the
+            # model at all? Position past `chars_sent` stopped being meaningful the
+            # moment the packer started keeping windows from further down.
+            if term.search(text) and not term.search(prepared.text):
+                missing_from_sent[name] += 1
         if not prepared.truncated:
             continue
         over_cut += 1
         over_ids.append(document.document_id)
         chars_dropped += prepared.chars_total - prepared.chars_sent
-        text = full_text(config, document)
         if len(text) != prepared.chars_total:
             raise SystemExit(f'{document.document_id}: reproduced length differs from the cut')
-        for name, term in TERMS.items():
-            matches = list(term.finditer(text))
-            if matches and matches[0].start() >= prepared.chars_sent:
-                first_after[name] += 1
-            if any(match.start() >= prepared.chars_sent for match in matches):
-                any_after[name] += 1
     return {
         'cut': int(config.extraction.max_doc_chars),
         'documents': documents,
@@ -103,8 +86,8 @@ def measure(config: Config, frame: pd.DataFrame) -> dict[str, object]:
         'chars_total': chars_total,
         'chars_dropped': chars_dropped,
         'share_dropped': round(chars_dropped / chars_total, 4) if chars_total else None,
-        'first_occurrence_after_cut': first_after,
-        'any_occurrence_after_cut': any_after,
+        # Per term: in how many documents the word exists but never reaches the model.
+        'terms_missing_from_sent': missing_from_sent,
         'over_ids': over_ids,
         'terms': {name: term.pattern for name, term in TERMS.items()},
     }

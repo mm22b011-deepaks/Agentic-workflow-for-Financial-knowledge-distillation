@@ -28,16 +28,38 @@ class BudgetExceeded(NowcastError):
     """Raised when the spend ledger reaches the configured budget cap."""
 
 
-class TruncatedCompletion(NowcastError):
-    """The model returned no content because its token budget ran out.
+class AuthError(NowcastError):
+    """The provider rejected the credential (401) or refused the request (403).
 
-    A reasoning model that spends the whole budget thinking returns `content: ''` with
-    `finish_reason: 'length'`. That is not a parse failure — there is nothing to parse —
-    so it must be retried with a larger budget rather than fed to a repair loop.
+    Retrying cannot fix a wrong key, and doing so spends the retry budget and hides the
+    real cause behind N identical failures, so the caller raises this instead.
     """
 
-    def __init__(self, message: str, max_tokens: int, completion_tokens: int = 0) -> None:
-        """Store the message and the budget that was exhausted."""
+
+class ModelNotFound(NowcastError):
+    """The model does not exist, or the provider rejected a parameter it does not support."""
+
+
+class EmptyCompletion(NowcastError):
+    """The model returned no content at all.
+
+    Not a parse failure — there is nothing to parse — so it must not be fed to a repair
+    loop, which would spend `1 + max_repairs` calls learning nothing.
+    """
+
+    def __init__(
+        self, message: str, max_tokens: int, finish_reason: str = '', completion_tokens: int = 0
+    ) -> None:
+        """Store the message, the budget in force, the finish reason and tokens spent."""
         super().__init__(message)
         self.max_tokens = max_tokens
+        self.finish_reason = finish_reason
         self.completion_tokens = completion_tokens
+
+
+class TruncatedCompletion(EmptyCompletion):
+    """An empty reply whose `finish_reason` says the token budget ran out.
+
+    A reasoning model that spends the whole budget thinking returns `content: ''` with
+    `finish_reason: 'length'`, which a larger budget can fix.
+    """

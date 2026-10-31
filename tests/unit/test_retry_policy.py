@@ -51,7 +51,9 @@ class FlakyCaller:
         self.text = text
         self.calls = 0
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Raise the next scripted error or return the reply."""
         self.calls += 1
         if self.errors:

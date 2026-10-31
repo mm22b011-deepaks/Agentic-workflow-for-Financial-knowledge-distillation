@@ -3,8 +3,39 @@
 Status legend: `[x]` done · `[~]` in progress · `[ ]` todo · `[!]` blocked on a decision
 
 Last gate run: `ruff check . && ruff format --check . && mypy src && pytest -q` →
-`ruff` clean, **91 files formatted**, `mypy` clean on **42 source files**,
-**248 tests passing** (2026-10-31, after the H5 and prompt-hardening work).
+`ruff` clean, **100 files formatted**, `mypy` clean on **45 source files**,
+**303 tests passing** (2026-11-01, after reviewer pass 2: F1–F19, the N1–N7 and H1–H5
+remainders, M1/M4). `evidence/phase_R0.txt` maps each item to its test.
+
+## Reviewer pass 2 (2026-11-01) — item status
+
+| Item | Status | What was measured / why it stays open |
+|------|--------|----------------------------------------|
+| F2 key provenance | `[x]` | smoke test reports source, length, sha256 prefix and warns on shadowing. Live: an exported 31-char value shadows `.env`. |
+| F12 auth fail-fast | `[x]` | 401/403 → `AuthError`, 400/404 → `ModelNotFound`, never retried; run aborts. |
+| N1 one cache | `[x]` | side cache deleted; cache key includes reasoning params. |
+| N2 budget/ledger/reasoning | `[x]` offline, `[!]` live | per-call budget, `EmptyCompletion`, ledgered failures, capability probe, `model-bakeoff` implemented + tested offline. Live probe blocked (H-A). |
+| F9 stratified sample | `[x]` | `--sample N --seed S`; deterministic, one per company first. |
+| N3 `eps_missing` | `[x]` | separate reason from `empty_extraction`. Live coverage rerun `[!]` H-A. |
+| F7 number in source | `[x]` | matched-window check; mutated digit flagged. |
+| F10 vocabularies | `[x]` | config-driven prompt + validator + aggregator; `mixed` scored 0.0. |
+| F11 confidence coverage | `[x]` | text fields and themes queued; `doc_truncated` queued. |
+| H5 interim packer | `[x]` offline | head + phrase windows, omission markers; live re-measure `[!]` H-A. |
+| F6 queue semantics | `[x]` | replace per (document, model), superseded archive, per-pair exclusion, company counts. |
+| F5 dedupe confidence | `[x]` | `record_confidence` written by consolidate; missing column raises. |
+| F1 cohort share | `[x]` | `share_of_cohort`/`share_of_index`, cohort.csv, `cohort_too_small` log. |
+| F3 per-metric minimums | `[x]` | `n_obs_*` and `metric_status_*` columns. |
+| F4 as-of winsorise | `[x]` | clip inside each snapshot; later documents cannot change earlier rows. |
+| F15 season decision | `[x]` decision, `[ ]` diagnostic | filing-quarter season kept (D17); `fiscal_period_consistency` deferred to R4. |
+| F8 gzip length | `[x]` | byte count + encoding-aware skip; live gzip unverified. |
+| F14 ingest correctness | `[~]` | window errors abort, `cik_failed:<status>` counted, no `date.today()`; `filings.files` pagination **not implemented** (needs live CIK). |
+| H1 crash safety | `[x]` | corrupt/short result files skipped and counted. |
+| F16 pipeline wiring | `[x]` | `aggregate` command with guardrail before write; `run-all` stops at first failure. |
+| M1/M4/H3/F17–F19 | `[x]` | referer URL, one `:free` constant, dead constants removed, `cache.dir` removed, SEC timeout, `.gitignore` zips/parts, tenacity removed, locks regenerated, deviations recorded in D17. `tresata.zip` still tracked → **H-B**. |
+
+Live gate items stay `[!]` on **H-A**: 10+ real releases with `--sample`, per-field
+coverage, bakeoff table, rebuilt index counts, `measure_truncation` on the rebuilt index,
+5 human-read records.
 
 ---
 
@@ -82,19 +113,26 @@ Two structural changes to existing keys:
 - [ ] **H3 reproducibility/portability decision** — default to record: `DATA_DIR` wins
       over YAML; all stored paths relative to `DATA_DIR`; manifest carries config hash,
       git sha, package versions, prompt hashes, seed.
-- [ ] Gate R0: ruff + mypy + pytest green; missing Phase 0 files exist (they do: `paths.py`,
-      `logging_setup.py`, `manifest.py`); `test_validators` + `test_review_queue` pass
-      (4 + 6 tests, currently green); 10 real documents ingested; `evidence/phase_R0.txt`.
-      Blocked on the real-document count — see the live extraction task below.
+- [x] Gate R0 offline half: ruff + mypy + pytest green (303 tests); mutation check
+      33/33 killed, 0 survived; Phase 0 files exist;
+      `test_validators` + `test_review_queue` pass (18 + 7 tests, measured 2026-11-01);
+      `evidence/phase_R0.txt` written with the per-item test map.
+- [!] Gate R0 live half: 10+ real documents with `--sample`, per-field coverage, bakeoff
+      table, rebuild counts, `measure_truncation` on the rebuilt index, 5 human-read
+      records. Blocked on H-A.
 
 ### Live work outstanding for R0
-- `[~]` Background extraction of **10 real documents** with the first configured free
-  model (`scripts/extract_sample.py 10`, task `b58qa62yb`). Process still running,
-  output file empty at last check. Result must be read, not assumed.
-- `[ ]` Write `evidence/phase_R0.txt` from that run.
+- [!] **H-A first**: `unset OPENROUTER_API_KEY`, rerun `scripts/smoke_llm.py`. The
+  smoke test now proves the exported key was shadowing `.env` and is not a valid key length.
+- `[ ]` Then `scripts/extract_sample.py --sample 10 --seed 42`: 10 releases, ≥5 companies,
+  ≥2 seasons; report per-field coverage, empty-completion rate, review rate by reason.
+- `[x]` `evidence/phase_R0.txt` written; its live sections are marked BLOCKED.
 - [x] **Resolved by Q4:** nothing is overwritten or moved. The rebuilt index is written
   to `data.document_index` (default `data/document_index.v2.parquet`); the old files
-  stay under `data/index_backup/`. The rebuild itself is blocked on the live 401.
+  stay under `data/index_backup/`. The rebuild was then **run offline** on 2026-11-01:
+  100 rows → 0 kept (`no_earnings_item: 61, non_text: 39`), because a pre-`items` index
+  cannot prove Item 2.02. Results and review rows for the dropped documents moved to
+  `superseded/`; nothing deleted. A rebuild that keeps rows needs a fresh ingest (H-A).
 
 ## P0 — Prompt hardening for weak models (2026-10-31) `[~]`
 

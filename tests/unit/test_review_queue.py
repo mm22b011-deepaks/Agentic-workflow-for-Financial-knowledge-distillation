@@ -46,3 +46,47 @@ def test_rows_for_record_splits_reasons_and_issues() -> None:
     assert ('reported_eps', 'low_confidence') in fields
     assert ('record', 'validation_issues') in fields
     assert ('reported_eps', 'number_not_in_quote') in fields
+
+
+def test_replace_rows_clears_a_documents_rows(tmp_path: Path) -> None:
+    """Re-extracting a document that passes removes its old queue rows."""
+    from nowcast.extraction.review_queue import append_rows, load_queue, replace_rows
+
+    path = tmp_path / 'queue.parquet'
+    append_rows(
+        path,
+        [{'document_id': 'doc-1', 'field': 'record', 'reason': 'llm_failed', 'model': 'm:free'}],
+    )
+    replace_rows(path, 'doc-1', 'm:free', [])
+    assert load_queue(path).empty
+
+
+def test_replace_rows_keeps_other_models(tmp_path: Path) -> None:
+    """One model's rows are replaced; the other model's rows stay."""
+    from nowcast.extraction.review_queue import append_rows, load_queue, replace_rows
+
+    path = tmp_path / 'queue.parquet'
+    append_rows(
+        path,
+        [
+            {'document_id': 'doc-1', 'field': 'record', 'reason': 'llm_failed', 'model': 'a:free'},
+            {'document_id': 'doc-1', 'field': 'record', 'reason': 'llm_failed', 'model': 'b:free'},
+        ],
+    )
+    replace_rows(path, 'doc-1', 'a:free', [])
+    frame = load_queue(path)
+    assert frame['model'].tolist() == ['b:free']
+
+
+def test_replace_rows_archives_what_it_replaced(tmp_path: Path) -> None:
+    """History is kept under superseded/, not deleted."""
+    from nowcast.extraction.review_queue import SUPERSEDED_DIR, append_rows, replace_rows
+
+    path = tmp_path / 'queue.parquet'
+    append_rows(
+        path,
+        [{'document_id': 'doc-1', 'field': 'record', 'reason': 'llm_failed', 'model': 'm:free'}],
+    )
+    replace_rows(path, 'doc-1', 'm:free', [])
+    archived = list((tmp_path / SUPERSEDED_DIR).glob('review_queue.*.parquet'))
+    assert len(archived) == 1

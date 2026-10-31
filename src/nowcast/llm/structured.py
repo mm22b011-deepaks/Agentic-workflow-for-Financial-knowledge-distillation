@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import re
@@ -11,7 +10,7 @@ from typing import Any, Protocol
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from nowcast.errors import BudgetExceeded, TruncatedCompletion
+from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, ModelNotFound
 from nowcast.llm.caller import LLMResult
 from nowcast.llm.prompts import PromptBundle, render_template
 
@@ -27,12 +26,9 @@ class CallerLike(Protocol):
     """Anything that can complete one chat call, including test fakes."""
 
     def complete(
-        self,
-        model: str,
-        messages: list[dict[str, str]],
-        cache: Any | None = None,
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
     ) -> LLMResult:
-        """Return one completion, optionally reusing a validated cached reply."""
+        """Return one completion at the given token budget."""
 
 
 def strip_code_fences(text: str) -> str:
@@ -64,14 +60,14 @@ def extract_structured(
     variables: dict[str, Any],
     schema: type[BaseModel],
     max_repairs: int,
-    cache: Any | None = None,
 ) -> tuple[BaseModel | None, str, str | None]:
-    """Extract a schema object, repairing up to max_repairs times without raising."""
+    """Extract a schema object, repairing up to max_repairs times without raising.
+
+    There is no cache here: `RetryingCaller` owns the one cache on the path. A second
+    write-only cache in this function stored replies that nothing ever read.
+    """
     parser = PydanticOutputParser(pydantic_object=schema)
     messages = _messages(bundle, variables, schema)
-    cache_key_text = hashlib.sha256(
-        json.dumps([model, messages], sort_keys=True).encode('utf-8')
-    ).hexdigest()
     last_text = ''
     error: str | None = None
     for attempt in range(max_repairs + 1):
@@ -81,9 +77,10 @@ def extract_structured(
             # A spend cap is a deliberate stop, not a per-document failure: let it
             # reach the runner so the batch halts instead of being reported as llm_failed.
             raise
-        except TruncatedCompletion:
+        except (EmptyCompletion, AuthError, ModelNotFound):
             # Not a parse failure and not repairable by prompting: the model had nothing
-            # to say. Propagate it so the runner reports `truncated`, not `llm_failed`.
+            # to say, or the credential/model is wrong. Propagate so the runner reports
+            # `truncated` / aborts, instead of calling it llm_failed and repairing it.
             raise
         except Exception as exc:
             LOGGER.warning('model call failed attempt=%d model=%s error=%s', attempt, model, exc)
@@ -92,8 +89,6 @@ def extract_structured(
         candidate = strip_code_fences(last_text)
         try:
             parsed = parser.parse(candidate)
-            if cache is not None:
-                cache.set(cache_key_text, candidate, model)
             return parsed, last_text, None
         except Exception as exc:
             # A model that wraps the object in commentary still yields the object:
@@ -106,8 +101,6 @@ def extract_structured(
                     parsed = None
                 if parsed is not None:
                     LOGGER.info('salvaged JSON from commentary attempt=%d model=%s', attempt, model)
-                    if cache is not None:
-                        cache.set(cache_key_text, json.dumps(salvaged), model)
                     return parsed, last_text, None
             error = str(exc)
             LOGGER.info('parse failed attempt=%d model=%s', attempt, model)

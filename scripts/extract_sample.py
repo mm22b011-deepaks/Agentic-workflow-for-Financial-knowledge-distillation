@@ -1,4 +1,4 @@
-"""Extract a small real sample with one configured free model, for manual spot-checks."""
+"""Extract a stratified real sample with one configured free model, for manual spot-checks."""
 
 from __future__ import annotations
 
@@ -16,9 +16,13 @@ LOGGER = logging.getLogger('nowcast.scripts.extract_sample')
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run extraction over the first `--limit` extractable documents with one free model."""
+    """Extract `--sample` documents (one per company first) with one free model."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--limit', type=int, default=5, help='documents to extract')
+    parser.add_argument('--limit', type=int, default=0, help='first N documents (not a sample)')
+    parser.add_argument(
+        '--sample', type=int, default=5, help='N documents, one per company first, by season'
+    )
+    parser.add_argument('--seed', type=int, default=None, help='seed for --sample')
     parser.add_argument('--model', default='', help='model id (default: first configured)')
     args = parser.parse_args(argv)
     config = setup()
@@ -26,8 +30,16 @@ def main(argv: list[str] | None = None) -> int:
     index = resolve_data_path(config, config.data.document_index)
     # load_documents drops non-text documents and rows without an earnings item, so a
     # stale index holding EX-99 scans cannot feed a JPEG to the model.
-    documents = load_documents(config, index)[: args.limit]
-    LOGGER.info('documents=%d model=%s', len(documents), model)
+    documents = load_documents(config, index)
+    from nowcast.extraction.selection import describe, stratified_sample
+
+    if args.limit:
+        LOGGER.warning('--limit takes the head of the index, which is not a representative sample')
+        documents = documents[: args.limit]
+    else:
+        seed = int(args.seed) if args.seed is not None else int(config.aggregation.sample_seed)
+        documents = stratified_sample(documents, args.sample, seed)
+    LOGGER.info('documents=%s model=%s', describe(documents), model)
 
     shared: dict[str, object] = {}
 

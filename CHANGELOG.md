@@ -116,3 +116,67 @@ pre-1.0 and follow the phase gates in `tasks.md`.
   crash guard and settings-complete fingerprint (H1, H4); 24-mutant check green (H2);
   one dotenv path and portable scripts (H3); unknown top-level config sections rejected
   (M2). Status and measurements per item are in `DEFECTS.md`.
+
+### Fixed — reviewer pass 2 (2026-11-01)
+
+- **F2 — the 401 was a shadowed key.** `scripts/smoke_llm.py` reports the API key's source,
+  length and sha256 prefix (never the value) and warns when an exported variable differs
+  from the one in `.env`. Measured live: an exported value shadows the file and is far shorter than an
+  OpenRouter key.
+- **F12 — auth errors fail fast.** New `AuthError` (401/403) and `ModelNotFound` (400/404),
+  never retried; `run_extraction` stops the run and re-raises instead of queueing one
+  `llm_failed` row per document.
+- **N2 — per-call token budget and a complete ledger.** `with_max_tokens` and the shared
+  ratchet are gone; an empty reply raises `EmptyCompletion` (`TruncatedCompletion` for
+  `finish_reason=length`); every attempt is ledgered with `finish_reason` and `outcome`
+  before any raise; `reasoning` is sent only when the provider says the model supports it;
+  one reasoning control with `validate_config` rejecting both at once.
+- **N1 — one cache.** The write-only cache in `extract_structured` is deleted; the cache
+  key includes the reasoning parameters.
+- **F9 — `--sample` takes a stratified sample** (one document per company first, seeded),
+  and `--limit` warns that it is the head of the index.
+- **F7 — a number must appear in the matched source window.** A quote with one changed
+  digit no longer passes on fuzzy similarity alone (`number_not_in_source`).
+- **F10 — vocabularies live in config** and drive the prompt, the validator and the
+  aggregator; `mixed` is scored 0.0 and an unknown tone is counted, not silently NaN.
+- **F11 — every field with a value is confidence-checked**, theme mentions included, and a
+  truncated document is queued as `doc_truncated`.
+- **N3 — `eps_missing`** is a separate review reason from `empty_extraction`.
+- **H5 — interim packer**: the head of the release plus windows around configured phrases,
+  joined in document order with omission markers.
+- **F6 — the review queue is a verdict**: rows are replaced per (document, model), the
+  replaced rows are archived under `superseded/`, aggregation excludes per (document,
+  model), and `n_review_excluded` counts companies.
+- **F5 — dedupe uses a stored confidence**: `consolidate` writes `record_confidence`, and a
+  missing column raises instead of silently sorting by document id.
+- **F1 — cohort share**: `share_of_cohort` and `share_of_index`, a `manifests/cohort.csv`,
+  and a `cohort_too_small:<season>` warning instead of lowering `min_constituents`.
+- **F3 — per-metric minimums**: `n_obs_*` and `metric_status_*` columns; a metric below
+  `aggregation.min_observations` is NaN with a status.
+- **F4 — winsorising inside each as-of snapshot**; later documents cannot change earlier
+  rows.
+- **F8 — gzip downloads are not flagged truncated**; the length check compares bytes
+  actually downloaded and skips when a `Content-Encoding` is present.
+- **F14 — a bad window is not every company's zero**: window errors abort, missing
+  `data.end_date` is a `ConfigError`, and non-404 submissions failures are counted as
+  `cik_failed:<status>`.
+- **H1 — consolidation survives corrupt result files**, skipping and counting them.
+- **F16 — `nowcast aggregate`** runs the privacy guardrail before writing, and `run-all`
+  runs through to it and stops at the first failure.
+- **Hygiene** — `llm.referer_url` (header omitted when empty), one `:free` constant, dead
+  exhibit constants and duplicate `cache.dir` removed, `data.sec_timeout_seconds`,
+  `.gitignore` covers `*.zip` and `*.part`, `tenacity` removed and locks regenerated.
+
+### Added — reviewer pass 2
+
+- `nowcast model-bakeoff` (offline-tested): one sample, every configured `:free` model,
+  empty-completion rate, parse success, per-field coverage, latency and request count.
+- `extraction/selection.py` (stratified sampling), `parsing/packing.py` (interim packer),
+  `extraction/bakeoff.py`, `llm` auth/model error types, `manifests/cohort.csv`,
+  `evidence/phase_R0.txt`.
+
+### Not done, deliberately
+
+- F15's `fiscal_period_consistency` diagnostic (an R4 output column).
+- F14's `filings.files` pagination (needs a live high-volume CIK).
+- Every live gate item, blocked on the OpenRouter key (H-A).

@@ -17,3 +17,7 @@ manifests/
 
 # Editable-install metadata
 *.egg-info/
+
+# Archives and partial downloads: a stray zip ships caches and raw filings
+*.zip
+*.part

@@ -451,3 +451,195 @@ as 0.0; their units are canonical and their themes use the configured vocabulary
 question. The 401 blocks it; the measurement is queued as task P0 in `tasks.md`, with
 per-field coverage, empty-completion rate, review-queue rate and 429 count required
 before any improvement is claimed.
+
+## D17 — Reviewer pass 2: what each fix decided, and why (2026-11-01)
+
+### F2 — the 401 is a shadowed key
+
+`scripts/smoke_llm.py` now reports the key's *source* (environment, `.env`, or missing),
+its length and a sha256 prefix, and warns when an exported variable differs from the one
+in `.env`. It never prints the key. Run on 2026-11-01: the warning fired — an exported
+variable shadows the file, and the exported value is far shorter than an
+OpenRouter key. So the key in `.env` has never actually been tried, and whether it works
+is **unverified**. Details are in the `evidence/` output, not in this file. H-A stands:
+`unset OPENROUTER_API_KEY`, rerun the smoke test, rotate if it still fails.
+
+### F12 — status codes decide the exception, not one catch-all
+
+`AuthError` (401/403) and `ModelNotFound` (400/404) are raised by the caller and never
+retried; only 429, 5xx, timeouts and network errors are. In `run_extraction` an auth error
+stops the run: the in-flight documents report `auth_failed`, the rest are never called,
+and the error is re-raised rather than queueing N identical `llm_failed` rows. Deviation
+from the prompt, which says "aborts like BudgetExceeded": a spend cap is an expected
+outcome, a rejected credential is a broken deployment, so the latter raises.
+
+### N2 — one budget per call, and every attempt ledgered
+
+`with_max_tokens` and the shared ratchet are gone. `complete(model, messages,
+max_tokens=None)` takes the budget per call; `RetryingCaller` doubles it for the retry
+only. Any empty or whitespace-only content raises `EmptyCompletion`, subclassed as
+`TruncatedCompletion` when `finish_reason == 'length'`. `message.reasoning` and
+`reasoning_content` are read only to log their length. The ledger gains `finish_reason`
+and `outcome` (`ok` / `truncated` / `empty`) and records **before** the raise, so the
+calls that failed are visible.
+
+One reasoning control: `llm.reasoning_control` ∈ `effort | max_tokens | none`, and
+`validate_config` rejects setting both an effort and a token cap. The `reasoning`
+parameter is sent only when the provider's models list says the model supports it, read
+from `llm.models_url`; when the list cannot be read the parameter is sent, because a 400
+is a clear failure while silently dropping it hides why a model reasons.
+
+`model-bakeoff` is implemented and tested offline with a fake transport. **Not run live.**
+
+### N1 — one cache
+
+The write-only cache in `extract_structured` is deleted, with its parameter. The
+`RetryingCaller` cache is the only one. The cache key includes the reasoning parameters,
+because a reply sampled under a different reasoning budget is a different reply.
+
+### F9 — a sample, not the head of the index
+
+`extract --sample N --seed S` and `extract_sample --sample N` take one document per
+company first (round-robin over a seeded company order), then a second per company, and
+so on. `--limit` remains for debugging and now logs that it is not representative.
+
+### F10 — one vocabulary, read from config
+
+`extraction.eps_basis_vocab`, `guidance_direction_vocab`, `tone_vocab` and
+`extraction.tone_scores` are the only source. The prompt templates receive them as
+variables, the validator rejects an out-of-vocabulary value with `vocab_invalid`, and the
+aggregator maps tone through `tone_scores`. Decisions:
+
+- **`mixed`** is a real answer, scored **0.0** like neutral: a document saying both things
+  must not pull the tone score either way. The prompt always offered it; the old validator
+  rejected it and the old aggregator left it as a silent NaN. Both are fixed.
+- **`withdrawn`** guidance is in the vocabulary and counts in **neither** the raise nor the
+  lower share. A `guidance_withdrawn_share` column is **not** added: it is not in the
+  output schema and that is an R4 decision, not a defect fix. Recorded so it is a
+  decision, not an omission.
+- **Unknown tone** is scored NaN and counted in a warning; never silently dropped.
+
+### F7 — the number must be in the matched source window
+
+`verify_quote` scores a quote against the whole document, so a 40-character quote with one
+changed digit scores about 0.97 and passes. After the quote matches, the best-matching
+window (`fuzz.partial_ratio_alignment`) is located in the source and the value's number
+must appear **in that window**; otherwise `number_not_in_source` plus the confidence
+penalty. The model's own quote is no longer the proof that the model is right.
+
+### F11 — every field with a value is checked
+
+`needs_review` loops numeric **and** text fields, and theme mentions with
+`mentioned=True`. A truncated document adds `doc_truncated` whether or not the record
+itself looks fine.
+
+### N3 — `eps_missing` is its own reason
+
+`empty_extraction` stays "no reported EPS **and** no revenue". Revenue without EPS is a
+partial release and gets `eps_missing`.
+
+### F6 — the queue is a verdict, not a log
+
+`review_queue.replace_rows(document_id, model, rows)` replaces that pair's rows (an empty
+list clears them) and archives the replaced rows under `<queue dir>/superseded/`.
+Aggregation excludes per (document, model), so one model's flag no longer removes another
+model's good record. `n_review_excluded` counts distinct companies excluded at that date,
+not rows.
+
+### F5 — dedupe uses a confidence that exists
+
+`consolidate` writes `record_confidence` (mean confidence of the non-null core fields:
+reported_eps, revenue, guidance_direction, tone). `per_document_metrics` reads it and
+raises `DataError` when `dedupe_rule = max_confidence` and the column is absent: the old
+code defaulted every confidence to 0.0 and resolved every duplicate by document id while
+the config said "highest confidence".
+
+### F1 — the denominator is the cohort
+
+`ingest` writes `manifests/cohort.csv` (cik, season only). `aggregate_index` reports
+`share_of_cohort` and `share_of_index`, and `share_reported` is the cohort share. Without
+a cohort file the index itself is the cohort, so older runs keep working. A season whose
+cohort is smaller than `min_constituents` is logged as `cohort_too_small:<season>`;
+`min_constituents` is not lowered. The ingest log now says how many sampled companies the
+cap can actually visit.
+
+### F3 — per-metric observation minimums
+
+`n_obs_beat`, `n_obs_growth`, `n_obs_guidance`, `n_obs_tone` and
+`n_obs_theme_<name>` are output columns. A metric below `aggregation.min_observations` is
+NaN with `metric_status_<name> = 'insufficient_observations'`. `guidance_ratio`'s
+denominator counts companies that stated a raise **or** a lower.
+
+### F4 — winsorising inside the as-of snapshot
+
+The clip is computed per as-of date from the documents public by then.
+`test_asof_value_unchanged_by_later_documents` pins that a later outlier changes nothing
+earlier.
+
+### F15 — the season is the filing quarter
+
+Already the behaviour, and it stays: the filing date is knowable at as-of time, the
+extracted fiscal pair is not. The `fiscal_period_consistency` diagnostic the prompt asks
+for is **not implemented** — it is a new output column and belongs with R4.
+
+### F8 — Content-Length is the encoded size
+
+With `Accept-Encoding: gzip`, `Content-Length` is the compressed size and the body is
+decoded, so the old check flagged every compressed page as truncated. The check now
+compares the bytes actually downloaded and skips itself when a `Content-Encoding` is
+present. **Not verified live**; the skip is what makes it safe.
+
+### F14 — a bad window is not every company's zero
+
+A `DataError` about the window is re-raised, not caught per company. A missing
+`data.end_date` is a `ConfigError` (no more `date.today()`). A non-404 submissions failure
+records `cik_failed:<status>`. Following `filings.files` is **not implemented**: it needs
+a live high-volume CIK to verify the pagination shape; `data.edgar_filing_files_url_template`
+is in place for it.
+
+### F16 — the pipeline reaches the aggregate
+
+`nowcast aggregate` reads `extractions.parquet`, calls `aggregate_index`, calls
+`assert_index_level_only` **before** writing, and writes parquet and CSV. `run-all` runs
+validate-config → build-constituents → ingest → extract → aggregate and stops at the first
+non-zero code. `nowcast`, `evaluate` and `report` are not added.
+
+### Hygiene (M1, M4, H3, F17–F19)
+
+- `HTTP-Referer` comes from `llm.referer_url`; the header is omitted when empty.
+  `X-Title` keeps the app name.
+- One `:free` constant (`config.FREE_MODEL_SUFFIX`), imported by the caller.
+- `EXHIBIT_FORMS_PREFIX`, `EARNINGS_EXHIBIT_TYPE`, `EXHIBIT_99_RE` and the duplicate
+  `EXHIBIT_TYPE_PREFIX` are deleted; one used constant remains.
+- `cache.dir` removed; `paths.cache_dir` is the only answer.
+- `data.sec_timeout_seconds` replaces borrowing `llm.timeout_seconds`.
+- `.gitignore` covers `*.zip` and `*.part`. `tresata.zip` is still tracked — **H-B**.
+- `tenacity` removed from `pyproject.toml` and both locks (it was pinned and unused;
+  `RetryingCaller` is the retry implementation). Locks regenerated with uv: 58 runtime
+  pins, 76 dev pins, no local path.
+- `smoke_llm.py` and `measure_truncation.py` log rather than print; `mutation_check.py`
+  keeps `print` because its output is a report read by a person.
+- **F17 deviations from the Build Pack**, recorded and not changed: argparse rather than
+  Typer; a hand-written dataclass config loader rather than OmegaConf; a filesystem cache
+  rather than diskcache; raw httpx rather than `langchain-openai`; six themes where B3
+  names a different list; `max_doc_chars` 24000 where B3 says 60000; `extract_structured`
+  returns `(parsed, raw_text, error)` rather than an `LLMResult`; `aggregate_index`'s
+  signature differs from B3. Each needs the human to accept or reject.
+- **F18**: the prompt's `"v1"` literal is gone; `schema_version` is a template variable
+  from config.
+
+### N7 — the rebuild was run offline, and kept nothing
+
+`nowcast rebuild-index` on `data/document_index.parquet` (100 rows, no `items` column):
+0 kept, `{no_earnings_item: 61, non_text: 39}`, report at
+`data/manifests/rebuild_index.json`. On `document_index.text_only.parquet` (61 rows):
+0 kept, `{no_earnings_item: 61}`. That is the guard working: an index written before the
+`items` column cannot prove Item 2.02, so guessing would be the defect. The store was not
+destroyed — results and review rows for dropped documents were moved to `superseded/`.
+A rebuild that keeps rows requires a fresh ingest, which is blocked on H-A. Recorded
+because a zero-kept rebuild is exactly the kind of result a report could quietly omit.
+
+### Not done, and said plainly
+
+F15's `fiscal_period_consistency`; F14's `filings.files` pagination; N7's live rebuild and
+the truncation re-measurement on the rebuilt index; every live gate item, blocked on H-A.
