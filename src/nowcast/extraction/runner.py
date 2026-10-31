@@ -59,14 +59,28 @@ def model_slug(model: str) -> str:
     return model.replace('/', '__').replace(':', '-')
 
 
-def load_documents(config: Config, index_path: Path) -> list[Document]:
-    """Load the document index and return typed documents."""
+TEXT_SUFFIXES = ('.htm', '.html', '.txt')
+
+
+def load_documents(
+    config: Config, index_path: Path, suffixes: tuple[str, ...] | None = None
+) -> list[Document]:
+    """Load the document index and return typed documents.
+
+    An index written before the exhibit suffix filter existed can hold EX-99 scans;
+    passing `suffixes` drops anything that is not parseable text before it reaches a
+    prompt, where it would only produce a confidently wrong extraction.
+    """
     from nowcast.ingestion.doc_index import load_index
 
     frame = load_index(index_path)
+    allowed = {item.lower() for item in (suffixes if suffixes is not None else TEXT_SUFFIXES)}
     documents: list[Document] = []
     for row in frame.to_dict('records'):
         raw_path = Path(str(row['raw_path']))
+        if raw_path.suffix.lower() not in allowed:
+            LOGGER.info('skip non-text document raw_path=%s', raw_path)
+            continue
         if not raw_path.is_absolute():
             raw_path = resolve_data_path(config, str(row['raw_path']))
         documents.append(
