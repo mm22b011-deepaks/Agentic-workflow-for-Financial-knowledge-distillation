@@ -1,0 +1,196 @@
+"""Unit tests for the extraction runner."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+
+import pytest
+
+from nowcast.config import Config, extractions_dir, resolve_data_path
+from nowcast.extraction import runner
+from nowcast.extraction.review_queue import load_queue
+from nowcast.extraction.runner import Document, run_extraction
+
+REPLY = json.dumps(
+    {
+        'schema_version': 'v1',
+        'document_id': 'x',
+        'fiscal_year': 2026,
+        'fiscal_quarter': 1,
+        'currency': 'USD',
+        'units': 'USD',
+        'reported_eps': {
+            'value': 0.55,
+            'evidence_quote': 'earnings per share were $0.55',
+            'confidence': 0.9,
+        },
+        'eps_basis': {
+            'value': 'gaap',
+            'evidence_quote': 'GAAP earnings per share',
+            'confidence': 0.9,
+        },
+        'revenue': {
+            'value': 1.2,
+            'evidence_quote': 'Revenue was $1.20 billion',
+            'confidence': 0.9,
+        },
+        'guidance_direction': {
+            'value': 'maintained',
+            'evidence_quote': 'Guidance was cut',
+            'confidence': 0.8,
+        },
+    }
+)
+OTHER_REPLY = json.dumps(
+    {
+        **json.loads(REPLY),
+        'guidance_direction': {
+            'value': 'lowered',
+            'evidence_quote': 'Guidance was cut',
+            'confidence': 0.8,
+        },
+    }
+)
+SOURCE = 'Revenue was $1.20 billion. GAAP earnings per share were $0.55. Guidance was cut.'
+
+
+def _documents(tmp_path: Path, count: int = 2) -> list[Document]:
+    """Create document stubs whose raw files hold the same source text."""
+    documents: list[Document] = []
+    for index in range(count):
+        path = tmp_path / f'doc{index}.txt'
+        path.write_text(SOURCE, encoding='utf-8')
+        documents.append(
+            Document(
+                document_id=f'doc{index}',
+                cik='0000000001',
+                report_date='2026-01-15',
+                document_type='EX-99',
+                raw_path=path,
+                sha256=f'hash{index}',
+            )
+        )
+    return documents
+
+
+class CountingFakeCaller:
+    """Caller that records calls and can fail on a given document."""
+
+    def __init__(self, reply: str = REPLY, fail_document: str | None = None) -> None:
+        self.reply = reply
+        self.fail_document = fail_document
+        self.calls: list[str] = []
+
+    def complete(self, model: str, messages: list[dict[str, str]]) -> object:
+        from nowcast.llm.caller import LLMResult
+
+        content = '\n'.join(message['content'] for message in messages)
+        for marker in ('doc0', 'doc1', 'doc2', 'doc3'):
+            if f'document_id={marker}' in content:
+                self.calls.append(marker)
+                if self.fail_document == marker:
+                    raise RuntimeError('simulated failure')
+                break
+        return LLMResult(text=self.reply, model=model)
+
+
+def _run(config: Config, documents: list[Document], caller: CountingFakeCaller, models=None):
+    """Drive run_extraction with one shared fake caller."""
+    return asyncio.run(
+        run_extraction(
+            config,
+            documents,
+            caller_factory=lambda _model: caller,
+            models=models or [config.llm.models[0]],
+            queue_path=resolve_data_path(config, config.extraction.review_queue_path),
+        )
+    )
+
+
+def test_runner_skips_completed_documents(config: Config, tmp_path: Path) -> None:
+    """A second run over the same inputs makes no new model calls."""
+    documents = _documents(tmp_path)
+    caller = CountingFakeCaller()
+    _run(config, documents, caller)
+    first_calls = len(caller.calls)
+    second = _run(config, documents, caller)
+    assert len(caller.calls) == first_calls
+    assert all(outcome.skipped for outcome in second)
+
+
+def test_runner_writes_results(config: Config, tmp_path: Path) -> None:
+    """Each document produces a result file and a consolidated parquet."""
+    documents = _documents(tmp_path)
+    _run(config, documents, CountingFakeCaller())
+    model_dir = extractions_dir(config) / runner.model_slug(config.llm.models[0])
+    assert len(list(model_dir.glob('*.json'))) == 2
+    parquet = extractions_dir(config) / f'{runner.model_slug(config.llm.models[0])}.parquet'
+    assert parquet.is_file()
+
+
+def test_runner_survives_one_bad_document(config: Config, tmp_path: Path) -> None:
+    """One failing document is queued as llm_failed while the rest succeed."""
+    documents = _documents(tmp_path)
+    caller = CountingFakeCaller(fail_document='doc1')
+    outcomes = _run(config, documents, caller)
+    statuses = {outcome.document_id: outcome.status for outcome in outcomes}
+    assert statuses == {'doc0': 'ok', 'doc1': 'failed'}
+    queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
+    assert 'llm_failed' in set(queue['reason'])
+
+
+def test_runner_stops_on_budget_and_keeps_results(config: Config, tmp_path: Path) -> None:
+    """BudgetExceeded stops remaining work but keeps completed results."""
+    from nowcast.errors import BudgetExceeded
+
+    documents = _documents(tmp_path, count=3)
+    processed: list[str] = []
+
+    class BudgetCaller(CountingFakeCaller):
+        def complete(self, model: str, messages: list[dict[str, str]]) -> object:
+            if len(processed) >= 1:
+                raise BudgetExceeded('cap reached')
+            result = super().complete(model, messages)
+            processed.append('x')
+            return result
+
+    outcomes = _run(config, documents, BudgetCaller())
+    assert any(outcome.status == 'ok' for outcome in outcomes)
+    assert any(outcome.status == 'budget_stopped' for outcome in outcomes) or any(
+        outcome.status == 'failed' and outcome.error for outcome in outcomes
+    )
+
+
+def test_model_disagreement_queued(config: Config, tmp_path: Path) -> None:
+    """Differing guidance across configured models lands in the review queue."""
+    documents = _documents(tmp_path, count=1)
+    callers = {
+        'model-a:free': CountingFakeCaller(REPLY),
+        'model-b:free': CountingFakeCaller(OTHER_REPLY),
+    }
+    asyncio.run(
+        run_extraction(
+            config,
+            documents,
+            caller_factory=lambda model: callers[model],
+            models=['model-a:free', 'model-b:free'],
+            queue_path=resolve_data_path(config, config.extraction.review_queue_path),
+        )
+    )
+    queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
+    assert 'model_disagreement' in set(queue['reason'])
+
+
+def test_runner_rejects_non_free_model(config: Config, tmp_path: Path) -> None:
+    """A paid model id is refused before any call is made."""
+    from nowcast.errors import ConfigError
+    from nowcast.llm.caller import LLMCaller
+
+    caller = LLMCaller(config.llm)
+    try:
+        with pytest.raises(ConfigError):
+            caller.complete('paid/model', [{'role': 'user', 'content': 'x'}])
+    finally:
+        caller.close()

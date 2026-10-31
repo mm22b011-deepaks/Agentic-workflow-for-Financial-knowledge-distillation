@@ -1,0 +1,55 @@
+# SYNTHETIC examples. Company names and figures below are invented for illustration only
+# and correspond to no real issuer. Money and per-share figures are copied as PRINTED
+# (do not expand "billion" into raw dollars) so the evidence quote contains the digits.
+- input: |
+    ACME FIXTURE CORP ANNOUNCES THIRD QUARTER RESULTS
+    Third quarter revenue was $1.20 billion, up 4% year over year. GAAP diluted earnings per
+    share were $0.55, compared with $0.51 in the prior-year quarter. Analysts on average
+    expected GAAP earnings per share of $0.53. We expect fourth quarter revenue to grow at a
+    similar pace to the third quarter. Demand in our industrial segment remained soft.
+  output: |
+    {
+      "schema_version": "v1",
+      "document_id": "synthetic-001",
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "currency": "USD",
+      "units": "USD",
+      "reported_eps": {"value": 0.55, "null_reason": null, "evidence_quote": "GAAP diluted earnings per share were $0.55", "confidence": 0.9},
+      "prior_year_eps": {"value": 0.51, "null_reason": null, "evidence_quote": "compared with $0.51 in the prior-year quarter", "confidence": 0.88},
+      "consensus_eps": {"value": 0.53, "null_reason": null, "evidence_quote": "expected GAAP earnings per share of $0.53", "confidence": 0.85},
+      "eps_basis": {"value": "gaap", "null_reason": null, "evidence_quote": "GAAP diluted earnings per share", "confidence": 0.9},
+      "revenue": {"value": 1.2, "null_reason": null, "evidence_quote": "Third quarter revenue was $1.20 billion", "confidence": 0.9},
+      "revenue_yoy_growth": {"value": 4.0, "null_reason": null, "evidence_quote": "up 4% year over year", "confidence": 0.9},
+      "guidance_direction": {"value": "raised", "null_reason": null, "evidence_quote": "We expect fourth quarter revenue to grow at a similar pace to the third quarter", "confidence": 0.6},
+      "guidance_metric": {"value": "revenue", "null_reason": null, "evidence_quote": "fourth quarter revenue", "confidence": 0.85},
+      "tone": {"value": "cautious", "null_reason": null, "evidence_quote": "Demand in our industrial segment remained soft", "confidence": 0.6},
+      "theme_mentions": {
+        "demand": {"mentioned": true, "direction": "down", "evidence_quote": "Demand in our industrial segment remained soft", "confidence": 0.85}
+      }
+    }
+- input: |
+    SAMPLE HOLDINGS PLC PRELIMINARY RESULTS
+    Revenue for the year was GBP 480 million. The company said cost pressures remain elevated
+    and declined to provide numerical guidance for the coming year.
+  output: |
+    {
+      "schema_version": "v1",
+      "document_id": "synthetic-002",
+      "fiscal_year": 2026,
+      "fiscal_quarter": null,
+      "currency": "GBP",
+      "units": "GBP millions",
+      "reported_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "prior_year_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "consensus_eps": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "eps_basis": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "revenue": {"value": 480, "null_reason": null, "evidence_quote": "Revenue for the year was GBP 480 million", "confidence": 0.9},
+      "revenue_yoy_growth": {"value": null, "null_reason": "not_stated", "evidence_quote": null, "confidence": 0.0},
+      "guidance_direction": {"value": "not_provided", "null_reason": null, "evidence_quote": "declined to provide numerical guidance for the coming year", "confidence": 0.85},
+      "guidance_metric": {"value": null, "null_reason": "ambiguous", "evidence_quote": null, "confidence": 0.0},
+      "tone": {"value": "cautious", "null_reason": null, "evidence_quote": "cost pressures remain elevated", "confidence": 0.6},
+      "theme_mentions": {
+        "costs": {"mentioned": true, "direction": "up", "evidence_quote": "cost pressures remain elevated", "confidence": 0.7}
+      }
+    }
