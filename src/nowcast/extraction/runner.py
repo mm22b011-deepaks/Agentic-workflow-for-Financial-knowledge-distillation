@@ -21,7 +21,7 @@ from nowcast.extraction.validators import needs_review, validate_record
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
 from nowcast.llm.structured import extract_structured
-from nowcast.parsing.html import html_to_text
+from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
 from nowcast.parsing.sections import pick_sections
 
 LOGGER = logging.getLogger(__name__)
@@ -115,7 +115,11 @@ def load_documents(
 def document_text(config: Config, document: Document) -> str:
     """Read, convert and truncate a document's text for prompting."""
     raw = document.raw_path.read_text(encoding='utf-8', errors='replace')
-    text = html_to_text(raw) if document.raw_path.suffix.lower() in {'.htm', '.html'} else raw
+    if document.raw_path.suffix.lower() in {'.htm', '.html'}:
+        text = html_to_text(raw)
+    else:
+        # A `.txt` exhibit from EDGAR still carries the <DOCUMENT><TYPE>..<TEXT> wrapper.
+        text = strip_sgml_wrapper(raw)
     sections: dict[str, str] = {}
     if config.parsing.section_patterns:
         text = pick_sections(

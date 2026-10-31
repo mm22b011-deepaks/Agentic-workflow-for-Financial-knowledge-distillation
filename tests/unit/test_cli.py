@@ -182,3 +182,52 @@ def test_ingest_records_a_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert 'constituents.csv' in body['input_fingerprints']
     assert 'sk-or-v1-manifest-check-not-real' not in text
     assert 'pytest@example.com' not in text
+    # The run's own report is written too, so "no documents" can be told apart from
+    # "every request was refused" without digging through logs.
+    report = json.loads((data / 'manifests' / 'ingest_report.json').read_text(encoding='utf-8'))
+    assert report['documents'] == 0
+    assert report['aborted'] is None
+
+
+def test_ingest_report_written_even_when_aborted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An aborted ingest still leaves its report, naming the abort."""
+    import json
+
+    import nowcast.ingestion.edgar as edgar
+    from nowcast.errors import DataError
+
+    data = tmp_path / 'data'
+    data.mkdir()
+    monkeypatch.setenv('DATA_DIR', str(data))
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-key')
+    monkeypatch.setenv('SEC_USER_AGENT', 'abort-check pytest@example.com')
+    constituents = data / 'constituents.csv'
+    pd.DataFrame(
+        [{'ticker': 'AAA', 'cik': '0000320193', 'effective_from': '2025-01-01', 'effective_to': ''}]
+    ).to_csv(constituents, index=False)
+
+    def fake_ingest(*_args: object, report: object = None, **_kwargs: object) -> list[dict]:
+        assert report is not None, 'the CLI must pass a report for the abort path to record'
+        report.companies = 3
+        report.record_status(403)
+        report.aborted = '3 consecutive blocked responses'
+        raise DataError(report.aborted)
+
+    monkeypatch.setattr(edgar, 'ingest_edgar', fake_ingest)
+    code = main(
+        [
+            'ingest',
+            '--config',
+            str(CONFIG_PATH),
+            '--set',
+            f'data.constituents_csv={constituents}',
+        ]
+    )
+    assert code == 2
+    report = json.loads((data / 'manifests' / 'ingest_report.json').read_text(encoding='utf-8'))
+    assert report['aborted'] == '3 consecutive blocked responses'
+    assert report['status_counts'] == {'403': 1}
+    # Nothing was written to the index on the abort path.
+    assert not (data / 'document_index.parquet').exists()
