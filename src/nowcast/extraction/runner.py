@@ -130,13 +130,36 @@ def document_text(config: Config, document: Document) -> str:
     return text[: int(config.extraction.max_doc_chars)]
 
 
+def validation_settings(config: Config) -> dict[str, object]:
+    """Return every setting that changes what a stored record means.
+
+    A record is the model's reply *after* validation: confidences are penalized, review
+    reasons are derived and the text is cut at `max_doc_chars`. Changing any of those
+    settings changes the record, so a stored record produced under different settings
+    must not be resumed over.
+    """
+    extraction = config.extraction
+    return {
+        'schema_version': extraction.schema_version,
+        'max_doc_chars': int(extraction.max_doc_chars),
+        'quote_match_min_ratio': float(extraction.quote_match_min_ratio),
+        'confidence_penalty_on_issue': float(extraction.confidence_penalty_on_issue),
+        'min_confidence': float(extraction.min_confidence),
+        'eps_tolerance_abs': float(extraction.eps_tolerance_abs),
+        'max_evidence_words': int(extraction.max_evidence_words),
+        'themes': [str(theme) for theme in extraction.themes],
+        'section_patterns': {str(k): str(v) for k, v in config.parsing.section_patterns.items()},
+        'min_section_chars': int(config.parsing.min_section_chars),
+    }
+
+
 def fingerprint(config: Config, document: Document, model: str, prompt_digest: str) -> str:
-    """Return the resume fingerprint for one document/model/prompt combination."""
+    """Return the resume fingerprint for one document/model/prompt/settings combination."""
     digest = hashlib.sha256()
     digest.update(document.sha256.encode('utf-8'))
     digest.update(prompt_digest.encode('utf-8'))
     digest.update(model.encode('utf-8'))
-    digest.update(config.extraction.schema_version.encode('utf-8'))
+    digest.update(json.dumps(validation_settings(config), sort_keys=True).encode('utf-8'))
     return digest.hexdigest()
 
 
@@ -192,6 +215,33 @@ def _record_failure(
     )
 
 
+def _safe_failure(
+    queue_target: Path,
+    document: Document,
+    model: str,
+    reason: str,
+    detail: str | None,
+) -> ExtractionOutcome:
+    """Record a failure without letting the recording itself raise.
+
+    Used only on the catch-all path: if the queue is what failed (an unwritable data
+    directory, say), reporting it again through the same queue would abort the run.
+    """
+    try:
+        return _record_failure(queue_target, document, model, reason, detail)
+    except Exception:
+        LOGGER.exception(
+            'could not queue document failure document=%s model=%s', document.document_id, model
+        )
+        return ExtractionOutcome(
+            document.document_id,
+            model,
+            'failed',
+            review_reasons=(reason,),
+            error=detail,
+        )
+
+
 def compose_caller(config: Config, inner: Any, cache: ResponseCache | None = None) -> Any:
     """Wrap a raw caller in the shared retry-plus-cache composition.
 
@@ -240,6 +290,26 @@ async def run_extraction(
     digest = _prompt_digest()
 
     async def _process(model: str, document: Document) -> ExtractionOutcome:
+        """Extract one (model, document), converting any failure into an outcome.
+
+        The whole path is guarded, not just the model call: a missing raw file, a
+        validation crash, a queue write that fails and an unwritable result file are
+        all per-document problems, and none of them may take down a 480-document run.
+        """
+        try:
+            return await _process_document(model, document)
+        except BudgetExceeded:
+            # A spend cap is a run-level stop, not a document failure; handled inside.
+            stop['budget'] = True
+            return ExtractionOutcome(document.document_id, model, 'budget_stopped')
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            LOGGER.exception('document failed model=%s document=%s', model, document.document_id)
+            return _safe_failure(queue_target, document, model, 'document_error', str(exc))
+
+    async def _process_document(model: str, document: Document) -> ExtractionOutcome:
+        """The unguarded per-document path; every exception is handled by _process."""
         expected = fingerprint(config, document, model, digest)
         target = result_path(config, model, document.document_id)
         if _already_done(target, expected):
