@@ -187,6 +187,13 @@ def test_ingest_records_a_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     report = json.loads((data / 'manifests' / 'ingest_report.json').read_text(encoding='utf-8'))
     assert report['documents'] == 0
     assert report['aborted'] is None
+    # The sample is in both the manifest and the summary: how the run chose what to
+    # read is part of what makes it reproducible.
+    assert body['sample']['seed'] == 42
+    assert body['sample']['companies'] == 1
+    summary = json.loads((data / 'manifests' / 'ingest_summary.json').read_text(encoding='utf-8'))
+    assert summary['sample']['ciks'] == 1
+    assert summary['sample']['seasons'][0] == '2025Q1'
 
 
 def test_ingest_report_written_even_when_aborted(

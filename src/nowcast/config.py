@@ -77,7 +77,9 @@ class DataConfig:
 
     start_date: str = ''
     end_date: str = ''
-    constituents_csv: str = 'inputs/constituents.csv'
+    # Written by build-constituents; the pipeline reads the built universe, not an
+    # hand-maintained ticker list.
+    constituents_csv: str = 'universe/constituents.csv'
     local_manifest_csv: str = 'inputs/local_manifest.csv'
     labels_csv: str = 'inputs/labels.csv'
     consensus_csv: str = 'inputs/consensus.csv'

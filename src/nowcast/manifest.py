@@ -119,6 +119,9 @@ class Manifest:
     input_fingerprints: dict[str, str] = field(default_factory=dict)
     stage: str = ''
     notes: str = ''
+    # How a run chose what it read: recorded so a capped or sampled run can be
+    # reproduced, not only re-run.
+    sample: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Return the manifest as an ordered, JSON-safe dict."""
@@ -134,6 +137,7 @@ class Manifest:
             'prompt_hashes': dict(sorted(self.prompt_hashes.items())),
             'input_fingerprints': dict(sorted(self.input_fingerprints.items())),
             'notes': self.notes,
+            'sample': self.sample,
         }
 
     def to_json(self, config: Config | None = None) -> str:

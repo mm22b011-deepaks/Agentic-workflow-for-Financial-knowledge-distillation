@@ -46,12 +46,15 @@ what is actually done and what is blocked.
 pip install -e '.[dev]'
 python -m nowcast.cli validate-config --strict
 python -m nowcast.cli build-constituents
-python -m nowcast.cli ingest --set data.constituents_csv=data/universe/constituents.csv
+python -m nowcast.cli ingest
 python -m nowcast.cli extract --limit 10
 ```
 
 `ingest` is capped by `data.edgar_max_documents` (default 100) and
-`data.edgar_docs_per_cik` (default 3). It never bulk-scrapes EDGAR.
+`data.edgar_docs_per_cik` (default 3). It never bulk-scrapes EDGAR: companies are walked
+in seeded order drawn per season (`universe.subset_seed`), so a capped run is a spread
+sample rather than the alphabetically first filers, and each filing contributes one
+exhibit — its highest-priority one — so a release and its supplement are one document.
 
 ## Expected input files
 
@@ -131,7 +134,7 @@ line with repeated `--set key.path=value`; `DATA_DIR` in the environment overrid
 | --- | --- | --- |
 | `paths.data_dir` | `data` | Root for every runtime folder. `DATA_DIR` wins. |
 | `data.start_date` / `data.end_date` | `2025-01-01` / `2026-10-31` | Download window. Ingest raises if neither is set instead of using today's date. |
-| `data.constituents_csv` | `inputs/constituents.csv` | Point-in-time membership file. |
+| `data.constituents_csv` | `universe/constituents.csv` | Point-in-time membership file written by `build-constituents`. |
 | `data.edgar_max_documents` | `100` | Hard cap on downloads for one run. |
 | `data.edgar_docs_per_cik` | `3` | Per-company cap, so one prolific filer cannot fill the budget. |
 | `data.sec_user_agent_env` | `SEC_USER_AGENT` | Name of the env var holding the SEC contact string. |

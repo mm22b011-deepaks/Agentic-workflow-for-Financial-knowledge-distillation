@@ -18,7 +18,9 @@ paths:
 data:
   start_date: '2025-01-01'
   end_date: '2026-10-31'
-  constituents_csv: inputs/constituents.csv
+  # Written by build-constituents. Pointing this at anything else means the run is
+  # measured against a membership list nobody built.
+  constituents_csv: universe/constituents.csv
   local_manifest_csv: inputs/local_manifest.csv
   labels_csv: inputs/labels.csv
   consensus_csv: inputs/consensus.csv

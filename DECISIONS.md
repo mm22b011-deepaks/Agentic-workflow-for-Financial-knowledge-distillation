@@ -333,3 +333,34 @@ mutant before trusting the suite's green.
   (`uv export --no-dev`, 58 pins) and `requirements-dev.lock.txt` adds test and lint
   tooling (`--extra dev`, 76 pins). Both are regenerated from `pyproject.toml` by uv and
   neither carries the editable local path the old file did.
+
+## D15 — N4: how a capped ingest decides what to read (Final, decided 2026-10-31)
+
+A document cap plus CIK-sorted walking is a sampling decision made by accident. The
+ingest stops at `data.edgar_max_documents`, so whatever order the companies are visited
+in decides the sample. Two rules now apply, in `ingestion/sampling.py`:
+
+1. **Walk order.** `season_sample` takes the members active at the start of each calendar
+   quarter in the window, draws `universe.subset_n` of them with `random.Random(
+   universe.subset_seed)` (all of them when it is 0), shuffles, and concatenates the
+   quarters. The result is a seeded permutation of the union, so a capped run is a spread
+   sample of the index. Membership is tested at the season's first day, so a mid-quarter
+   joiner is not credited to a quarter it was not a member of. Every member appears once.
+2. **One document per filing, one per season.** `select_filings` keeps the
+   highest-priority exhibit of each accession (`EX-99.1`, then `EX-99`, then `EX-99.2`),
+   then one filing per calendar quarter, newest season first. Without this the per-company
+   cap of 3 documents was spent on one quarter's release plus its supplement, and the
+   other quarters were never seen.
+
+**Why the seed is in the manifest.** `Manifest.sample` records companies, seed, seasons
+and skip counts, and `ingest_summary.json` records the same. A capped run that cannot say
+how it chose is not reproducible, only repeatable.
+
+**Deviation from the register.** The register asks for exhibit priority "from config";
+it is a module constant (`EXHIBIT_PRIORITY`) instead. It encodes EDGAR's own filing
+convention rather than a deployment choice, and no other code reads it. If the human
+wants it configurable, the change is one key plus a `_tuple` in `load_config`.
+
+**Not measured.** This is offline behaviour only. How many of the 519 members actually
+have a 2.02 filing in each quarter is a live question and stays blocked with the rest of
+the live work.
