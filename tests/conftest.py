@@ -27,7 +27,9 @@ class FakeCaller:
         self.fail_on_call = fail_on_call
         self.calls: list[dict[str, Any]] = []
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Return the next canned reply, or raise when the call index matches."""
         index = len(self.calls)
         self.calls.append({'model': model, 'messages': messages})

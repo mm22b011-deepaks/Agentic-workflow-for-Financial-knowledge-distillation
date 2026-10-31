@@ -221,9 +221,20 @@ the stored record, so changing a threshold silently reuses old results.
       corrected from the evidence quote when it shows a percent sign; a sub-1% printed
       figure such as 0.5% is left as 0.5. Normalisation runs **before** validation so a
       correctable fraction is not penalised.
+- [x] **Interim packer** (Step 5): `parsing/packing.py` keeps the first third of the
+      limit plus windows around `extraction.pack_phrases`, merges overlapping regions,
+      joins them in document order with `[... omitted ...]`, and records `windows_used`.
+      Measured on the same 61 text documents after the change
+      (`scripts/measure_truncation.py --index document_index.parquet`): 14 of 61 still
+      over the limit and 558,647 characters still not sent, but the terms that matter
+      now reach the model — `terms_missing_from_sent: {eps: 0, revenue: 0, guidance: 0,
+      growth: 1}`. Before the packer, guidance was missing from 4 documents and revenue
+      from 6. The one remaining growth miss is a document whose only "growth" word is not
+      near a configured phrase.
 - Tests: `tests/unit/test_units.py` (parametrised units/growth cases, `prepare_text`
-  measurement, and a runner-to-parquet end-to-end case), plus
-  `test_runner_stores_diagnostics_and_corrected_values`.
+  measurement, and a runner-to-parquet end-to-end case), `tests/unit/test_packing.py`
+  (guidance window kept past the cut, document order, omission markers, short text,
+  plain head cut), plus `test_runner_stores_diagnostics_and_corrected_values`.
 - Deviation, logged in `DECISIONS.md` D16: `tests/fixtures/documents/records.json`
   keeps `0.08` as a *model reply* for "up 8%", and the integration/end-to-end tests
   assert the stored and consolidated value is `8.0`. Correcting the input is the
@@ -275,3 +286,37 @@ entry for nested zips goes with that removal.
   (default `data/document_index.v2.parquet`), write the rebuilt index there, keep the old
   files under `data/index_backup/`. Nothing is deleted.
 - **Q3** — `reporting.max_detail_level` stays `index`.
+
+---
+
+## Reviewer pass 2 status (2026-11-01)
+
+The register below is the pass-1 text. Pass 2 added F1–F19, plus the N/H/M remainders.
+Per-item status and reasoning are in `DECISIONS.md` D17 and `tasks.md`; the test that
+covers each is mapped in `evidence/phase_R0.txt`. Summary of what is still open:
+
+| Item | State |
+|------|-------|
+| F2 key provenance | FIXED; live cause measured (an exported, too-short value shadows `.env`) |
+| F12 auth fail-fast | FIXED |
+| N1 one cache | FIXED |
+| N2 | FIXED offline; live reasoning probe + bakeoff BLOCKED (H-A) |
+| F9 sample | FIXED |
+| N3 | FIXED offline; live coverage rerun BLOCKED (H-A) |
+| F7 / F11 / F6 / F5 / F4 / F8 / H1 | FIXED |
+| F10 vocabularies | FIXED; `withdrawn` guidance has no share column (recorded, D17) |
+| F1 cohort share | FIXED |
+| F3 per-metric minimums | FIXED |
+| F15 | decision recorded; `fiscal_period_consistency` NOT implemented |
+| F14 | window/status fixes done; `filings.files` pagination NOT implemented |
+| F16 | `aggregate` command FIXED; `nowcast`/`evaluate`/`report` intentionally absent |
+| N4, N5, N6 (offline), N7 (offline), H2–H5, M2 | FIXED in pass 1 |
+| M1 | FIXED except `tresata.zip` tracking (H-B) |
+| M4 | VERIFIED except `tresata.zip` (H-B) |
+| Gate R0 live items | BLOCKED (H-A) |
+
+Measured 2026-11-01 and recorded in `evidence/phase_R0.txt`:
+`ruff` clean, 100 files formatted, `mypy` clean on 45 files, **303 passed**,
+**mutation check 33/33 killed, 0 survived**. Offline index rebuild: 100 rows → 0 kept
+(`no_earnings_item: 61, non_text: 39`), old files untouched, results moved to
+`superseded/`.

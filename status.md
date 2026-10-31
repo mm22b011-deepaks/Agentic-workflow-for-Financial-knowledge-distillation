@@ -1,27 +1,29 @@
 # status.md — where the build actually stands
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## Governing spec
 
 Two amendments now sit on top of the frozen Build Pack, recorded in full in `tasks.md`:
 the **R-amendment** (R0–R8: SQLite as system of record, lossless hierarchy, context
 packer, structure-first extraction) and **Amendment Q** (no number silently missing,
-excluded or non-comparable). Decisions are in `DECISIONS.md` (D1–D16). Rules are in
+excluded or non-comparable). Decisions are in `DECISIONS.md` (D1–D17). Rules are in
 `claude.md`.
 
 ## Gates (run, not assumed)
 
 ```
 ruff check .            -> All checks passed
-ruff format --check .   -> 91 files already formatted
-mypy src                -> Success: no issues found in 42 source files
-pytest -q               -> 248 passed
+ruff format --check .   -> 96 files formatted
+mypy src                -> Success: no issues found in 45 source files
+pytest -q               -> 300 passed
+mutation check          -> 33 mutants, 33 killed, 0 survived
 ```
 
-These cover the offline suite after the R0 defect-remediation pass and the H5 /
-prompt-hardening work. **Gate R0 is not green** — its live half is blocked by the
-OpenRouter 401; see Open.
+These cover the offline suite after reviewer pass 2 (F1–F19, N1–N7 and H1–H5
+remainders, M1/M4). **Gate R0 is not green**: its live half is blocked on H-A, an
+exported API key shadowing the one in `.env` (see Open, item 1). `evidence/phase_R0.txt`
+holds the commands, the outputs and the per-item test map.
 
 ## Done and verified
 
@@ -98,6 +100,22 @@ and Gate R0. M1 stays open except the dead `sections` dict (removed in H5); M4 i
 verified except that `tresata.zip` is tracked in git by accident and awaits a deliberate
 removal with the human's go-ahead.
 
+### Reviewer pass 2 (2026-11-01)
+Offline half of Gate R0 finished: F1–F16, the N1–N7 and H1–H5 remainders, and M1/M4.
+The items that change behaviour rather than wording: auth failures no longer retried
+(F12); one cache (N1); a per-call token budget with every attempt ledgered (N2);
+`--sample` for representative runs (F9); the number must appear in the *matched source
+window*, not only in the model's own quote (F7); vocabulary-driven prompt, validator and
+aggregator (F10); review queue replaced per (document, model) with a superseded archive
+(F6); `record_confidence` so dedupe has something to sort by (F5); cohort-based shares
+(F1); per-metric observation minimums (F3); as-of winsorising (F4); gzip downloads no
+longer flagged truncated (F8); `nowcast aggregate` with the privacy guardrail before the
+write (F16). Decisions and deferrals: `DECISIONS.md` D17.
+
+The offline index rebuild was run: 100 rows → **0 kept**, `{no_earnings_item: 61,
+non_text: 39}` — a pre-`items` index cannot prove Item 2.02. Nothing was deleted; the
+affected results moved to `superseded/`.
+
 ### Aggregation (pre-amendment Phase 4)
 `aggregation/aggregate.py` + 19 tests, including the index-level privacy guardrail.
 A live test caught a real boundary defect: a surprise exactly at `eps_tolerance_abs` was
@@ -107,19 +125,25 @@ that R4's SQL is checked against (D7).
 
 ## Open
 
-1. **OpenRouter returns 401 `User not found`** for the configured key, re-confirmed by
-   `scripts/smoke_llm.py` on both configured models. All live gates are blocked on a
-   valid key supplied or rotated by the human: N2's reasoning-field probe and model
-   bakeoff, N3's per-field-coverage rerun, N6's high-volume CIK check, N7's rebuild,
-   Gate R0, and the prompt-hardening measurement. Credential inspection is off-limits to
-   the assistant, so this cannot be diagnosed from inside the session.
+1. **OpenRouter still returns 401 `User not found` — and the cause is now measured.**
+   `scripts/smoke_llm.py` reports where the key came from: an **exported**
+   `OPENROUTER_API_KEY` (far shorter than an OpenRouter key) shadows the one in `.env`, so the file's key has
+   never been tried. `unset OPENROUTER_API_KEY`, then rerun the smoke test; if it still
+   fails, the file's key needs rotating. Everything live waits on this: N2's live probe
+   and bakeoff, N3's coverage rerun, N6's pagination check, N7's rebuild, Gate R0, and the
+   weak-model prompt measurement.
 2. **D12b / N2 — empty completions** are handled offline (truncation classification,
    one doubled-budget retry, `truncated` review reason). Whether a given free model
    still spends its whole budget on reasoning needs a live bakeoff, which item 1 blocks.
    Do not claim the model problem is gone until that table exists.
-3. **Index rebuild.** Q4 resolved the design: write `data/document_index.v2.parquet`,
-   keep the old files under `data/index_backup/`, delete nothing. Execution is blocked
-   by item 1, not by the local-destruction guard.
+3. **Index rebuild — run offline, kept nothing, and that is correct.** Q4's design holds:
+   write `data/document_index.v2.parquet`, delete nothing. Run 2026-11-01 on the old
+   index: 100 rows → 0 kept, `{no_earnings_item: 61, non_text: 39}`, report in
+   `data/manifests/rebuild_index.json`. The pre-v2 index has no `items` column, so no row
+   can prove Item 2.02; the rebuild refuses rather than guessing, exactly as designed.
+   This also moved the stored extraction results and review-queue rows for those
+   documents into `superseded/` (nothing deleted). A rebuild that *keeps* rows needs a
+   fresh ingest, which is blocked by item 1.
 4. **Gate 2B items 4–5** — human judgement: review `data/universe/unmapped.csv`
    (74 delisted tickers) and spot-check 10 intervals against a second source.
 5. **`requirements.lock.txt` stale** — `sqlalchemy`, `alembic`, `langchain-openai`,

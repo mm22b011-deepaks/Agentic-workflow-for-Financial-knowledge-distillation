@@ -20,9 +20,6 @@ from nowcast.ingestion.sampling import select_filings
 from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
 
 LOGGER = logging.getLogger(__name__)
-EXHIBIT_FORMS_PREFIX = 'EX-'
-EARNINGS_EXHIBIT_TYPE = 'EX-99'
-EXHIBIT_99_RE = re.compile(r'ex[-_]?99')
 
 
 @dataclass
@@ -126,7 +123,7 @@ def build_client(config: Config, transport: httpx.BaseTransport | None = None) -
     """Build an httpx client carrying the SEC User-Agent header."""
     return httpx.Client(
         headers={'User-Agent': user_agent(config), 'Accept-Encoding': 'gzip, deflate'},
-        timeout=float(config.llm.timeout_seconds),
+        timeout=float(config.data.sec_timeout_seconds),
         transport=transport,
         follow_redirects=True,
     )
@@ -144,6 +141,7 @@ def _archive_url(config: Config, cik: str, accession: str, filename: str) -> str
     )
 
 
+# One constant: the exhibit family an earnings release lives in.
 EXHIBIT_TYPE_PREFIX = 'EX-99'
 HEADERS_DOC_RE = re.compile(r'<DOCUMENT>(.*?)</DOCUMENT>', re.S)
 TYPE_RE = re.compile(r'<TYPE>([^\n<]+)')
@@ -226,7 +224,10 @@ def fetch_disclosures(
             'no filing window: set data.start_date or pass start_date, so the run is '
             "reproducible instead of depending on today's date"
         )
-    upper = end_date or _configured_date(config, config.data.end_date) or date.today()
+    upper = end_date or _configured_date(config, config.data.end_date)
+    if upper is None:
+        # `date.today()` made every run's window different on a different day.
+        raise ConfigError('data.end_date must be set; an implicit "today" is not reproducible')
     wanted = set(config.data.edgar_forms)
     wanted_items = list(config.data.edgar_earnings_items)
     found: list[Disclosure] = []
@@ -276,7 +277,7 @@ def fetch_disclosures(
     return found
 
 
-def _status_of(exc: httpx.HTTPError) -> str:
+def _status_of(exc: Exception) -> str:
     """Return the HTTP status behind an httpx error, or 'x' when there is none."""
     response = getattr(exc, 'response', None)
     return str(getattr(response, 'status_code', 'x')) if response is not None else 'x'
@@ -319,11 +320,15 @@ def download_document(
         report.attempts += 1
         report.record_status(response.status_code)
     response.raise_for_status()
+    # Content-Length is the *encoded* size: with Accept-Encoding: gzip, httpx decodes the
+    # body, so comparing it to len(response.content) flags every compressed page as
+    # truncated and the run downloads nothing. Compare what actually arrived instead.
     expected = int(response.headers.get('content-length') or 0)
-    if expected and len(response.content) != expected:
-        raise httpx.HTTPError(
-            f'truncated download: {len(response.content)} of {expected} bytes from {url}'
-        )
+    encoding = (response.headers.get('content-encoding') or '').strip().lower()
+    delivered = int(getattr(response, 'num_bytes_downloaded', 0) or 0)
+    arrived = delivered or len(response.content)
+    if expected and not encoding and arrived and arrived != expected:
+        raise httpx.HTTPError(f'truncated download: {arrived} of {expected} bytes from {url}')
     temporary = target.with_name(target.name + '.part')
     temporary.write_bytes(response.content)
     temporary.replace(target)
@@ -427,7 +432,13 @@ def ingest_edgar(
                         }
                     )
             except (httpx.HTTPError, DataError) as exc:
+                # A bad configured date or window is the same for every company: it is
+                # the operator's bug, not this CIK's, so it must not be swallowed N times
+                # and leave a run that looks like an honest zero.
+                if isinstance(exc, DataError) and 'window' in str(exc).lower():
+                    raise
                 LOGGER.warning('cik failed cik=%s error=%s', cik, exc)
+                active_report.record_skip(f'cik_failed:{_status_of(exc)}')
             # Checked outside the per-CIK handler: a 403 on the submissions request
             # raises out of fetch_disclosures, and the abort must still see it.
             if active_report.consecutive_blocked >= abort_after:

@@ -30,6 +30,9 @@ data:
   # Consecutive 403/429 answers after which a run stops instead of asking the rest of
   # the universe for the same refusal.
   sec_abort_after_blocked: 5
+  # The SEC client has its own timeout; borrowing the LLM one made a filing page wait
+  # as long as a reasoning model.
+  sec_timeout_seconds: 30.0
   # Relative to the data root. The pre-v2 index stays where it is; a rebuild writes here.
   document_index: document_index.v2.parquet
   edgar_submissions_url_template: 'https://data.sec.gov/submissions/CIK{cik_padded}.json'
@@ -38,6 +41,9 @@ data:
   # The accession directory segment is required: without it EDGAR's CDN answers 403,
   # not 404, so a missing segment looks like a permissions problem at run time.
   edgar_index_headers_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{accession}-index-headers.html'
+  # Used only when filings.recent does not reach the window start: one page of the
+  # historical submissions feed per request, {name} from the provider's own index.
+  edgar_filing_files_url_template: 'https://data.sec.gov/submissions/{name}'
   edgar_forms:
     - 8-K
   # Only parseable text exhibits are downloaded: an EX-99 image (some filers publish
@@ -68,16 +74,21 @@ llm:
   max_tokens: 8192
   # A truncated (empty) completion is retried once at double this, never above the ceiling.
   max_tokens_ceiling: 32768
+  # Exactly one reasoning control: 'effort' or 'max_tokens'. Both at once made one dead.
+  reasoning_control: effort
   reasoning_effort: low
-  max_reasoning_tokens: 3000
+  max_reasoning_tokens: 0
+  # Asked what each model supports, instead of assuming. Empty = assume it supports it.
+  models_url: 'https://openrouter.ai/api/v1/models'
   retry_attempts: 3
   retry_backoff_seconds: 2.0
   retry_max_wait_seconds: 120.0
   app_name: index-earnings-nowcast
+  # OpenRouter reads HTTP-Referer as a URL; empty omits the header.
+  referer_url: ''
 
 cache:
   enabled: true
-  dir: .cache/llm
   ttl_days: 30
 
 budget:
@@ -101,6 +112,25 @@ extraction:
     - supply_chain
     - ai_investment
   review_queue_path: extractions/review_queue.parquet
+  # One list read by the prompt, the validators and the aggregator.
+  eps_basis_vocab: [gaap, adjusted, mixed]
+  guidance_direction_vocab: [raised, maintained, lowered, withdrawn, not_provided, mixed]
+  tone_vocab: [confident, neutral, cautious, mixed]
+  # Score of each tone for aggregation. A value with no score is an error, not a NaN.
+  # 'mixed' is a real answer that is not directional: it is averaged as 0 like neutral,
+  # so a document saying both things cannot pull the tone score either way.
+  tone_scores:
+    confident: 1.0
+    neutral: 0.0
+    cautious: -1.0
+    mixed: 0.0
+  # Codes the review queue may emit. doc_truncated is code-generated, never model output.
+  review_reason_codes:
+    [empty_extraction, eps_missing, low_confidence, null_reason_missing,
+     validation_issues, llm_failed, truncated, doc_truncated, document_error,
+     model_disagreement]
+  # Interim packer: head of the release plus windows around these phrases.
+  pack_phrases: ["per share", revenue, outlook, guidance]
 
 aggregation:
   weighting: equal
@@ -110,6 +140,10 @@ aggregation:
   # One company's quarter may arrive as two rows (two models, or two exhibits in one
   # filing). Reduced by this rule before any count or metric sees it.
   dedupe_rule: max_confidence
+  # A metric seen by fewer companies than this is NaN with a status, never computed.
+  min_observations: 10
+  # Seeded sample order for extract --sample.
+  sample_seed: 42
 
 nowcast:
   min_documents: 3

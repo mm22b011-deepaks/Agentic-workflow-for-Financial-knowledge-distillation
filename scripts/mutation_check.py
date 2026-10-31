@@ -29,6 +29,8 @@ RUNNER = 'src/nowcast/extraction/runner.py'
 AGGREGATE = 'src/nowcast/aggregation/aggregate.py'
 UNITS = 'src/nowcast/extraction/units.py'
 PROMPTS = 'src/nowcast/llm/prompts.py'
+COMPOSITION = 'src/nowcast/llm/composition.py'
+REVIEW = 'src/nowcast/extraction/review_queue.py'
 
 VALIDATOR_TESTS = ['tests/unit/test_validators.py']
 EDGAR_TESTS = ['tests/unit/test_edgar.py']
@@ -36,6 +38,8 @@ RUNNER_TESTS = ['tests/unit/test_runner.py', 'tests/unit/test_truncation.py']
 AGGREGATE_TESTS = ['tests/unit/test_aggregate.py']
 UNITS_TESTS = ['tests/unit/test_units.py']
 PROMPT_TESTS = ['tests/unit/test_prompts.py']
+AUTH_TESTS = ['tests/unit/test_auth_errors.py']
+REVIEW_TESTS = ['tests/unit/test_runner.py', 'tests/unit/test_review_queue.py']
 
 
 @dataclass(frozen=True)
@@ -125,7 +129,7 @@ MUTANTS = (
     Mutant(
         'content-length check skipped',
         EDGAR,
-        'if expected and len(response.content) != expected:',
+        'if expected and not encoding and arrived and arrived != expected:',
         'if False:',
         tuple(EDGAR_TESTS),
     ),
@@ -147,8 +151,8 @@ MUTANTS = (
     Mutant(
         'truncation reported as llm_failed',
         RUNNER,
-        "return _record_failure(queue_target, document, model, 'truncated', str(exc))",
-        "return _record_failure(queue_target, document, model, 'llm_failed', str(exc))",
+        "reason = 'truncated' if isinstance(exc, TruncatedCompletion) else 'llm_failed'",
+        "reason = 'llm_failed'",
         tuple(RUNNER_TESTS),
     ),
     Mutant(
@@ -179,6 +183,73 @@ MUTANTS = (
         "return f'{recognised_currency} {recognised_scale}'",
         'return text or None',
         tuple(UNITS_TESTS),
+    ),
+    Mutant(
+        'number-in-source check dropped',
+        VALIDATORS,
+        'if not number_in_quote(float(field.value), window):',
+        'if False:',
+        tuple(VALIDATOR_TESTS),
+    ),
+    Mutant(
+        'vocabulary check dropped',
+        VALIDATORS,
+        'if vocabulary and str(field.value).lower().strip() not in set(vocabulary):',
+        'if False:',
+        tuple(VALIDATOR_TESTS),
+    ),
+    Mutant(
+        'text fields drop out of the confidence check',
+        VALIDATORS,
+        'for name in (*NUMERIC_FIELDS, *TEXT_FIELDS):',
+        'for name in NUMERIC_FIELDS:',
+        tuple(VALIDATOR_TESTS),
+    ),
+    # composition.py
+    Mutant(
+        '401 retried like a transient error',
+        COMPOSITION,
+        'except (BudgetExceeded, AuthError, ModelNotFound):',
+        'except (BudgetExceeded, ModelNotFound):',
+        tuple(AUTH_TESTS),
+    ),
+    Mutant(
+        'cache key drops reasoning settings',
+        COMPOSITION,
+        "'reasoning': self._config.llm.reasoning_params(),",
+        "'reasoning': {},",
+        tuple(AUTH_TESTS),
+    ),
+    # review_queue.py
+    Mutant(
+        'queue append instead of replace',
+        REVIEW,
+        "    kept = existing[keep['_merge'] == 'left_only'].reset_index(drop=True)",
+        '    kept = existing.reset_index(drop=True)',
+        tuple(REVIEW_TESTS),
+    ),
+    # edgar.py gzip
+    Mutant(
+        'gzip body length compared to its decoded size',
+        EDGAR,
+        '    if expected and not encoding and arrived and arrived != expected:',
+        '    if expected and arrived and arrived != expected:',
+        tuple(EDGAR_TESTS),
+    ),
+    # aggregate.py
+    Mutant(
+        'per-metric observation minimum ignored',
+        AGGREGATE,
+        "if suppressed or count < metric_minimum:\n                    row[name] = float('nan')",
+        "if False:\n                    row[name] = float('nan')",
+        tuple(AGGREGATE_TESTS),
+    ),
+    Mutant(
+        'dedupe confidence ignored',
+        AGGREGATE,
+        "        frame['confidence'] = pd.to_numeric(frame['record_confidence'], errors='coerce')",
+        "        frame['confidence'] = 0.0",
+        tuple(AGGREGATE_TESTS),
     ),
     # prompts.py
     Mutant(

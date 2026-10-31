@@ -574,3 +574,97 @@ def test_sgml_wrapper_stripped() -> None:
     for metadata in ('EX-99.1', 'd123dex991.htm', 'SEQUENCE', 'DESCRIPTION'):
         assert metadata not in text, metadata
     assert strip_sgml_wrapper('plain text') == 'plain text'
+
+
+def test_gzip_download_not_flagged_truncated(config: Config) -> None:
+    """A gzip-encoded body is decoded, so its length never equals Content-Length."""
+    import gzip
+
+    from nowcast.ingestion.edgar import download_document
+
+    body = gzip.compress(b'<html>Revenue was $5 million.</html>' * 20)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=body,
+            headers={
+                'content-length': str(len(body)),
+                'content-encoding': 'gzip',
+                'content-type': 'text/html',
+            },
+        )
+
+    disclosure = Disclosure(
+        cik='1',
+        accession='0000000001-26-000009',
+        filing_date=datetime.date(2026, 1, 2),
+        form='8-K',
+        exhibit_type='EX-99',
+        document='gzip.htm',
+    )
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    path = download_document(config, disclosure, client, RateLimiter(1000.0))
+    assert path.is_file()
+
+
+def test_bad_window_aborts_not_zero_documents(config: Config) -> None:
+    """A bad configured date is the operator's bug, not every company's zero."""
+    from nowcast.errors import ConfigError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=SUBMISSIONS)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    config = dataclasses.replace(
+        config, data=dataclasses.replace(config.data, end_date='not-a-date')
+    )
+    with pytest.raises((ConfigError, DataError)):
+        ingest_edgar(
+            config,
+            ['0000000001'],
+            client=client,
+            limiter=RateLimiter(1000.0),
+            start_date=datetime.date(2029, 1, 1),
+        )
+
+
+def test_blank_end_date_raises(config: Config) -> None:
+    """No end date is an error, not an implicit "today"."""
+    from nowcast.errors import ConfigError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=SUBMISSIONS)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    config = dataclasses.replace(config, data=dataclasses.replace(config.data, end_date=''))
+    with pytest.raises(ConfigError, match='end_date'):
+        ingest_edgar(
+            config,
+            ['0000000001'],
+            client=client,
+            limiter=RateLimiter(1000.0),
+            start_date=datetime.date(2029, 1, 1),
+        )
+
+
+def test_cik_http_failure_counted(config: Config) -> None:
+    """A submissions failure is counted by status, not silently dropped."""
+    from nowcast.ingestion.edgar import IngestReport
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text='boom')
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    report = IngestReport()
+    rows = ingest_edgar(
+        config,
+        ['0000000001'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+        report=report,
+    )
+    assert rows == []
+    assert any(reason.startswith('cik_failed:') for reason in report.skip_reasons)

@@ -22,6 +22,10 @@ def _variables() -> dict[str, object]:
         'document_text': 'Revenue was $1.20 billion.',
         'max_evidence_words': 25,
         'themes': 'demand, pricing',
+        'schema_version': 'v1',
+        'eps_basis_vocab': 'gaap, adjusted',
+        'guidance_direction_vocab': 'raised, maintained, lowered',
+        'tone_vocab': 'confident, neutral, cautious',
     }
 
 
@@ -87,7 +91,9 @@ def test_structured_reraises_budget_exceeded() -> None:
     class BudgetCaller:
         """A caller that has already spent its budget."""
 
-        def complete(self, model: str, messages: list[dict[str, str]]) -> object:
+        def complete(
+            self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+        ) -> object:
             raise BudgetExceeded('budget exhausted')
 
     try:

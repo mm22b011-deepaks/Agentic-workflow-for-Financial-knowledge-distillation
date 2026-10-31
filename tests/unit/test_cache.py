@@ -11,9 +11,7 @@ from nowcast.llm.cache import ResponseCache, cache_key
 
 def _cache(tmp_path: Path, enabled: bool = True, ttl_days: int = 30) -> ResponseCache:
     """Build a cache rooted at a temp directory."""
-    return ResponseCache(
-        CacheConfig(enabled=enabled, dir=str(tmp_path), ttl_days=ttl_days), tmp_path
-    )
+    return ResponseCache(CacheConfig(enabled=enabled, ttl_days=ttl_days), tmp_path)
 
 
 def test_cache_roundtrip(tmp_path: Path) -> None:

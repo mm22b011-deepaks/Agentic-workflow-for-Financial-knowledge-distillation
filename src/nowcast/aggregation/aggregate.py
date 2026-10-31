@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from nowcast.config import Config, resolve_data_path
+from nowcast.config import Config, manifests_dir, resolve_data_path
 from nowcast.errors import DataError
 from nowcast.extraction.review_queue import load_queue
 from nowcast.ingestion.constituents import active_on, load_constituents
@@ -26,7 +26,6 @@ LOGGER = logging.getLogger(__name__)
 SURPRISE_DECIMALS = 10
 
 FORBIDDEN_COLUMNS = ('ticker', 'cik', 'document_id', 'company_name')
-TONE_SCORES = {'confident': 1.0, 'neutral': 0.0, 'cautious': -1.0}
 SUMMARY_COLUMNS = (
     'as_of_date',
     'season_year',
@@ -43,6 +42,15 @@ BASE_METRICS = (
     'guidance_lower_share',
     'guidance_ratio',
     'tone_score_mean',
+)
+# Observations behind each metric. A metric with fewer real observations than
+# `aggregation.min_observations` is NaN with a status, never computed: with twelve
+# companies and one consensus figure, a "beat rate" of 1.0 is that company's result.
+OBSERVATION_COLUMNS = (
+    'n_obs_beat',
+    'n_obs_growth',
+    'n_obs_guidance',
+    'n_obs_tone',
 )
 
 
@@ -61,8 +69,14 @@ def output_columns(config: Config) -> list[str]:
     """Return the aggregate frame's column order."""
     return [
         *SUMMARY_COLUMNS,
-        *BASE_METRICS,
+        'share_of_cohort',
+        'share_of_index',
         *[f'theme_{theme}_share' for theme in config.extraction.themes],
+        *BASE_METRICS,
+        *OBSERVATION_COLUMNS,
+        *[f'n_obs_theme_{theme}' for theme in config.extraction.themes],
+        *[f'metric_status_{name}' for name in BASE_METRICS],
+        *[f'metric_status_theme_{theme}_share' for theme in config.extraction.themes],
         'suppressed',
     ]
 
@@ -110,12 +124,17 @@ def winsorize(series: pd.Series, proportion: float) -> pd.Series:
     return values.clip(lower=lower, upper=upper)
 
 
-def _review_excluded(config: Config, extractions: pd.DataFrame) -> set[str]:
-    """Return the document ids the review queue marked for human attention."""
+def _review_excluded(config: Config, extractions: pd.DataFrame) -> set[tuple[str, str]]:
+    """Return the (document, model) pairs the review queue marked for attention.
+
+    Keyed by both, not by document alone: one model's flag must not exclude the other
+    model's good record of the same filing.
+    """
     queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
     if queue.empty:
         return set()
-    return {str(value) for value in queue['document_id'].dropna()}
+    pairs = queue[['document_id', 'model']].dropna()
+    return {(str(row.document_id), str(row.model)) for row in pairs.itertuples(index=False)}
 
 
 def collapse_to_companies(
@@ -134,6 +153,8 @@ def collapse_to_companies(
     if frame.empty:
         return frame, 0
     key = ['cik', 'season_year', 'season_quarter']
+    # Confidence first, document id as the tie-break: rows written before `consolidate`
+    # recorded a confidence would otherwise all tie at NaN and resolve by id.
     ordered = frame.sort_values(
         [*key, 'confidence', 'document_id'], ascending=[True, True, True, False, True]
     )
@@ -164,10 +185,28 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     frame['cik'] = frame['cik'].astype('string').str.strip().str.zfill(10)
     # A queued document is marked, not deleted: an as-of date before the queue existed
     # must not be told that a company was excluded from it.
-    frame['in_review'] = frame['document_id'].isin(queued)
-    frame['confidence'] = pd.to_numeric(
-        frame['confidence'] if 'confidence' in frame.columns else 0.0, errors='coerce'
+    model = (
+        frame['model'].astype('string')
+        if 'model' in frame.columns
+        else pd.Series('', index=frame.index, dtype='string')
     )
+    frame['in_review'] = [
+        (document, str(name)) in queued
+        for document, name in zip(frame['document_id'], model, strict=True)
+    ]
+    if 'record_confidence' in frame.columns:
+        frame['confidence'] = pd.to_numeric(frame['record_confidence'], errors='coerce')
+    elif 'confidence' in frame.columns:
+        frame['confidence'] = pd.to_numeric(frame['confidence'], errors='coerce')
+    elif str(config.aggregation.dedupe_rule) == 'max_confidence':
+        # Silently weighting by a column that does not exist is how every duplicate
+        # ended up resolved by document id while the config said "highest confidence".
+        raise DataError(
+            'dedupe_rule is max_confidence but the extractions frame has no '
+            'record_confidence column; regenerate it with `extract`'
+        )
+    else:
+        frame['confidence'] = 0.0
     if frame.empty:
         return DocumentMetrics(frame)
 
@@ -195,14 +234,22 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     frame.loc[frame['surprise'].isna(), 'beat'] = np.nan
 
     prior = pd.to_numeric(frame['prior_year_eps'], errors='coerce')
+    # Un-winsorised: the clip has to happen inside each as-of snapshot, or an early
+    # date's value depends on a document published after it.
     frame['eps_growth'] = (reported - prior) / prior.abs()
     frame.loc[prior.isna() | (prior == 0), 'eps_growth'] = np.nan
-    frame['eps_growth'] = winsorize(frame['eps_growth'], float(config.aggregation.winsorize_pct))
 
     direction = frame['guidance_direction'].astype('string').str.lower().str.strip()
     frame['guidance_raised'] = (direction == 'raised').astype(float)
     frame['guidance_lowered'] = (direction == 'lowered').astype(float)
-    frame['tone_score'] = frame['tone'].astype('string').str.lower().str.strip().map(TONE_SCORES)
+    scores = {str(k).lower(): float(v) for k, v in config.extraction.tone_scores.items()}
+    raw_tone = frame['tone'].astype('string').str.lower().str.strip()
+    unknown = raw_tone.dropna()
+    unknown = unknown[~unknown.isin(scores)]
+    if not unknown.empty:
+        # Counted, not silently NaN: an unknown tone is a vocabulary drift to fix.
+        LOGGER.warning('unknown tone values: %s', dict(unknown.value_counts().head(5)))
+    frame['tone_score'] = raw_tone.map(scores)
 
     for theme in config.extraction.themes:
         column = f'theme_{theme}_direction'
@@ -215,6 +262,33 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     frame['season_year'] = [item[0] for item in seasons]
     frame['season_quarter'] = [item[1] for item in seasons]
     return DocumentMetrics(frame)
+
+
+def _directional(raised: pd.Series, lowered: pd.Series) -> int:
+    """Return how many companies stated a raise or a lower, the ratio's real denominator."""
+    stated = raised.fillna(0.0) + lowered.fillna(0.0)
+    return int((stated > 0).sum())
+
+
+def _cohort_members(config: Config) -> set[str]:
+    """Return the CIKs the ingest sampled, from the cohort file; every member if absent."""
+    path = manifests_dir(config) / 'cohort.csv'
+    if not path.is_file():
+        return set()
+    frame = pd.read_csv(path, dtype={'cik': str})
+    return {str(value).strip().zfill(10) for value in frame['cik']}
+
+
+def cohort_by_season(config: Config) -> dict[str, set[str]]:
+    """Return the sampled cohort per season; {} when no cohort file exists."""
+    path = manifests_dir(config) / 'cohort.csv'
+    if not path.is_file():
+        return {}
+    frame = pd.read_csv(path, dtype={'cik': str})
+    result: dict[str, set[str]] = {}
+    for row in frame.itertuples(index=False):
+        result.setdefault(str(row.season), set()).add(str(row.cik).strip().zfill(10))
+    return result
 
 
 def _weighted_mean(values: pd.Series, weights: pd.Series) -> float:
@@ -294,13 +368,28 @@ def aggregate_index(
             # One company reports one quarter once, so the company count, not the row
             # count, is what a share can legitimately be printed against.
             n_reported = int(counted['cik'].nunique())
-            n_expected = len(members)
+            # The denominator is the sampled cohort, not all ~500 members: a 100-document
+            # run against the whole index reports a share near 0.03 and suppresses
+            # everything. Without a cohort file the index is the cohort.
+            member_ciks = set(members['cik'].astype(str).str.zfill(10))
+            # The season's own cohort when the ingest recorded one: a company sampled for
+            # another quarter did not report this one, and counting it as expected makes
+            # share_reported look like a coverage failure instead of a partial season.
+            season_key = f'{year}Q{quarter}'
+            cohort = cohort_by_season(config).get(season_key)
+            if cohort:
+                n_expected = len(cohort & member_ciks)
+            else:
+                cohort = _cohort_members(config)
+                n_expected = len(cohort & member_ciks) if cohort else len(member_ciks)
+            n_index_members = len(members)
             share = (n_reported / n_expected) if n_expected else float('nan')
+            share_of_index = (n_reported / n_index_members) if n_index_members else float('nan')
             if n_expected and n_reported > n_expected:
                 raise DataError(
                     f'share_reported would exceed 1 at as_of={stamp.date()}: '
-                    f'{n_reported} reported companies against {n_expected} members; '
-                    'the constituents file does not cover the reports being aggregated'
+                    f'{n_reported} reported companies against {n_expected} cohort members; '
+                    'the cohort file does not cover the reports being aggregated'
                 )
             row: dict[str, object] = {
                 'as_of_date': stamp,
@@ -309,39 +398,91 @@ def aggregate_index(
                 'n_reported': n_reported,
                 'n_expected': n_expected,
                 'share_reported': share,
+                'share_of_cohort': share,
+                'share_of_index': share_of_index,
                 'n_review_excluded': excluded,
             }
             suppressed = n_reported < minimum
             row['suppressed'] = bool(suppressed)
 
-            if suppressed:
-                # The guardrail: too few companies to report a share without disclosing one.
-                row.update({name: float('nan') for name in BASE_METRICS})
-                row.update({f'theme_{t}_share': float('nan') for t in config.extraction.themes})
-            else:
-                beats = counted['beat']
-                graded = beats[beats.notna()]
-                row['beat_rate'] = (
+            # Winsorise inside this snapshot only: clipping over the whole season lets a
+            # document published later change an earlier as-of value (look-ahead).
+            counted = counted.copy()
+            counted['eps_growth'] = winsorize(
+                counted['eps_growth'], float(config.aggregation.winsorize_pct)
+            )
+            observations = {
+                'beat_rate': counted['beat'].notna().sum(),
+                'eps_growth_agg': counted['eps_growth'].notna().sum(),
+                'guidance_raise_share': counted['guidance_raised'].notna().sum(),
+                'guidance_lower_share': counted['guidance_lowered'].notna().sum(),
+                'guidance_ratio': (
+                    _directional(counted['guidance_raised'], counted['guidance_lowered'])
+                ),
+                'tone_score_mean': counted['tone_score'].notna().sum(),
+            }
+            row['n_obs_beat'] = int(observations['beat_rate'])
+            row['n_obs_growth'] = int(observations['eps_growth_agg'])
+            row['n_obs_guidance'] = int(observations['guidance_ratio'])
+            row['n_obs_tone'] = int(observations['tone_score_mean'])
+            theme_obs = {
+                theme: int(counted[f'theme_{theme}_up'].notna().sum())
+                for theme in config.extraction.themes
+            }
+            for theme, count in theme_obs.items():
+                row[f'n_obs_theme_{theme}'] = count
+
+            values: dict[str, float] = {}
+            if not suppressed:
+                graded = counted['beat']
+                graded = graded[graded.notna()]
+                values['beat_rate'] = (
                     _weighted_mean((graded > 0).astype(float), weights.loc[graded.index])
                     if not graded.empty
                     else float('nan')
                 )
-                row['eps_growth_agg'] = _weighted_mean(counted['eps_growth'], weights)
+                values['eps_growth_agg'] = _weighted_mean(counted['eps_growth'], weights)
                 raise_share = _weighted_mean(counted['guidance_raised'], weights)
                 lower_share = _weighted_mean(counted['guidance_lowered'], weights)
-                row['guidance_raise_share'] = raise_share
-                row['guidance_lower_share'] = lower_share
+                values['guidance_raise_share'] = raise_share
+                values['guidance_lower_share'] = lower_share
                 denominator = (raise_share if pd.notna(raise_share) else 0.0) + (
                     lower_share if pd.notna(lower_share) else 0.0
                 )
-                row['guidance_ratio'] = (
+                values['guidance_ratio'] = (
                     float(raise_share) / denominator if denominator > 0 else float('nan')
                 )
-                row['tone_score_mean'] = _weighted_mean(counted['tone_score'], weights)
+                values['tone_score_mean'] = _weighted_mean(counted['tone_score'], weights)
                 for theme in config.extraction.themes:
-                    row[f'theme_{theme}_share'] = _weighted_mean(
+                    values[f'theme_{theme}_share'] = _weighted_mean(
                         counted[f'theme_{theme}_up'], weights
                     )
+            else:
+                # The guardrail: too few companies to report a share without disclosing one.
+                values = dict.fromkeys(
+                    (*BASE_METRICS, *[f'theme_{t}_share' for t in config.extraction.themes]),
+                    float('nan'),
+                )
+
+            # A metric also needs enough observations of its own. Twelve companies and
+            # one consensus figure is a beat rate of 1.0: one company's result.
+            metric_minimum = int(config.aggregation.min_observations)
+            for name in BASE_METRICS:
+                count = int(observations[name])
+                if suppressed or count < metric_minimum:
+                    row[name] = float('nan')
+                    row[f'metric_status_{name}'] = 'insufficient_observations'
+                else:
+                    row[name] = values[name]
+                    row[f'metric_status_{name}'] = 'ok'
+            for theme, count in theme_obs.items():
+                key = f'theme_{theme}_share'
+                if suppressed or count < metric_minimum:
+                    row[key] = float('nan')
+                    row[f'metric_status_{key}'] = 'insufficient_observations'
+                else:
+                    row[key] = values[key]
+                    row[f'metric_status_{key}'] = 'ok'
             rows.append(row)
 
     return pd.DataFrame(rows, columns=columns).sort_values('as_of_date').reset_index(drop=True)

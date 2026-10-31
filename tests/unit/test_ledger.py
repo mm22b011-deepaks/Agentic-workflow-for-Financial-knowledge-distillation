@@ -33,6 +33,8 @@ def test_ledger_total_and_parquet(tmp_path: Path) -> None:
         'total_tokens',
         'cost_usd',
         'max_tokens',
+        'finish_reason',
+        'outcome',
         'cached',
     ]
     assert len(frame) == 2

@@ -500,7 +500,6 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rapidfuzz", version = "3.14.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "rapidfuzz", version = "3.14.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "tenacity" },
 ]
 
 [package.optional-dependencies]
@@ -532,7 +531,6 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6" },
     { name = "rapidfuzz", specifier = ">=3.6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "tenacity", specifier = ">=8.2" },
     { name = "types-pyyaml", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]

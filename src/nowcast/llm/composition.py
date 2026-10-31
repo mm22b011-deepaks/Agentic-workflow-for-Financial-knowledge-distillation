@@ -9,11 +9,19 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 
 from nowcast.config import Config, cache_dir
-from nowcast.errors import BudgetExceeded, RateLimited, TruncatedCompletion
+from nowcast.errors import (
+    AuthError,
+    BudgetExceeded,
+    EmptyCompletion,
+    ModelNotFound,
+    RateLimited,
+    TruncatedCompletion,
+)
 from nowcast.llm.cache import ResponseCache, cache_key
 from nowcast.llm.caller import LLMResult
 
@@ -69,9 +77,17 @@ class RetryingCaller:
         self._sleep = sleep or time.sleep
         self.cache_hits = 0
         self.calls = 0
+        # Extraction calls this from a thread pool; an unsynchronised counter loses hits
+        # and makes a cache measurement wrong.
+        self._lock = threading.Lock()
 
     def _key(self, model: str, messages: list[dict[str, str]]) -> str:
-        """Return the cache key for one request, including the sampling settings."""
+        """Return the cache key for one request, including every sampling setting.
+
+        The prompt text already carries the rendered prompt, so the few-shot examples and
+        the document are in the key. The sampling parameters are not, and a reply sampled
+        with a different reasoning budget is a different reply.
+        """
         prompt_text = '\n'.join(message['content'] for message in messages)
         return cache_key(
             prompt_text,
@@ -80,46 +96,52 @@ class RetryingCaller:
                 'temperature': self._config.llm.temperature,
                 'max_tokens': self._config.llm.max_tokens,
                 'schema_version': self._config.extraction.schema_version,
+                'reasoning': self._config.llm.reasoning_params(),
             },
         )
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
-        """Return a cached or fresh completion, retrying transient failures."""
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
+        """Return a cached or fresh completion, retrying transient failures only."""
         key = self._key(model, messages)
         cached = self._cache.get(key)
         if cached is not None and cacheable_reply(cached):
-            self.cache_hits += 1
+            with self._lock:
+                self.cache_hits += 1
             return LLMResult(text=cached, model=model, cached=True)
         attempts = max(1, int(self._config.llm.retry_attempts))
         backoff = float(self._config.llm.retry_backoff_seconds)
         max_wait = float(self._config.llm.retry_max_wait_seconds)
         ceiling = int(self._config.llm.max_tokens_ceiling)
+        budget = int(max_tokens or self._config.llm.max_tokens)
         last_error: Exception | None = None
         truncated_retry_used = False
         for attempt in range(attempts):
             try:
-                self.calls += 1
-                result = self._caller.complete(model, messages)
-            except BudgetExceeded:
-                # A spend cap is a deliberate stop, never something to retry.
+                with self._lock:
+                    self.calls += 1
+                result = self._caller.complete(model, messages, max_tokens=budget)
+            except (BudgetExceeded, AuthError, ModelNotFound):
+                # A spend cap, a rejected credential and a missing model are facts about
+                # the run, not transient states: retrying them spends the budget on the
+                # same answer and buries the cause under N identical failures.
                 raise
-            except TruncatedCompletion as exc:
-                # Not a parse failure: there is no text. Retry once with a larger budget,
-                # then give up clearly instead of feeding '' to a repair loop.
+            except EmptyCompletion as exc:
                 last_error = exc
+                if not isinstance(exc, TruncatedCompletion):
+                    # Nothing to parse and no budget to raise: hand it up as it is.
+                    break
                 if truncated_retry_used or exc.max_tokens >= ceiling:
                     break
                 truncated_retry_used = True
-                raised = min(int(exc.max_tokens) * 2, ceiling)
+                budget = min(int(exc.max_tokens) * 2, ceiling)
                 LOGGER.warning(
                     'truncated completion: retrying with max_tokens=%d (was %d) model=%s',
-                    raised,
+                    budget,
                     exc.max_tokens,
                     model,
                 )
-                override = getattr(self._caller, 'with_max_tokens', None)
-                if override is not None:
-                    override(raised)
                 continue
             except Exception as exc:
                 last_error = exc
@@ -135,7 +157,7 @@ class RetryingCaller:
             else:
                 LOGGER.info('reply not cacheable model=%s chars=%d', model, len(result.text))
             return result
-        if isinstance(last_error, TruncatedCompletion):
+        if isinstance(last_error, EmptyCompletion):
             raise last_error
         requested = getattr(last_error, 'retry_after_seconds', None)
         if isinstance(requested, (int, float)) and not isinstance(requested, bool):

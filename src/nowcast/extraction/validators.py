@@ -37,6 +37,23 @@ def verify_quote(quote: str, source: str) -> float:
     return round(fuzz.partial_ratio(quote.lower(), source.lower()) / 100.0, 4)
 
 
+def matched_window(quote: str, source: str) -> str:
+    """Return the part of the source that best matches the quote.
+
+    A whole-document fuzzy score says a quote resembles *something* in the source; it
+    cannot say the number in it is real. A forty-character quote with one digit changed
+    scores about 0.97, well past any workable threshold. The number therefore has to
+    appear in the window the quote was matched against, not merely somewhere in the
+    document.
+    """
+    if not quote or not source:
+        return ''
+    alignment = fuzz.partial_ratio_alignment(quote.lower(), source.lower())
+    if alignment is None:
+        return ''
+    return source[alignment.dest_start : alignment.dest_end + 1]
+
+
 def _digits_in(text: str) -> set[str]:
     """Return the numeric tokens of a string with commas and signs stripped."""
     tokens: set[str] = set()
@@ -117,6 +134,14 @@ def validate_record(
         if field.evidence_quote and not number_in_quote(float(field.value), field.evidence_quote):
             issues.append(Issue(name, 'number_not_in_quote', (field.evidence_quote or '')[:80]))
             field.confidence = field.confidence * penalty
+        elif field.evidence_quote:
+            window = matched_window(field.evidence_quote, source)
+            if not number_in_quote(float(field.value), window):
+                # The quote resembles the source (possibly with a changed digit) but the
+                # number is not in the text it matched. Checking the model's own quote
+                # only ever proves the model is consistent with itself.
+                issues.append(Issue(name, 'number_not_in_source', window[:80]))
+                field.confidence = field.confidence * penalty
 
     for name in TEXT_FIELDS:
         field = getattr(record, name)
@@ -129,6 +154,12 @@ def validate_record(
         _check_field_quote(
             name, field.evidence_quote, source, config, issues, adjust_text, field.confidence
         )
+        vocabulary = config.extraction.vocab(name)
+        if vocabulary and str(field.value).lower().strip() not in set(vocabulary):
+            # The prompt offers these values; a reply outside them is either a model
+            # inventing a category or a prompt drifting from config.
+            issues.append(Issue(name, 'vocab_invalid', str(field.value)[:80]))
+            field.confidence = field.confidence * penalty
 
     for theme, mention in record.theme_mentions.items():
         if not mention.mentioned:
@@ -148,12 +179,6 @@ def validate_record(
     if record.reported_eps.value is not None and record.eps_basis.value is None:
         issues.append(Issue('eps_basis', 'basis_missing', 'reported_eps present without basis'))
         record.reported_eps.confidence = record.reported_eps.confidence * penalty
-    if (
-        record.reported_eps.value is not None
-        and record.eps_basis.value
-        and (str(record.eps_basis.value).lower() not in {'gaap', 'adjusted'})
-    ):
-        issues.append(Issue('eps_basis', 'basis_invalid', str(record.eps_basis.value)))
     return issues, record
 
 
@@ -171,18 +196,37 @@ def is_empty_extraction(record: ExtractionRecord) -> bool:
     return all(getattr(record, name).value is None for name in CORE_NUMERIC_FIELDS)
 
 
-def needs_review(record: ExtractionRecord, issues: list[Issue], config: Config) -> list[str]:
-    """Return the reasons a record must go to the review queue."""
+def needs_review(
+    record: ExtractionRecord,
+    issues: list[Issue],
+    config: Config,
+    truncated: bool = False,
+) -> list[str]:
+    """Return the reasons a record must go to the review queue.
+
+    Every field with a value is checked for confidence, not just the numeric ones: a
+    low-confidence `tone` or `guidance_direction` is exactly the claim a human should
+    look at, and it was silently accepted before.
+    """
     reasons: list[str] = []
     minimum = float(config.extraction.min_confidence)
     if is_empty_extraction(record):
         reasons.append('empty_extraction')
-    for name in NUMERIC_FIELDS:
+    elif record.reported_eps.value is None:
+        # Revenue without EPS is a real, partial release; name the gap rather than
+        # calling the whole extraction empty.
+        reasons.append('eps_missing')
+    for name in (*NUMERIC_FIELDS, *TEXT_FIELDS):
         field = getattr(record, name)
         if field.value is not None and field.confidence < minimum:
             reasons.append(f'low_confidence:{name}')
         if field.value is None and field.null_reason is None and field.evidence_quote is not None:
             reasons.append(f'null_reason_missing:{name}')
+    for theme, mention in record.theme_mentions.items():
+        if mention.mentioned and mention.confidence < minimum:
+            reasons.append(f'low_confidence:theme.{theme}')
+    if truncated:
+        reasons.append('doc_truncated')
     if issues:
         reasons.append('validation_issues')
     return reasons

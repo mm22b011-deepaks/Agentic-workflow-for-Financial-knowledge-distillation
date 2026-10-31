@@ -185,3 +185,113 @@ def test_partial_record_is_not_empty_extraction(config: Config) -> None:
     partial = _record(revenue={'value': None, 'null_reason': 'not_stated'})
     issues, validated = validate_record(partial, SOURCE, config)
     assert 'empty_extraction' not in needs_review(validated, issues, config)
+
+
+def test_mutated_digit_in_quote_is_flagged(config: Config) -> None:
+    """A quote with one wrong digit matches the source fuzzily, but its number does not."""
+    # 0.57 vs the printed 0.55: partial_ratio is high, so the quote check alone passes.
+    mutated = _record(
+        reported_eps={
+            'value': 0.57,
+            'evidence_quote': 'GAAP diluted earnings per share were $0.57',
+            'confidence': 0.9,
+        }
+    )
+    assert verify_quote(mutated.reported_eps.evidence_quote, SOURCE) > 0.85
+    issues, _validated = validate_record(mutated, SOURCE, config)
+    codes = {(issue.field, issue.code) for issue in issues}
+    assert ('reported_eps', 'number_not_in_source') in codes
+
+
+def test_correct_quote_with_scaled_number_passes(config: Config) -> None:
+    """A printed 1.20 billion with value 1.2 is correct, and must not be flagged."""
+    issues, _validated = validate_record(_record(), SOURCE, config)
+    codes = {(issue.field, issue.code) for issue in issues}
+    assert ('revenue', 'number_not_in_source') not in codes
+    assert ('revenue', 'number_not_in_quote') not in codes
+
+
+def test_every_prompt_vocabulary_value_is_accepted_downstream(config: Config) -> None:
+    """Each configured vocabulary value validates; nothing the prompt offers is rejected."""
+    for field, vocab in (
+        ('eps_basis', config.extraction.eps_basis_vocab),
+        ('guidance_direction', config.extraction.guidance_direction_vocab),
+        ('tone', config.extraction.tone_vocab),
+    ):
+        for value in vocab:
+            record = _record(
+                **{field: {'value': value, 'evidence_quote': SOURCE, 'confidence': 0.9}}
+            )
+            issues, _validated = validate_record(record, SOURCE, config)
+            assert not [issue for issue in issues if issue.code == 'vocab_invalid'], (
+                f'{field}={value!r} is offered by the prompt but rejected by the validator'
+            )
+
+
+def test_value_outside_vocabulary_is_flagged(config: Config) -> None:
+    """A model inventing a category gets a named issue, not a silent pass."""
+    record = _record(
+        tone={
+            'value': 'ecstatic',
+            'evidence_quote': 'GAAP diluted earnings per share',
+            'confidence': 0.9,
+        }
+    )
+    issues, _validated = validate_record(record, SOURCE, config)
+    assert ('tone', 'vocab_invalid') in {(issue.field, issue.code) for issue in issues}
+
+
+def test_low_confidence_text_field_queued(config: Config) -> None:
+    """A low-confidence guidance_direction or tone reaches the queue like a number does."""
+    record = _record(
+        guidance_direction={
+            'value': 'raised',
+            'evidence_quote': 'up 4% year over year',
+            'confidence': 0.1,
+        },
+        tone={'value': 'cautious', 'evidence_quote': 'up 4% year over year', 'confidence': 0.1},
+    )
+    reasons = needs_review(record, [], config)
+    assert 'low_confidence:guidance_direction' in reasons
+    assert 'low_confidence:tone' in reasons
+
+
+def test_low_confidence_theme_mention_queued(config: Config) -> None:
+    """A theme the model is unsure about is a claim a human should see."""
+    record = _record(
+        theme_mentions={
+            'demand': {
+                'mentioned': True,
+                'direction': 'up',
+                'evidence_quote': 'up 4% year over year',
+                'confidence': 0.1,
+            }
+        }
+    )
+    assert 'low_confidence:theme.demand' in needs_review(record, [], config)
+
+
+def test_eps_missing_flagged_separately(config: Config) -> None:
+    """Revenue without EPS is partial, not empty: the two reasons must differ."""
+    partial = _record(
+        reported_eps={'value': None, 'null_reason': 'not_stated', 'confidence': 0.0},
+        prior_year_eps={'value': None, 'null_reason': 'not_stated', 'confidence': 0.0},
+    )
+    reasons = needs_review(partial, [], config)
+    assert 'eps_missing' in reasons
+    assert 'empty_extraction' not in reasons
+
+    empty = _record(
+        reported_eps={'value': None, 'null_reason': 'not_stated', 'confidence': 0.0},
+        revenue={'value': None, 'null_reason': 'not_stated', 'confidence': 0.0},
+    )
+    empty_reasons = needs_review(empty, [], config)
+    assert 'empty_extraction' in empty_reasons
+    assert 'eps_missing' not in empty_reasons
+
+
+def test_truncated_document_queued_as_doc_truncated(config: Config) -> None:
+    """A cut document is not a clean success, even when the record itself is fine."""
+    reasons = needs_review(_record(), [], config, truncated=True)
+    assert 'doc_truncated' in reasons
+    assert 'doc_truncated' not in needs_review(_record(), [], config, truncated=False)

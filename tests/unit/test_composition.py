@@ -70,7 +70,9 @@ class RateLimitedOnce:
         self.text = text
         self.calls = 0
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Fail the first call with a rate limit, then succeed."""
         self.calls += 1
         if self.calls == 1:
@@ -86,7 +88,9 @@ class CountingCaller:
         self.text = text
         self.calls = 0
 
-    def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+    def complete(
+        self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+    ) -> LLMResult:
         """Return the canned reply and count the call."""
         self.calls += 1
         return LLMResult(text=self.text, model=model)
@@ -139,7 +143,9 @@ def test_empty_reply_never_cached(config: Config, tmp_path: Path) -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+        def complete(
+            self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+        ) -> LLMResult:
             """Return an empty completion every time."""
             self.calls += 1
             return LLMResult(text='', model=model)
@@ -160,7 +166,9 @@ def test_unparseable_reply_never_cached(config: Config, tmp_path: Path) -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        def complete(self, model: str, messages: list[dict[str, str]]) -> LLMResult:
+        def complete(
+            self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
+        ) -> LLMResult:
             """Return prose that no parser can read."""
             self.calls += 1
             return LLMResult(text='I cannot answer that.', model=model)
