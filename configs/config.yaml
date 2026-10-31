@@ -31,6 +31,13 @@ data:
   edgar_index_headers_url_template: 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession}-index-headers.html'
   edgar_forms:
     - 8-K
+  # Only parseable text exhibits are downloaded: an EX-99 image (some filers publish
+  # the release as scans) would otherwise be decoded as HTML and fill the document cap
+  # with binary noise.
+  edgar_document_suffixes:
+    - .htm
+    - .html
+    - .txt
   edgar_earnings_items:
     - '2.02'
   edgar_lookback_days: 730
