@@ -194,3 +194,42 @@ def test_runner_rejects_non_free_model(config: Config, tmp_path: Path) -> None:
             caller.complete('paid/model', [{'role': 'user', 'content': 'x'}])
     finally:
         caller.close()
+
+
+def test_load_documents_skips_non_text_files(config: Config, tmp_path: Path) -> None:
+    """A stale index entry pointing at a scan is dropped before it reaches a prompt."""
+    import pandas as pd
+
+    index = pd.DataFrame(
+        [
+            {
+                'document_id': 'doc-a',
+                'cik': '0000000001',
+                'report_date': '2025-01-30',
+                'document_type': 'EX-99.1',
+                'source': 'edgar',
+                'raw_path': 'raw/0000000001/a/dex991.htm',
+                'sha256': 'x',
+                'chars': 10,
+                'downloaded_at': '2025-01-30T00:00:00+00:00',
+            },
+            {
+                'document_id': 'doc-b',
+                'cik': '0000000001',
+                'report_date': '2025-01-30',
+                'document_type': 'EX-99.1',
+                'source': 'edgar',
+                'raw_path': 'raw/0000000001/a/ex991001.jpg',
+                'sha256': 'y',
+                'chars': 10,
+                'downloaded_at': '2025-01-30T00:00:00+00:00',
+            },
+        ]
+    )
+    path = tmp_path / 'index.parquet'
+    index.to_parquet(path, index=False)
+
+    from nowcast.extraction.runner import load_documents
+
+    documents = load_documents(config, path)
+    assert [document.document_id for document in documents] == ['doc-a']
