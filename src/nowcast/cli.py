@@ -192,7 +192,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     import asyncio
 
     from nowcast.extraction.runner import consolidate, load_documents, run_extraction
-    from nowcast.llm.caller import LLMCaller
+    from nowcast.llm.composition import make_caller
     from nowcast.llm.ledger import BudgetLedger
 
     config = _load(args)
@@ -216,18 +216,18 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     shared: Any = None
 
     def factory(model: str) -> Any:
-        """Return one shared caller; the runner is single-process and thread-safe."""
+        """Return the composed caller built at the one composition point."""
         nonlocal shared
         del model
         if shared is None:
-            shared = LLMCaller(config.llm, ledger=ledger)
+            shared = make_caller(config, ledger=ledger)
         return shared
 
     try:
         outcomes = asyncio.run(run_extraction(config, documents, factory, models))
     finally:
         if shared is not None:
-            shared.close()
+            shared._caller.close()  # the composition owns exactly one client
         ledger.flush()
     ok = sum(1 for item in outcomes if item.status == 'ok')
     failed = sum(1 for item in outcomes if item.status == 'failed')

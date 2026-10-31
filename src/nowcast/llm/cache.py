@@ -73,7 +73,12 @@ class ResponseCache:
             LOGGER.info('cache entry expired key=%s', key)
             return None
         text = payload.get('text')
-        return str(text) if text is not None else None
+        if text is None:
+            return None
+        # An empty entry must read as a miss: callers test `is not None`, so returning
+        # '' would replay an empty completion on every run, forever.
+        stored = str(text)
+        return stored if stored.strip() else None
 
     def set(self, key: str, text: str, model: str) -> None:
         """Store a response text under the cache key."""

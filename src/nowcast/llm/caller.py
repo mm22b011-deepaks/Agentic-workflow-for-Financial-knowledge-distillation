@@ -78,6 +78,7 @@ class LLMResult:
     completion_tokens: int = 0
     total_tokens: int = 0
     cost_usd: float = 0.0
+    cached: bool = False
 
 
 class LLMCaller:
