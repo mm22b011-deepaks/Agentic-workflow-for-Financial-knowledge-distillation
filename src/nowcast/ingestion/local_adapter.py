@@ -74,9 +74,21 @@ def index_manifest(config: Config, manifest_path: Path | str) -> list[dict[str, 
                 'sha256': file_sha256(raw_file),
                 'chars': len(text),
                 'downloaded_at': datetime.now(timezone.utc).isoformat(),
+                # Pass the manifest's own item codes through. A manifest that does not
+                # state them gets '', which extraction treats as "not proven a 2.02
+                # release" rather than silently assuming it. A blank CSV cell arrives
+                # as NaN, which must not become the string 'nan'.
+                'items': _item_text(record.get('items')),
             }
         )
     return rows
+
+
+def _item_text(value: object) -> str:
+    """Return a manifest item list as text, mapping a missing CSV cell to blank."""
+    if value is None or (isinstance(value, float) and value != value):
+        return ''
+    return str(value).strip()
 
 
 def _document_text(path: Path) -> str:

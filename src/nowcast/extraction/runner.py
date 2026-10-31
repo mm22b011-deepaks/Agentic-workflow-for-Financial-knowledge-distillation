@@ -59,6 +59,7 @@ def model_slug(model: str) -> str:
 
 
 TEXT_SUFFIXES = ('.htm', '.html', '.txt')
+EARNINGS_ITEM = '2.02'
 
 
 def load_documents(
@@ -66,19 +67,29 @@ def load_documents(
 ) -> list[Document]:
     """Load the document index and return typed documents.
 
-    An index written before the exhibit suffix filter existed can hold EX-99 scans;
-    passing `suffixes` drops anything that is not parseable text before it reaches a
-    prompt, where it would only produce a confidently wrong extraction.
+    Two filters, both at the index: a row whose raw file is not parseable text never
+    reaches a prompt, and neither does a row whose 8-K items do not include a configured
+    earnings item. The second is the difference between extracting an earnings release
+    and extracting someone's dividend announcement with equal confidence.
     """
-    from nowcast.ingestion.doc_index import load_index
+    from nowcast.ingestion.doc_index import has_earnings_item, load_index
 
     frame = load_index(index_path)
     allowed = {item.lower() for item in (suffixes if suffixes is not None else TEXT_SUFFIXES)}
+    wanted_items = tuple(config.data.edgar_earnings_items) or (EARNINGS_ITEM,)
     documents: list[Document] = []
+    not_earnings = 0
     for row in frame.to_dict('records'):
         raw_path = Path(str(row['raw_path']))
         if raw_path.suffix.lower() not in allowed:
             LOGGER.info('skip non-text document raw_path=%s', raw_path)
+            continue
+        items = row.get('items')
+        if not has_earnings_item(items, wanted_items):
+            # An index written before the `items` column existed carries no proof, so
+            # every row of it lands here. That is deliberate: it sends the operator to
+            # the rebuild (N7) instead of extracting unclassified filings.
+            not_earnings += 1
             continue
         if not raw_path.is_absolute():
             raw_path = resolve_data_path(config, str(row['raw_path']))
@@ -91,6 +102,12 @@ def load_documents(
                 raw_path=raw_path,
                 sha256=str(row['sha256']),
             )
+        )
+    if not_earnings:
+        LOGGER.warning(
+            'skip documents whose index row has no earnings item: %d (wanted %s)',
+            not_earnings,
+            ','.join(wanted_items),
         )
     return documents
 

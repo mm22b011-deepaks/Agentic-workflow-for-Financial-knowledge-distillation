@@ -157,10 +157,26 @@ def validate_record(
     return issues, record
 
 
+CORE_NUMERIC_FIELDS = ('reported_eps', 'revenue')
+
+
+def is_empty_extraction(record: ExtractionRecord) -> bool:
+    """Return True when an earnings release yielded none of its core numbers.
+
+    A 2.02 filing that produces no reported EPS and no revenue is not a `not_stated`
+    record with two honest nulls: either the document was not a release, or the text
+    handed to the model did not contain the figures. Either way it must not pass as a
+    clean success, so it is named separately in the review queue.
+    """
+    return all(getattr(record, name).value is None for name in CORE_NUMERIC_FIELDS)
+
+
 def needs_review(record: ExtractionRecord, issues: list[Issue], config: Config) -> list[str]:
     """Return the reasons a record must go to the review queue."""
     reasons: list[str] = []
     minimum = float(config.extraction.min_confidence)
+    if is_empty_extraction(record):
+        reasons.append('empty_extraction')
     for name in NUMERIC_FIELDS:
         field = getattr(record, name)
         if field.value is not None and field.confidence < minimum:

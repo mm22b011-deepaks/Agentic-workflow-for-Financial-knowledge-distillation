@@ -166,6 +166,9 @@ class AggregationConfig:
     weights_csv: str = ''
     min_constituents: int = 10
     winsorize_pct: float = 0.05
+    # How a (company, season) reported more than once is reduced to one observation:
+    # the row with the highest stored confidence, or the earliest document id.
+    dedupe_rule: str = 'max_confidence'
 
 
 @dataclass(frozen=True)
@@ -420,6 +423,8 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('aggregation.winsorize_pct must be in [0, 0.5)')
     if config.aggregation.min_constituents < 1:
         problems.append('aggregation.min_constituents must be >= 1')
+    if config.aggregation.dedupe_rule not in {'max_confidence', 'first_document'}:
+        problems.append("aggregation.dedupe_rule must be 'max_confidence' or 'first_document'")
     if config.llm.max_tokens_ceiling < config.llm.max_tokens:
         problems.append('llm.max_tokens_ceiling must be >= llm.max_tokens')
     if config.extraction.max_doc_chars <= 0:

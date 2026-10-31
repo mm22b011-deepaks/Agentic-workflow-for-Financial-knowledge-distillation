@@ -216,6 +216,7 @@ def test_load_documents_skips_non_text_files(config: Config, tmp_path: Path) -> 
                 'sha256': 'x',
                 'chars': 10,
                 'downloaded_at': '2025-01-30T00:00:00+00:00',
+                'items': '2.02,9.01',
             },
             {
                 'document_id': 'doc-b',
@@ -227,6 +228,7 @@ def test_load_documents_skips_non_text_files(config: Config, tmp_path: Path) -> 
                 'sha256': 'y',
                 'chars': 10,
                 'downloaded_at': '2025-01-30T00:00:00+00:00',
+                'items': '2.02,9.01',
             },
         ]
     )
@@ -237,3 +239,69 @@ def test_load_documents_skips_non_text_files(config: Config, tmp_path: Path) -> 
 
     documents = load_documents(config, path)
     assert [document.document_id for document in documents] == ['doc-a']
+
+
+def _write_index(tmp_path: Path, rows: list[dict[str, object]]) -> Path:
+    """Write a document index holding the given rows."""
+    import pandas as pd
+
+    path = tmp_path / 'index.parquet'
+    pd.DataFrame(rows).to_parquet(path, index=False)
+    return path
+
+
+def _index_row(document_id: str, path: str, items: str) -> dict[str, object]:
+    """Build one index row for a text document with the given 8-K items."""
+    return {
+        'document_id': document_id,
+        'cik': '0000000001',
+        'report_date': '2025-01-30',
+        'document_type': 'EX-99.1',
+        'source': 'edgar',
+        'raw_path': path,
+        'sha256': document_id,
+        'chars': 10,
+        'downloaded_at': '2025-01-30T00:00:00+00:00',
+        'items': items,
+    }
+
+
+def test_non_earnings_document_not_extracted(config: Config, tmp_path: Path) -> None:
+    """A filing without Item 2.02 is not an earnings release and never reaches a prompt."""
+    from nowcast.extraction.runner import load_documents
+
+    path = _write_index(
+        tmp_path,
+        [
+            _index_row('earnings', 'raw/1/a/earnings.htm', '2.02,9.01'),
+            _index_row('dividend', 'raw/1/b/dividend.htm', '8.01'),
+            _index_row('unknown', 'raw/1/c/unknown.htm', ''),
+        ],
+    )
+    documents = load_documents(config, path)
+    assert [document.document_id for document in documents] == ['earnings']
+
+
+def test_index_written_before_items_column_is_not_extracted(config: Config, tmp_path: Path) -> None:
+    """A pre-v2 index carries no item proof, so its rows are refused rather than guessed."""
+    import pandas as pd
+
+    from nowcast.extraction.runner import load_documents
+
+    path = tmp_path / 'old_index.parquet'
+    pd.DataFrame(
+        [
+            {
+                'document_id': 'old',
+                'cik': '0000000001',
+                'report_date': '2025-01-30',
+                'document_type': 'EX-99',
+                'source': 'edgar',
+                'raw_path': 'raw/1/a/old.htm',
+                'sha256': 'x',
+                'chars': 10,
+                'downloaded_at': '2025-01-30T00:00:00+00:00',
+            }
+        ]
+    ).to_parquet(path, index=False)
+    assert load_documents(config, path) == []
