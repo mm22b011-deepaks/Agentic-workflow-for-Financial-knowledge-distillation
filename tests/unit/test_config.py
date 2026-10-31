@@ -56,6 +56,15 @@ def test_unknown_section_key_is_rejected() -> None:
         load_config(CONFIG_PATH, overrides={'llm.mystery': 'x'})
 
 
+def test_unknown_top_level_section_is_rejected(tmp_path: Path) -> None:
+    """A misspelled section name fails instead of silently keeping the defaults."""
+    broken = tmp_path / 'config.yaml'
+    broken.write_text('aggregaton:\n  min_constituents: 3\n', encoding='utf-8')
+    with pytest.raises(ConfigError, match='unknown top-level section') as excinfo:
+        load_config(broken)
+    assert 'aggregaton' in str(excinfo.value)
+
+
 def test_non_mapping_section_is_rejected(tmp_path: Path) -> None:
     """A section that is not a mapping produces a readable error."""
     broken = tmp_path / 'config.yaml'

@@ -1,107 +1,102 @@
-"""Build the constituents CSV by discovering large-cap CIKs from EDGAR's company_tickers file."""
+"""Build the constituents CSV for a list of tickers, resolving CIKs from EDGAR.
+
+The ticker list is an input, not part of the code: pass a file with one ticker per line
+(`--tickers`), or leave it out to use `inputs/tickers.txt` under the data root. Nothing
+here contains a ticker, a CIK or a URL.
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
+import logging
 import os
-import sys
 from pathlib import Path
 
 import httpx
 import pandas as pd
+from _bootstrap import setup
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'src'))
+from nowcast.config import Config, resolve_data_path
 
-from dotenv import load_dotenv  # noqa: E402
-
-from nowcast.config import load_config  # noqa: E402
-
-TICKERS_URL = 'https://www.sec.gov/files/company_tickers.json'
-WANTED_TICKERS = [
-    'AAPL',
-    'MSFT',
-    'NVDA',
-    'AMZN',
-    'GOOGL',
-    'META',
-    'TSLA',
-    'AVGO',
-    'BRK-B',
-    'LLY',
-    'JPM',
-    'V',
-    'UNH',
-    'XOM',
-    'MA',
-    'COST',
-    'HD',
-    'PG',
-    'JNJ',
-    'WMT',
-    'NFLX',
-    'ABBV',
-    'BAC',
-    'CRM',
-    'ORCL',
-    'CVX',
-    'MRK',
-    'KO',
-    'PEP',
-    'AMD',
-    'TMO',
-    'ADBE',
-    'CSCO',
-    'ACN',
-    'LIN',
-    'MCD',
-    'ABT',
-    'DHR',
-    'WFC',
-    'TXN',
-    'INTU',
-    'QCOM',
-    'PM',
-    'CAT',
-    'IBM',
-    'GE',
-    'AMGN',
-    'NOW',
-    'UBER',
-    'SPGI',
-]
+LOGGER = logging.getLogger('nowcast.scripts.make_inputs')
 
 
-def main() -> int:
-    """Write inputs/constituents.csv from the EDGAR ticker file."""
-    load_dotenv(ROOT / '.env', override=True)
-    config = load_config(ROOT / 'configs' / 'config.yaml')
-    agent = os.environ[config.data.sec_user_agent_env]
-    response = httpx.get(TICKERS_URL, headers={'User-Agent': agent}, timeout=60.0)
-    response.raise_for_status()
-    payload = json.loads(response.text)
-    by_ticker = {}
+def read_tickers(path: Path) -> list[str]:
+    """Read tickers from a text or CSV file, one per line, blanks and comments dropped."""
+    if not path.is_file():
+        raise FileNotFoundError(f'ticker list not found: {path}')
+    tickers: list[str] = []
+    for line in path.read_text(encoding='utf-8').splitlines():
+        value = line.split(',')[0].strip().upper()
+        if value and not value.startswith('#'):
+            tickers.append(value)
+    return tickers
+
+
+def ticker_to_cik(payload: dict[str, dict[str, object]]) -> dict[str, str]:
+    """Map uppercase ticker to a ten-digit CIK from EDGAR's company_tickers payload."""
+    mapping: dict[str, str] = {}
     for item in payload.values():
-        ticker = str(item['ticker']).upper()
-        if ticker in WANTED_TICKERS:
-            by_ticker[ticker] = str(item['cik_str']).zfill(10)
-    missing = [ticker for ticker in WANTED_TICKERS if ticker not in by_ticker]
+        mapping[str(item['ticker']).upper()] = str(item['cik_str']).zfill(10)
+    return mapping
+
+
+def build_rows(config: Config, tickers: list[str], client: httpx.Client) -> tuple[list[dict], list]:
+    """Return constituent rows for the tickers EDGAR knows, plus the ones it does not."""
+    response = client.get(config.universe.sec_ticker_map_url)
+    response.raise_for_status()
+    mapping = ticker_to_cik(json.loads(response.text))
+    missing = [ticker for ticker in tickers if ticker not in mapping]
     rows = [
         {
             'ticker': ticker,
-            'cik': by_ticker[ticker],
-            'effective_from': '2020-01-01',
-            'effective_to': '2035-12-31',
+            'cik': mapping[ticker],
+            'effective_from': config.data.start_date or '2020-01-01',
+            'effective_to': config.data.end_date or '',
             'weight': 1.0,
         }
-        for ticker in WANTED_TICKERS
-        if ticker in by_ticker
+        for ticker in tickers
+        if ticker in mapping
     ]
-    out = ROOT / 'inputs' / 'constituents.csv'
+    return rows, missing
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Write the constituents CSV for a given ticker list."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '--tickers', default='', help='ticker list file (default: inputs/tickers.txt)'
+    )
+    parser.add_argument('--out', default='', help='output CSV (default: data.constituents_csv)')
+    args = parser.parse_args(argv)
+    config = setup()
+    # Default lives beside the constituents file under DATA_DIR, not in the checkout:
+    # the data root is the one place the operator keeps inputs.
+    tickers_path = (
+        Path(args.tickers) if args.tickers else resolve_data_path(config, 'inputs/tickers.txt')
+    )
+    out = Path(args.out) if args.out else resolve_data_path(config, config.data.constituents_csv)
+    tickers = read_tickers(tickers_path)
+    with httpx.Client(
+        headers={'User-Agent': _user_agent(config)}, timeout=float(config.llm.timeout_seconds)
+    ) as client:
+        rows, missing = build_rows(config, tickers, client)
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out, index=False)
-    print(f'wrote {out} rows={len(rows)} missing={missing}')
+    LOGGER.info('wrote %s rows=%d missing=%s', out, len(rows), missing)
     return 0
+
+
+def _user_agent(config: Config) -> str:
+    """Return the configured SEC user agent, failing clearly when it is absent."""
+    value = os.environ.get(config.data.sec_user_agent_env, '')
+    if not value:
+        raise SystemExit(
+            f'environment variable {config.data.sec_user_agent_env!r} is not set; '
+            'SEC requires a User-Agent with a contact address'
+        )
+    return value
 
 
 if __name__ == '__main__':

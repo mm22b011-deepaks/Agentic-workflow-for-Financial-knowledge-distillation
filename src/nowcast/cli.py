@@ -17,6 +17,7 @@ from nowcast.config import (
     resolve_data_path,
     validate_config,
 )
+from nowcast.envfile import load_dotenv_without_overriding
 from nowcast.errors import ConfigError, DataError, NowcastError
 from nowcast.logging_setup import setup_logging
 from nowcast.manifest import (
@@ -40,11 +41,7 @@ def _bootstrap_dotenv(candidates: tuple[Path, ...] = (Path('.env'),)) -> None:
     supplies what is missing, which is what makes a local CLI run convenient
     without letting a checked-out file clobber real credentials.
     """
-    from dotenv import load_dotenv
-
-    for candidate in candidates:
-        if candidate.is_file():
-            load_dotenv(candidate, override=False)
+    load_dotenv_without_overriding(candidates)
 
 
 def _configure_logging(config: Config) -> None:

@@ -106,19 +106,44 @@ Only the model call is protected in `runner._process`; `document_text`, `validat
 - [ ] Wrap the whole path; record the failure per document; continue
 - Test: `test_runner_survives_missing_raw_file_and_write_error`
 
-### H2 — Weak or misleading tests `[CONFIRMED]`
+### H2 — Weak or misleading tests `[CONFIRMED]` → `[FIXED 2026-10-31]`
 `test_runner_stops_on_budget_and_keeps_results` accepts either outcome.
-- [ ] Assert `budget_stopped` explicitly and that completed results are kept
-- [ ] Audit every test for "either outcome" assertions and for helpers tested while the
-      live path is not
-- [ ] Mutation testing on `validators.py`, `edgar.py`, `runner.py`, `aggregate.py`;
+- [x] Assert `budget_stopped` explicitly and that completed results are kept
+- [x] Audit every test for "either outcome" assertions and for helpers tested while the
+      live path is not — no remaining "either outcome" assertion found
+- [x] Mutation testing on `validators.py`, `edgar.py`, `runner.py`, `aggregate.py`;
       report surviving mutants
 
-### H3 — Reproducibility and portability leftovers `[CONFIRMED]`
-- [ ] No `load_dotenv(override=True)` in scripts; no `ROOT/'data'` or `ROOT/'inputs'`;
+First run: **20 mutants, 15 killed, 5 survived**. Each survivor was a behaviour nothing
+pinned, and each got a test that fails only under that mutant:
+
+| Survivor | Test that now kills it |
+|----------|------------------------|
+| quote threshold becomes `<=` | `test_quote_at_exactly_the_threshold_is_accepted` |
+| confidence penalty dropped | `test_missing_evidence_penalises_confidence` |
+| window lower bound exclusive | `test_window_bounds_are_inclusive` |
+| blocked counter never resets | `test_a_success_clears_the_blocked_run` |
+| company collapse removed | `test_duplicate_rows_do_not_weight_one_company_twice` |
+
+Second run (after those tests, and again after the H3 refactor):
+**20 mutants, 20 killed, 0 survived** — `python scripts/mutation_check.py`.
+
+### H3 — Reproducibility and portability leftovers `[CONFIRMED]` → `[FIXED 2026-10-31]`
+- [x] No `load_dotenv(override=True)` in scripts; no `ROOT/'data'` or `ROOT/'inputs'`;
       no `print`
-- [ ] `make_inputs.py` / `probe_models.py`: no hard-coded tickers, URLs or model IDs
-- [ ] `requirements.lock.txt`: no `-e file:///home/...`; regenerate clean; split dev pins
+- [x] `make_inputs.py` / `probe_models.py`: no hard-coded tickers, URLs or model IDs
+- [x] `requirements.lock.txt`: no `-e file:///home/...`; regenerate clean; split dev pins
+
+Measured after the fix: `grep -n 'print(' scripts/{make_inputs,probe_models,smoke_llm,
+ingest_real,extract_sample}.py` → no matches; scripts report through the same
+`setup_logging` formatter the CLI uses. One dotenv implementation
+(`nowcast.envfile.load_dotenv_without_overriding`, `override=False` only) serves both the
+CLI and every script; `test_scripts_and_cli_share_one_dotenv_rule` pins that. Tickers come
+from `--tickers` (default `inputs/tickers.txt` under the data root); models from
+`--models` / `--models-file` / config. Lock files regenerated with uv:
+`requirements.lock.txt` 58 pins (`--no-dev`), `requirements-dev.lock.txt` 76 pins
+(`--extra dev`), neither containing a local path. `requests` stays pinned: it is a
+transitive dependency of `langchain-core`/`langsmith`, not a direct one.
 
 ### H4 — Fingerprint and stored validation `[CONFIRMED]`
 Fingerprint omits `max_doc_chars` and the validation thresholds; penalties are baked into
@@ -142,9 +167,15 @@ the stored record, so changing a threshold silently reuses old results.
 `llm.timeout_seconds`; `:free` defined in both `config.py` and `caller.py`;
 `EXHIBIT_99_RE` / `EXHIBIT_FORMS_PREFIX` unused; dead dict in `runner.document_text`.
 
-### M2 — Unknown key raises `TypeError` `[UNSURE]`
-`_section` already rejects unknown keys with `ConfigError`; needs a test through
-`load_config` to confirm no path reaches `dataclass(**section)` with an unknown key.
+### M2 — Unknown key raises `TypeError` `[UNSURE]` → `[ALREADY-FIXED (test) + one real gap]`
+`_section` already rejected unknown keys inside a known section with `ConfigError`.
+Probing through `load_config` found the gap the `[UNSURE]` was hiding: an unknown
+**top-level** section (`aggregaton:`, `nope:`) was accepted silently, so a misspelled
+section name left the defaults in force and the run succeeded against settings nobody
+chose. `_reject_unknown_sections` now fails on it, naming the key and the known sections.
+Test: `test_unknown_top_level_section_is_rejected`; the per-section case keeps
+`test_unknown_section_key_is_rejected` and the CLI-level
+`test_unknown_config_key_is_a_config_error`.
 
 ### M3 — Docs report only measured state `[ONGOING]`
 `DEFECTS.md`, `status.md`, `tasks.md` updated with real counts after each item.

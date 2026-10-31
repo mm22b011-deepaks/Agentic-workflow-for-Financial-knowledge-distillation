@@ -231,3 +231,20 @@ def test_ingest_report_written_even_when_aborted(
     assert report['status_counts'] == {'403': 1}
     # Nothing was written to the index on the abort path.
     assert not (data / 'document_index.parquet').exists()
+
+
+def test_scripts_and_cli_share_one_dotenv_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both entry points call the one implementation, so they cannot drift apart."""
+    from nowcast import cli, envfile
+
+    calls: list[tuple[Path, ...]] = []
+    monkeypatch.setattr(
+        envfile, 'load_dotenv_without_overriding', lambda paths: calls.append(tuple(paths))
+    )
+    monkeypatch.setattr(
+        cli, 'load_dotenv_without_overriding', envfile.load_dotenv_without_overriding
+    )
+    cli._bootstrap_dotenv((tmp_path / '.env',))
+    assert calls == [(tmp_path / '.env',)]

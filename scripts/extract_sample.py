@@ -1,55 +1,74 @@
-"""Extract a small real sample with the configured free model, for manual spot-checks."""
+"""Extract a small real sample with one configured free model, for manual spot-checks."""
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
-import sys
-from pathlib import Path
 
-from dotenv import load_dotenv
+from _bootstrap import setup
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'src'))
+from nowcast.config import resolve_data_path
+from nowcast.extraction.runner import load_documents, run_extraction
+from nowcast.llm.composition import make_caller
 
-from nowcast.config import load_config  # noqa: E402
-from nowcast.extraction.runner import load_documents, run_extraction  # noqa: E402
-from nowcast.llm.caller import LLMCaller  # noqa: E402
-
-logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(message)s')
+LOGGER = logging.getLogger('nowcast.scripts.extract_sample')
 
 
-def main(limit: int) -> int:
-    """Run extraction over the first `limit` text documents with one free model."""
-    load_dotenv(ROOT / '.env', override=True)
-    config = load_config(ROOT / 'configs' / 'config.yaml')
-    # load_documents drops non-text documents, so an index holding old EX-99 scans
-    # cannot feed a JPEG to the model.
-    documents = load_documents(config, ROOT / 'data' / 'document_index.parquet')[:limit]
-    print(f'documents={len(documents)} model={config.llm.models[0]}')
-    caller = LLMCaller(config.llm)
+def main(argv: list[str] | None = None) -> int:
+    """Run extraction over the first `--limit` extractable documents with one free model."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--limit', type=int, default=5, help='documents to extract')
+    parser.add_argument('--model', default='', help='model id (default: first configured)')
+    args = parser.parse_args(argv)
+    config = setup()
+    model = args.model or config.llm.models[0]
+    index = resolve_data_path(config, config.data.document_index)
+    # load_documents drops non-text documents and rows without an earnings item, so a
+    # stale index holding EX-99 scans cannot feed a JPEG to the model.
+    documents = load_documents(config, index)[: args.limit]
+    LOGGER.info('documents=%d model=%s', len(documents), model)
 
-    def factory(_model: str) -> LLMCaller:
-        return caller
+    shared: dict[str, object] = {}
+
+    def factory(_model: str) -> object:
+        # One composed caller for the whole run: the runner passes a RetryingCaller
+        # through unchanged, so retry and cache apply but the HTTP client is not rebuilt
+        # per document.
+        if 'caller' not in shared:
+            shared['caller'] = make_caller(config)
+        return shared['caller']
 
     def progress(outcome: object) -> None:
         info = outcome
-        print(f'  {info.document_id[:48]:48s} {info.status:14s} {",".join(info.review_reasons)}')
+        LOGGER.info(
+            '%s %s %s',
+            info.document_id[:48],
+            info.status,
+            ','.join(info.review_reasons),
+        )
 
     try:
         outcomes = asyncio.run(
-            run_extraction(config, documents, caller_factory=factory, models=[config.llm.models[0]])
+            run_extraction(
+                config,
+                documents,
+                caller_factory=factory,
+                models=[model],
+                on_outcome=progress,
+            )
         )
     finally:
-        caller.close()
+        if 'caller' in shared:
+            shared['caller']._caller.close()  # type: ignore[attr-defined]
     ok = sum(1 for item in outcomes if item.status == 'ok')
-    print(f'ok={ok} failed={sum(1 for i in outcomes if i.status == "failed")}')
-    if ok < len(outcomes):
-        for item in outcomes:
-            if item.status != 'ok':
-                print('  FAILED', item.document_id, (item.error or '')[:300])
+    failed = sum(1 for item in outcomes if item.status == 'failed')
+    LOGGER.info('ok=%d failed=%d', ok, failed)
+    for item in outcomes:
+        if item.status != 'ok':
+            LOGGER.warning('FAILED %s %s', item.document_id, (item.error or '')[:300])
     return 0
 
 
 if __name__ == '__main__':
-    raise SystemExit(main(int(sys.argv[1]) if len(sys.argv) > 1 else 5))
+    raise SystemExit(main())

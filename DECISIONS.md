@@ -291,3 +291,45 @@ preference: exclude reasoning models from the extraction model list and use a
 non-reasoning `:free` model for the narrow schemas; cap reasoning via
 `max_reasoning_tokens`; raise `max_tokens` only if the provider allows it on the free
 tier. Not yet decided, because it needs a measured comparison, not a guess.
+
+---
+
+## D13 — H2: how test strength is measured (Final, decided 2026-10-31)
+
+A behaviour that no test would notice if it changed is not tested. The audit signal is a
+small, hand-written mutation check (`scripts/mutation_check.py`) over the four modules
+where a silent bug would corrupt output: `validators.py`, `edgar.py`, `runner.py`,
+`aggregate.py`. Twenty mutants, each an exact edit a person would actually make, each
+paired with the test file that should catch it.
+
+**Why not a full mutation-testing framework.** `mutmut`/`cosmic-ray` rewrite whole
+modules and take tens of minutes on this suite; the value here comes from *which* edits
+are made, not from the count. Every mutant is listed in the script with the test file
+expected to kill it, so a new survivor is a specific, readable gap.
+
+**Measured.** First run: 20 mutants, 15 killed, **5 survived**. The five were pinned with
+five tests (see `DEFECTS.md` H2), after which: **20 killed, 0 survived**, re-confirmed
+after the H3 import refactor. The script restores each file's bytes in a `finally` and
+verifies the sha256, so a crash cannot leave a mutant in the tree.
+
+**Standing rule.** When behaviour in one of these four modules changes, add or update a
+mutant before trusting the suite's green.
+
+## D14 — H3: one dotenv path, one reporting channel, locks split by use (Final)
+
+- **Dotenv.** `nowcast.envfile.load_dotenv_without_overriding` is the only loader;
+  `override=False` is the only mode. The CLI and `scripts/_bootstrap.py` both call it, so
+  a checked-out `.env` can never clobber a Colab secret or shell export.
+  `test_scripts_and_cli_share_one_dotenv_rule` fails if a second implementation appears.
+- **Reporting.** Scripts report through `nowcast.logging_setup.setup_logging`, the same
+  formatter and stdout/stderr split the CLI uses. `print()` is gone from every script
+  that is part of the pipeline; `mutation_check.py` keeps `print` because its output is
+  a report read by a person, not a pipeline stage.
+- **Inputs.** Ticker lists and model candidate lists are inputs: `--tickers`
+  (default `inputs/tickers.txt` under the data root) and `--models` / `--models-file`
+  (default: the configured models). No ticker, CIK, URL or model id is baked into a
+  script.
+- **Locks.** Two files rather than one: `requirements.lock.txt` is the runtime set
+  (`uv export --no-dev`, 58 pins) and `requirements-dev.lock.txt` adds test and lint
+  tooling (`--extra dev`, 76 pins). Both are regenerated from `pyproject.toml` by uv and
+  neither carries the editable local path the old file did.

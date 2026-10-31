@@ -286,6 +286,29 @@ def test_two_exhibits_same_filing_count_once(
     assert frame.loc[0, 'share_reported'] == pytest.approx(0.25)
 
 
+def test_duplicate_rows_do_not_weight_one_company_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Collapsing is not just counting distinct CIKs: the duplicate row leaves the metrics.
+
+    Counting distinct CIKs alone would still average the duplicate's EPS growth into the
+    index, letting one company pull the aggregate toward itself by reporting twice.
+    """
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 2})
+    constituents = _constituents(tmp_path)
+    rows = [
+        _compass(document_id='a1', cik='0000000001', prior_year_eps=1.0, reported_eps=3.0),
+        _compass(document_id='a2', cik='0000000001', prior_year_eps=1.0, reported_eps=3.0),
+        _compass(document_id='b1', cik='0000000002', prior_year_eps=1.0, reported_eps=1.0),
+        _compass(document_id='c1', cik='0000000003', prior_year_eps=1.0, reported_eps=1.0),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_reported'] == 3
+    # Three companies growing 200%, 0% and 0% average 2/3. Averaging the four rows
+    # instead gives 3/4, which is the duplicate weighting company 1 as heavily as two.
+    assert frame.loc[0, 'eps_growth_agg'] == pytest.approx(2.0 / 3.0)
+
+
 def test_collapse_keeps_the_most_confident_row() -> None:
     """The dedupe rule is applied explicitly, not by row order."""
     from nowcast.aggregation.aggregate import collapse_to_companies
