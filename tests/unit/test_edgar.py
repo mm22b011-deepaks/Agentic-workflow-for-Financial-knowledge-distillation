@@ -245,6 +245,23 @@ def test_ingest_uses_configured_window_not_today(config: Config) -> None:
     assert outside == []
 
 
+def test_window_bounds_are_inclusive(config: Config) -> None:
+    """A filing dated exactly on either end of the window is inside it."""
+    for start, end in (
+        (datetime.date(2030, 1, 2), datetime.date(2031, 1, 1)),
+        (datetime.date(2029, 1, 1), datetime.date(2030, 1, 2)),
+    ):
+        rows = ingest_edgar(
+            config,
+            ['1'],
+            client=_client(),
+            limiter=RateLimiter(1000.0),
+            start_date=start,
+            end_date=end,
+        )
+        assert len(rows) == 1, (start, end)
+
+
 def test_ingest_without_any_window_raises(config: Config) -> None:
     """With no window supplied or configured, ingest fails instead of guessing today."""
     from nowcast.errors import DataError
@@ -441,6 +458,47 @@ def test_consecutive_403_aborts(config: Config, monkeypatch: pytest.MonkeyPatch)
     assert len(requested) == 3, requested
     assert report.aborted is not None
     assert report.status_counts == {'403': 3}
+
+
+def test_a_success_clears_the_blocked_run(config: Config) -> None:
+    """Only consecutive blocks abort: one good answer proves the client is welcome again."""
+    config = dataclasses.replace(
+        config,
+        data=dataclasses.replace(config.data, sec_abort_after_blocked=3),
+    )
+
+    # Blocked, blocked, a full success, blocked, blocked: never three in a row.
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if 'submissions' in path:
+            cik = path.split('CIK')[-1].split('.')[0].lstrip('0') or '0'
+        elif '/data/' in path:
+            cik = path.split('/data/')[1].split('/')[0]
+        else:
+            return httpx.Response(404)
+        if cik in {'1', '2', '4', '5'}:
+            return httpx.Response(403, text='forbidden')
+        if 'submissions' in path:
+            return httpx.Response(200, json=SUBMISSIONS)
+        if path.endswith('-index-headers.html'):
+            return httpx.Response(200, text=HEADERS_HTML)
+        return httpx.Response(200, text=EXHIBIT_HTML)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    report = IngestReport()
+    rows = ingest_edgar(
+        config,
+        ['1', '2', '3', '4', '5'],
+        client=client,
+        limiter=RateLimiter(1000.0),
+        start_date=datetime.date(2029, 1, 1),
+        end_date=datetime.date(2031, 1, 1),
+        report=report,
+    )
+    # Without the reset, CIK 4 would be the third block in the run and abort everything.
+    assert report.aborted is None
+    assert len(rows) == 1
+    assert report.status_counts == {'200': 3, '403': 4}
 
 
 def test_partial_download_not_treated_as_complete(config: Config) -> None:

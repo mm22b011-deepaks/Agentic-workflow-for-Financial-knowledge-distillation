@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import dataclasses
+
+import pytest
+
 from nowcast.config import Config
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.validators import (
@@ -81,6 +85,33 @@ def test_number_not_in_quote_flagged(config: Config) -> None:
         config,
     )
     assert any(issue.code == 'number_not_in_quote' for issue in issues)
+
+
+def test_missing_evidence_penalises_confidence(config: Config) -> None:
+    """A value with no quote at all is penalized once, exactly like a bad quote."""
+    record = _record(reported_eps={'value': 0.55, 'confidence': 1.0})
+    issues, validated = validate_record(record, SOURCE, config)
+    assert [issue.code for issue in issues] == ['quote_missing']
+    assert validated.reported_eps.confidence == pytest.approx(
+        config.extraction.confidence_penalty_on_issue
+    )
+
+
+def test_quote_at_exactly_the_threshold_is_accepted(config: Config) -> None:
+    """The threshold is a floor: a quote scoring exactly at it is evidence, not a miss."""
+    quote = 'quarter revenue was one point two billion'
+    score = verify_quote(quote, SOURCE)
+    assert score == pytest.approx(0.7)
+    exact = dataclasses.replace(
+        config,
+        extraction=dataclasses.replace(config.extraction, quote_match_min_ratio=score),
+    )
+    issues, _validated = validate_record(
+        _record(eps_basis={'value': 'gaap', 'evidence_quote': quote, 'confidence': 0.9}),
+        SOURCE,
+        exact,
+    )
+    assert not any(issue.code == 'quote_not_found' for issue in issues)
 
 
 def test_confidence_penalty_applied(config: Config) -> None:

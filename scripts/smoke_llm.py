@@ -2,28 +2,28 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
-import sys
-from pathlib import Path
 
-from dotenv import load_dotenv
+from _bootstrap import setup
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'src'))
+from nowcast.llm.caller import LLMCaller
 
-from nowcast.config import load_config  # noqa: E402
-from nowcast.llm.caller import LLMCaller  # noqa: E402
-
-logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
+LOGGER = logging.getLogger('nowcast.scripts.smoke_llm')
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Call every configured model with one short prompt and report the outcome."""
-    load_dotenv(ROOT / '.env', override=True)
-    config = load_config(ROOT / 'configs' / 'config.yaml')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '--model', action='append', default=[], help='model id to call (repeatable; default: all)'
+    )
+    args = parser.parse_args(argv)
+    config = setup()
+    models = args.model or list(config.llm.models)
     failures = 0
     with LLMCaller(config.llm) as caller:
-        for model in config.llm.models:
+        for model in models:
             try:
                 result = caller.complete(
                     model,
@@ -32,10 +32,10 @@ def main() -> int:
                         {'role': 'user', 'content': 'status?'},
                     ],
                 )
-                print(f'OK   {model} -> {result.text[:60]!r} tokens={result.total_tokens}')
+                LOGGER.info('%s -> %r tokens=%d', model, result.text[:60], result.total_tokens)
             except Exception as exc:
                 failures += 1
-                print(f'FAIL {model} -> {type(exc).__name__}: {str(exc)[:300]}')
+                LOGGER.error('%s -> %s: %s', model, type(exc).__name__, str(exc)[:300])
     return 1 if failures else 0
 
 

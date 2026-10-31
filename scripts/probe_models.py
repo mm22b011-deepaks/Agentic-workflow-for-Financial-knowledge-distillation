@@ -1,41 +1,54 @@
-"""Probe candidate free models with a tiny structured-output request."""
+"""Probe candidate free models with a tiny structured-output request.
+
+Candidates come from the command line (`--models a,b`) or from a file (`--models-file`),
+never from a list baked into this script: which models are worth probing is a finding,
+not a constant.
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
-import sys
+import logging
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
+from _bootstrap import setup
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'src'))
+from nowcast.llm.caller import LLMCaller
 
-from nowcast.config import load_config  # noqa: E402
-from nowcast.llm.caller import LLMCaller  # noqa: E402
-
-CANDIDATES = [
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    'nvidia/nemotron-3-ultra-550b-a55b:free',
-    'google/gemma-4-26b-a4b-it:free',
-    'xingchen-agi/xing4.0-29b-a4b:free',
-    'poolside/laguna-s-2.1:free',
-    'thinkingmachines/inkling-small:free',
-    'liquid/lfm-2.5-2.6b:free',
-]
-
+LOGGER = logging.getLogger('nowcast.scripts.probe_models')
 PROMPT = 'Return exactly this JSON and nothing else: {"ok": true, "n": 3}'
-
 JSON_INSTR = 'Respond with only a JSON object. No prose, no code fences.'
 
 
-def main() -> int:
-    """Call each candidate once and print latency, ok/fail and reply head."""
-    load_dotenv(ROOT / '.env', override=True)
-    config = load_config(ROOT / 'configs' / 'config.yaml')
+def candidates(args: argparse.Namespace) -> list[str]:
+    """Return the model ids to probe, from the flag, a file, or the configured models."""
+    if args.models:
+        return [item.strip() for item in args.models.split(',') if item.strip()]
+    if args.models_file:
+        path = Path(args.models_file)
+        return [
+            line.strip()
+            for line in path.read_text(encoding='utf-8').splitlines()
+            if line.strip() and not line.strip().startswith('#')
+        ]
+    return []
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Call each candidate once and report latency, ok/fail and the reply's shape."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--models', default='', help='comma-separated model ids to probe')
+    parser.add_argument('--models-file', default='', help='file with one model id per line')
+    args = parser.parse_args(argv)
+    config = setup()
+    models = candidates(args) or list(config.llm.models)
+    if not models:
+        LOGGER.error('no models to probe; pass --models or --models-file')
+        return 2
     with LLMCaller(config.llm) as caller:
-        for model in CANDIDATES:
+        for model in models:
             started = time.monotonic()
             try:
                 result = caller.complete(
@@ -47,19 +60,24 @@ def main() -> int:
                 )
                 elapsed = time.monotonic() - started
                 text = result.text.strip().replace('\n', ' ')[:80]
-                try:
-                    json.loads(text)
-                    shape = 'json-ok'
-                except json.JSONDecodeError:
-                    shape = 'not-json'
-                print(
-                    f'OK   {model:52s} {elapsed:5.1f}s tok={result.total_tokens:5d} {shape} | {text}'
+                shape = 'json-ok' if _is_json(text) else 'not-json'
+                LOGGER.info(
+                    '%s %.1fs tok=%d %s | %s', model, elapsed, result.total_tokens, shape, text
                 )
             except Exception as exc:
                 elapsed = time.monotonic() - started
-                print(f'FAIL {model:52s} {elapsed:5.1f}s {type(exc).__name__}: {str(exc)[:120]}')
-            time.sleep(1.0)
+                LOGGER.error('%s %.1fs %s: %s', model, elapsed, type(exc).__name__, str(exc)[:120])
+            time.sleep(float(config.llm.retry_backoff_seconds))
     return 0
+
+
+def _is_json(text: str) -> bool:
+    """Return whether the reply parses as JSON."""
+    try:
+        json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 if __name__ == '__main__':

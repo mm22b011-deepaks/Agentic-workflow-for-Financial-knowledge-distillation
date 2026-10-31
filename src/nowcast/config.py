@@ -257,6 +257,21 @@ def _fields(cls: Any) -> frozenset[str]:
     return frozenset(item.name for item in dataclasses.fields(cls))
 
 
+def _reject_unknown_sections(raw: dict[str, Any]) -> None:
+    """Fail on a top-level key that names no config section.
+
+    Without this a typo such as `aggregaton:` is silently ignored and the defaults
+    quietly apply, which is worse than a hard error: the run succeeds while measured
+    against settings nobody chose.
+    """
+    unknown = sorted(set(raw) - _fields(Config))
+    if unknown:
+        raise ConfigError(
+            f'config has unknown top-level section(s): {", ".join(unknown)}; '
+            f'known: {", ".join(sorted(_fields(Config)))}'
+        )
+
+
 def _tuple(value: Any, name: str) -> tuple[str, ...]:
     """Coerce a list-like config value into a tuple of strings."""
     if value is None:
@@ -325,6 +340,7 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
         raise ConfigError('config root must be a mapping')
     if overrides:
         raw = _apply_overrides(raw, overrides)
+    _reject_unknown_sections(raw)
 
     runtime = _section(raw, 'runtime', _fields(RuntimeConfig))
     paths = _section(raw, 'paths', _fields(PathsConfig))
