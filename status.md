@@ -180,31 +180,33 @@ that R4's SQL is checked against (D7).
    `.env`; with `env -u OPENROUTER_API_KEY` the 73-character key in `~/tresata/.env`
    authenticates and both models answer. **Rotate that key**: its value was pasted into a
    chat transcript and must be treated as compromised.
-2. **(was) OpenRouter still returns 401 `User not found` — and the cause is now measured.**
-   `scripts/smoke_llm.py` reports where the key came from: an **exported**
-   `OPENROUTER_API_KEY` (far shorter than an OpenRouter key) shadows the one in `.env`, so the file's key has
-   never been tried. `unset OPENROUTER_API_KEY`, then rerun the smoke test; if it still
-   fails, the file's key needs rotating. Everything live waits on this: N2's live probe
-   and bakeoff, N3's coverage rerun, N6's pagination check, N7's rebuild, Gate R0, and the
-   weak-model prompt measurement.
-2. **D12b / N2 — empty completions** are handled offline (truncation classification,
-   one doubled-budget retry, `truncated` review reason). Whether a given free model
-   still spends its whole budget on reasoning needs a live bakeoff, which item 1 blocks.
-   Do not claim the model problem is gone until that table exists.
-3. **Index rebuild — run offline, kept nothing, and that is correct.** Q4's design holds:
+2. **The extraction is not yet trustworthy (the live blocker now).** 29/60 documents carry
+   `number_not_in_source` and 20/60 `quote_not_found`. Reading records against source
+   shows the matcher is largely at fault, not the model: a correct `49,725` was missed
+   because the alignment window landed elsewhere, while `Revenue $ 11,510` matched a
+   *different* table row (`$ 9,825`) and must stay flagged. Task T1 in `tasks.md` fixes
+   the matcher; no threshold will be lowered.
+3. **One call per document is not proven.** 42 of 60 documents needed a second call
+   because the reply was cut at `max_tokens=16384`, not because of escalation. Task T4
+   measures the reply-size distribution and sets the budget in config.
+4. **`data/document_index.v2.parquet` is empty** — my `--force` rebuild replaced the 60
+   live rows. They are preserved in
+   `data/document_index.v2.from-live-20261101.parquet`; restoring in place needs your
+   go-ahead (the copy was blocked by the local-destruction guard).
+5. **Index rebuild — run offline, kept nothing, and that is correct.** Q4's design holds:
    write `data/document_index.v2.parquet`, delete nothing. Run 2026-11-01 on the old
    index: 100 rows → 0 kept, `{no_earnings_item: 61, non_text: 39}`, report in
    `data/manifests/rebuild_index.json`. The pre-v2 index has no `items` column, so no row
    can prove Item 2.02; the rebuild refuses rather than guessing, exactly as designed.
    This also moved the stored extraction results and review-queue rows for those
    documents into `superseded/` (nothing deleted). A rebuild that *keeps* rows needs a
-   fresh ingest, which is blocked by item 1.
-4. **Gate 2B items 4–5** — human judgement: review `data/universe/unmapped.csv`
+   fresh ingest, which is no longer blocked — the key works.
+6. **Gate 2B items 4–5** — human judgement: review `data/universe/unmapped.csv`
    (74 delisted tickers) and spot-check 10 intervals against a second source.
-5. **`requirements.lock.txt` stale** — `sqlalchemy`, `alembic`, `langchain-openai`,
+7. **`requirements.lock.txt` stale** — `sqlalchemy`, `alembic`, `langchain-openai`,
    `tenacity` are required by R1/R6 and are not installed yet.
-6. **Colab notebook never actually run in Colab** — the Gate 7 requirement stands.
-7. **Needle-recall margin** — "within an agreed margin of edge recall" is the human's
+8. **Colab notebook never actually run in Colab** — the Gate 7 requirement stands.
+9. **Needle-recall margin** — "within an agreed margin of edge recall" is the human's
    call; a proposal will follow the first sweep's real numbers.
 
 ## Amendment Q — nothing built yet
