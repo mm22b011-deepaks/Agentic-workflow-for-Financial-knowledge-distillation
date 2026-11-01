@@ -582,3 +582,112 @@ Found and fixed: a surprise exactly at `eps_tolerance_abs` was graded a beat bec
    (`sqlalchemy`, `alembic`, `langchain-openai`, `tenacity` are not installed yet).
 6. **Needle-recall margin** — the agreement on "within an agreed margin of edge recall"
    is a human decision; propose it after the first sweep, do not assume it.
+
+---
+
+# WHAT IS LEFT — detailed task list (2026-11-02)
+
+Grouped by what blocks what. Status: `[ ]` todo · `[!]` needs your decision · `[~]` started.
+
+## P1 — The extraction is not trustworthy yet (blocks Gate R0)
+
+**T1. Fix the quote matcher (new, found 2026-11-02).**
+Measured: 29/60 documents carry `number_not_in_source`, 20/60 `quote_not_found`.
+Reading two records against source showed the model is mostly right and the matcher is
+wrong:
+- `Total revenues $ 49,725` — the value and digits are correct; `49,725` is in the text at
+  char 1450, but `matched_window` returned `Total revenues (in b` because
+  `partial_ratio_alignment` picked a weaker alignment. `number_not_in_source` is a false
+  positive.
+- `Diluted earnings (loss) per common share $ 0.56` — ratio 0.787, below the 0.85
+  threshold, so `quote_not_found`; the words exist in the table row
+  `diluted earnings (loss) per share attributable to Centene $ (2.24) $ 0.56`.
+- `Revenue $ 11,510` matched the window `Revenue $ 9,825` — a *different* table row, which
+  is a genuine wrong match and must stay flagged.
+Tasks:
+- [ ] Replace the window heuristic with: find all windows whose ratio clears the threshold,
+  and pass if **any** contains the number. Keep failing when none does (the 9,825 case).
+- [ ] Tests: `test_number_found_when_alignment_picks_a_weaker_window`,
+  `test_wrong_table_row_still_flagged`.
+- [ ] Re-run the 60-document extraction and report the new review rate. Do **not** lower
+  `quote_match_min_ratio`; that would hide the real case.
+
+**T2. Read 5 records by hand** (your action, Gate R0 item 4). The run exists; the records
+are in `data/extractions/nvidia__nemotron-3.5-lightning-free/`. I can produce a one-page
+side-by-side of value / quote / source excerpt for whatever 5 you pick.
+
+**T3. Decide the guidance coverage gap.** `guidance_direction` is non-null in 36/60
+documents. Some releases genuinely give no numeric guidance; some do and were missed.
+- [ ] Sample 10 of the 24 nulls, read the source, and split "not stated" from "missed".
+  That number decides whether the prompt needs work or the field is simply often absent.
+
+## P2 — The one-call rule is not proven
+
+**T4. 42 of 60 documents needed a second call** because the reply was cut at
+`max_tokens=16384` (`finish_reason=length`), not because of escalation.
+- [ ] Measure the reply size distribution from the ledger (`completion_tokens`).
+- [ ] Set `llm.max_tokens` from that distribution in `configs/config.yaml` (not a `--set`),
+  and validate it against `max_tokens_ceiling`.
+- [ ] Re-run and assert `POST count == document count` when nothing fails. If a free model
+  cannot finish inside a sane budget, that is a bakeoff finding, not something to hide.
+- Test: `test_reply_budget_covers_the_measured_release_size`.
+
+## P3 — Pass-3 items I did not build (explicitly deferred)
+
+**T5. H-case H-d — `filings.files` pagination.** When `filings.recent` does not reach
+`data.start_date`, fetch older pages via `data.edgar_filing_files_url_template`.
+- [ ] Implement with the same rate limiter; record `window_not_covered:<cik>` when the
+  template is empty or the pages also fall short.
+- [ ] Verify on one real high-volume CIK (live, no model key needed).
+- Tests: `test_pagination_fetches_older_pages`, `test_pagination_skipped_when_recent_covers_window`.
+
+**T6. H-e — bakeoff rework.** Current bakeoff has a ledger-less request count, p50 only,
+no 429 count, output not isolated, no accuracy mode.
+- [ ] Wire a real ledger; report requests, tokens, 429s.
+- [ ] True per-call p50/p95 latency from the ledger, not batch time ÷ documents.
+- [ ] Separate "parsed" from "non-empty extraction" (they are different failures).
+- [ ] Write to `manifests/bakeoff/<run>/`, never into the live extraction directory.
+- [ ] `--labels data/inputs/bakeoff_labels.csv` accuracy mode over ≥10 hand-labelled
+  releases. **No labels file exists yet** — T2's hand-reads can seed it.
+- Tests: `test_bakeoff_requests_nonzero`, `test_bakeoff_isolated_output`,
+  `test_bakeoff_accuracy_against_labels`.
+
+**T7. H-f — dedupe by model priority, not self-confidence.** `aggregation.dedupe_rule` is
+still `max_confidence`, which lets one model's self-reported confidence decide.
+- [ ] Add `model_priority` from the bakeoff ranking; require agreement above a threshold
+  as the alternative rule.
+- Test: `test_dedupe_not_decided_by_self_confidence`.
+
+**T8. H-g — four validation gaps.**
+- [ ] Cache only replies that validated against the schema (today `cacheable_reply` only
+  needs JSON, so a schema-invalid reply is cached and replayed).
+- [ ] Check `fiscal_year`/`fiscal_quarter` against `report_date` (±1 quarter tolerance).
+- [ ] Validate `theme_mentions[*].direction` against a config vocabulary.
+- [ ] Capture `prior_year_basis` (GAAP vs adjusted) — currently unrecorded.
+- One test per item, named after the behaviour.
+
+## P4 — Needs your decision (I cannot do these safely)
+
+**T9. [!] Restore the populated index.** `data/document_index.v2.parquet` is the empty file
+from my `--force` rebuild. The 60 rows are in
+`data/document_index.v2.from-live-20261101.parquet`. Say "restore it" and I will copy it
+back; the earlier attempt was blocked by the local-destruction guard.
+**T10. [!] Untrack `tresata.zip`** (contains `tests/__pycache__`) — `git rm --cached`.
+**T11. [!] Remove the stray tracked `inputs/constituents.csv`** (M-b) — keep it under
+`archive/` or delete from git.
+**T12. [!] Rotate the OpenRouter key** you pasted into chat.
+
+## P5 — Known-stale docs/config (not blocking, but wrong now)
+
+**T13.** `status.md` still lists a duplicate "2." in Open (items 1/2), and item 2 describes
+a 401 that is resolved. Fix the numbering.
+**T14.** `requirements.lock.txt` does not include R1's dependencies (sqlalchemy, alembic) —
+regenerate when R1 starts, not before.
+**T15.** `DECISIONS.md` D12b says the empty-completion defect is "open"; the live run
+superseded that reading (it is a reply-budget problem, T4).
+
+## Order
+
+T1 → re-run → T2 (your read) → T3 → T4 → T5 → T6 → T7 → T8 → T9–T12 (your calls) →
+T13–T15. R1 does not start until the T1 re-run gives a defensible review rate and T2 is
+done.
