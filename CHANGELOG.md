@@ -180,3 +180,49 @@ pre-1.0 and follow the phase gates in `tasks.md`.
 - F15's `fiscal_period_consistency` diagnostic (an R4 output column).
 - F14's `filings.files` pagination (needs a live high-volume CIK).
 - Every live gate item, blocked on the OpenRouter key (H-A).
+
+### Fixed — pass 3 (2026-11-01)
+
+- **B1 — the cohort is the (company, season) pairs the run targets.** `Sample.pairs`
+  records them, ingest only keeps filings from a sampled season
+  (`season_not_sampled`), `manifests/cohort.csv` is one row per pair, and aggregation
+  reads the cohort per season. Live SEC run: 60 documents, 61 companies, 64 pairs,
+  eight seasons, every downloaded pair in the cohort.
+- **B2 — `number_in_quote` reads one scale from the quote.** 1000 against "$1.2 billion"
+  is now flagged; the printed figure and its expansion still pass.
+- **B4 — a review flag withdraws a field, not a company.** Blocking reasons drop the
+  record; any other flag withdraws only that field's metric contribution.
+- **B5 — the packer allocates budget by priority** (guidance/outlook, per-share, revenue)
+  and keeps document order; a negative-budget slice that silently dropped regions is
+  gone, and a sweep test pins the limit.
+- **B6 — `rebuild-index` refuses a populated target** unless `--force`, and backs the old
+  file up with a timestamp first.
+- **B7 — ingest persists as it goes**: each document is merged into the index
+  immediately, and the cohort, report and summary are written in `finally`, so an abort
+  keeps what was downloaded.
+- **H-a — request budget instead of a dollar budget**: a shared per-minute and per-day
+  limiter, a global cooldown on `Retry-After`, and a model cascade that escalates only on
+  failure or low confidence.
+- **H-b — `finish_reason=length` is truncation even with content**; a transient empty
+  reply is retried once.
+- **H-c — only current results are used**: temperature, max tokens, reasoning and the
+  units rule are in the fingerprint, stale results move to `superseded/`, and aggregate
+  drops rows marked stale.
+- **H-h — paths follow the config file**, getters no longer create directories, the
+  module-level skipped-results list is gone, and `RetryingCaller.close()` replaces private
+  `_caller` access.
+- **M-a — SGML stripping is anchored to the start of the file** and keeps everything to
+  the final `</TEXT>`, so inline SVG text cannot truncate a page.
+
+### Added — pass 3
+
+- `nowcast.llm.throttle.RequestLimiter`; `llm.requests_per_minute`, `requests_per_day`,
+  `cooldown_seconds`, `cascade_min_confidence`; `aggregation.revenue_growth_agg` and
+  `metric_status_* = 'no_consensus'`; `extraction/selection` pairing; per-season cohort
+  reading; `paths` config-dir anchoring.
+
+### Not done in pass 3
+
+H-d (`filings.files` pagination), H-e (bakeoff ledger, p50/p95, 429, accuracy mode), H-f
+(model-priority dedupe), H-g (cache-after-validate, fiscal_year, theme directions,
+prior-year basis). M-b/M-c await the decision on tracked files.

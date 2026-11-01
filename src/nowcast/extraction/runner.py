@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,7 +19,7 @@ from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, Truncated
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.units import normalise_record
-from nowcast.extraction.validators import needs_review, validate_record
+from nowcast.extraction.validators import is_empty_extraction, needs_review, validate_record
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
 from nowcast.llm.structured import extract_structured
@@ -28,6 +29,8 @@ from nowcast.parsing.sections import pick_sections
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_NAME = 'extraction'
+# Bumped when normalisation changes what a stored record means.
+UNITS_RULE_VERSION = 2
 EXTRACTION_PARQUET = 'extractions.parquet'
 
 
@@ -186,6 +189,12 @@ def validation_settings(config: Config) -> dict[str, object]:
         'themes': [str(theme) for theme in extraction.themes],
         'section_patterns': {str(k): str(v) for k, v in config.parsing.section_patterns.items()},
         'min_section_chars': int(config.parsing.min_section_chars),
+        # A different sampling temperature or token budget produces a different reply,
+        # so a result from those settings is not evidence about this run's.
+        'temperature': float(config.llm.temperature),
+        'max_tokens': int(config.llm.max_tokens),
+        'reasoning': config.llm.reasoning_params(),
+        'units_rule': UNITS_RULE_VERSION,
     }
 
 
@@ -280,7 +289,9 @@ def _safe_failure(
         )
 
 
-def compose_caller(config: Config, inner: Any, cache: ResponseCache | None = None) -> Any:
+def compose_caller(
+    config: Config, inner: Any, cache: ResponseCache | None = None, limiter: Any = None
+) -> Any:
     """Wrap a raw caller in the shared retry-plus-cache composition.
 
     A caller that is already composed (a test fake, or a `RetryingCaller` handed in by a
@@ -292,7 +303,7 @@ def compose_caller(config: Config, inner: Any, cache: ResponseCache | None = Non
     if isinstance(inner, RetryingCaller):
         return inner
     active_cache = cache if cache is not None else ResponseCache(config.cache, cache_dir(config))
-    return RetryingCaller(inner, active_cache, config)
+    return RetryingCaller(inner, active_cache, config, limiter=limiter)
 
 
 async def run_extraction(
@@ -361,6 +372,16 @@ async def run_extraction(
             LOGGER.exception('document failed model=%s document=%s', model, document.document_id)
             return _safe_failure(queue_target, document, model, 'document_error', str(exc))
 
+    from nowcast.llm.throttle import RequestLimiter
+
+    # One limiter for the whole run and all its threads: a per-document limiter would
+    # multiply the free tier's request cap by the worker count.
+    run_limiter = RequestLimiter(
+        per_minute=int(config.llm.requests_per_minute),
+        per_day=int(config.llm.requests_per_day),
+        cooldown_seconds=float(config.llm.cooldown_seconds),
+    )
+
     async def _process_document(model: str, document: Document) -> ExtractionOutcome:
         """The unguarded per-document path; every exception is handled by _process."""
         expected = fingerprint(config, document, model, digest)
@@ -376,7 +397,7 @@ async def run_extraction(
                 )
             # Every model call goes through the one composition point, so retry,
             # Retry-After and the cache apply on the live path, not only in tests.
-            caller = compose_caller(config, caller_factory(model))
+            caller = compose_caller(config, caller_factory(model), limiter=run_limiter)
             prepared = prepare_text(config, document)
             variables = prompt_variables(document, prepared.text)
             if prepared.truncated:
@@ -459,6 +480,8 @@ async def run_extraction(
                     'cik': document.cik,
                     'report_date': document.report_date,
                     'document_type': document.document_type,
+                    'sha256': document.sha256,
+                    'prompt_digest': digest,
                     'raw_text': raw_text,
                     'record': record.model_dump(mode='json'),
                     'diagnostics': diagnostics,
@@ -472,7 +495,46 @@ async def run_extraction(
                 truncated=prepared.truncated,
             )
 
-    tasks = [_process(model, document) for model in active_models for document in documents]
+    def weak(record: ExtractionRecord) -> bool:
+        """Return whether a record is thin enough to be worth a second model."""
+        if is_empty_extraction(record):
+            return True
+        values = [
+            float(getattr(record, name).confidence)
+            for name in ('reported_eps', 'revenue', 'guidance_direction', 'tone')
+            if getattr(record, name).value is not None
+        ]
+        return not values or max(values) < float(config.llm.cascade_min_confidence)
+
+    async def _cascade(document: Document) -> ExtractionOutcome:
+        """Try the configured models in order, moving on only on failure or weakness.
+
+        The first model answers almost everything; a second opinion is paid for only
+        where the first one produced nothing useful. Every attempt is a real request, so
+        it is paced by the shared limiter like any other.
+        """
+        first = active_models[0]
+        outcome = await _process(first, document)
+        if len(active_models) < 2 or outcome.status in {'skipped', 'budget_stopped', 'auth_failed'}:
+            return outcome
+        if outcome.status != 'ok':
+            LOGGER.info(
+                'cascade: escalating document=%s from=%s reason=%s',
+                document.document_id,
+                first,
+                outcome.status,
+            )
+            return await _process(active_models[1], document)
+        payload = _load_result(config, first, document.document_id)
+        record = (payload or {}).get('record')
+        if not isinstance(record, dict):
+            return outcome
+        if not weak(ExtractionRecord.model_validate(record)):
+            return outcome
+        LOGGER.info('cascade: escalating document=%s from=%s', document.document_id, first)
+        return await _process(active_models[1], document)
+
+    tasks = [_cascade(document) for document in documents]
     for coro in asyncio.as_completed(tasks):
         outcome = await coro
         async with lock:
@@ -490,10 +552,9 @@ async def run_extraction(
     return outcomes
 
 
-SKIPPED_RESULTS: list[str] = []
-
-
-def _load_result(config: Config, model: str, document_id: str) -> dict[str, Any] | None:
+def _load_result(
+    config: Config, model: str, document_id: str, skipped: list[str] | None = None
+) -> dict[str, Any] | None:
     """Load one stored result payload, returning None when absent or unreadable.
 
     A truncated or corrupted file is skipped and counted, not raised: one bad file must
@@ -506,11 +567,13 @@ def _load_result(config: Config, model: str, document_id: str) -> dict[str, Any]
         payload = json.loads(path.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError):
         LOGGER.warning('skipping unreadable result path=%s', path)
-        SKIPPED_RESULTS.append(str(path))
+        if skipped is not None:
+            skipped.append(str(path))
         return None
     if not isinstance(payload, dict) or 'document_id' not in payload:
         LOGGER.warning('skipping malformed result path=%s', path)
-        SKIPPED_RESULTS.append(str(path))
+        if skipped is not None:
+            skipped.append(str(path))
         return None
     return payload
 
@@ -554,12 +617,39 @@ def _flag_disagreements(
         review_queue.append_rows(queue_path, rows)
 
 
-def skipped_result_count() -> int:
-    """Return how many result files consolidation and disagreement checks skipped."""
-    return len(SKIPPED_RESULTS)
+def _settings_digest(config: Config, payload: dict[str, Any], model: str) -> str:
+    """Recompute a stored result's fingerprint from what it recorded about itself."""
+    sha = str(payload.get('sha256') or '')
+    if not sha:
+        # Results written before the sha was stored cannot be re-checked against the
+        # current settings; they are kept rather than discarded on a guess.
+        return str(payload.get('fingerprint') or '')
+    proxy = Document(
+        document_id=str(payload.get('document_id') or ''),
+        cik=str(payload.get('cik') or ''),
+        report_date=str(payload.get('report_date') or ''),
+        document_type=str(payload.get('document_type') or ''),
+        raw_path=Path(),
+        sha256=sha,
+    )
+    return fingerprint(config, proxy, model, str(payload.get('prompt_digest') or ''))
 
 
-def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
+def supersede_result(config: Config, path: Path) -> Path:
+    """Move one stale result under superseded/, keeping the model directory layout."""
+    target_root = extractions_dir(config) / 'superseded'
+    target = target_root / path.parent.name / path.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        target = target.with_name(f'{path.stem}.{int(time.time() * 1000)}{path.suffix}')
+    path.replace(target)
+    LOGGER.info('superseded stale result path=%s -> %s', path, target)
+    return target
+
+
+def consolidate(
+    config: Config, models: list[str], skipped: list[str] | None = None
+) -> pd.DataFrame:
     """Write one parquet file per model holding every stored record.
 
     Columns are the union over all models: a theme or diagnostic present for one model
@@ -571,13 +661,22 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
         directory = extractions_dir(config) / model_slug(model)
         rows: list[dict[str, Any]] = []
         for path in sorted(directory.glob('*.json')):
-            payload = _load_result(config, model, path.stem)
+            payload = _load_result(config, model, path.stem, skipped)
             if payload is None:
+                continue
+            # Only the document hash and the settings need re-checking here; the prompt
+            # digest is stored with the result, so a prompt change still shows up.
+            current = _settings_digest(config, payload, model)
+            if str(payload.get('fingerprint') or '') != current:
+                # Written under other settings: it answers a different question, so it
+                # is set aside rather than mixed into this run's numbers.
+                supersede_result(config, path)
                 continue
             record = payload.get('record')
             if not isinstance(record, dict):
                 LOGGER.warning('skipping result without a record path=%s', path)
-                SKIPPED_RESULTS.append(str(path))
+                if skipped is not None:
+                    skipped.append(str(path))
                 continue
             row = {
                 'document_id': payload['document_id'],
@@ -614,6 +713,8 @@ def consolidate(config: Config, models: list[str]) -> pd.DataFrame:
             # Mean confidence of the fields that carry the record. Dedupe keys on this;
             # without it every duplicate was resolved by document id, silently.
             row['record_confidence'] = record_confidence(record)
+            # Surviving a consolidate means the fingerprint matched: this row is current.
+            row['stale'] = False
             rows.append(row)
         if rows:
             frame = pd.DataFrame(rows)

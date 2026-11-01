@@ -59,6 +59,7 @@ class RebuildReport:
     problems: list[IndexProblem] = field(default_factory=list)
     superseded_extractions: list[str] = field(default_factory=list)
     superseded_queue_rows: int = 0
+    backup_path: Path | None = None
 
     def as_dict(self) -> dict[str, object]:
         """Return the report as JSON-serialisable data."""
@@ -71,6 +72,7 @@ class RebuildReport:
             'problem_count_by_code': _count_by_code(self.problems),
             'superseded_extractions': list(self.superseded_extractions),
             'superseded_queue_rows': self.superseded_queue_rows,
+            'backup_path': str(self.backup_path) if self.backup_path else None,
         }
 
 
@@ -183,13 +185,15 @@ def rebuild_index(
     rows: list[dict[str, object]] | pd.DataFrame,
     source_path: Path | None = None,
     supersede: bool = True,
+    force: bool = False,
 ) -> RebuildReport:
     """Validate and write the rebuilt index, then move superseded results aside.
 
     The new index is written to `data.document_index`, which must not be the source
     path: overwriting the old index would destroy the only record of what was
     downloaded before, which is exactly the thing a rebuild is meant to be checked
-    against.
+    against. A target that already holds rows is backed up and then refused unless
+    `force`, so a stale rebuild cannot silently replace a fresher index.
     """
     frame = rows.copy() if isinstance(rows, pd.DataFrame) else pd.DataFrame(rows)
     for column in INDEX_COLUMNS:
@@ -204,6 +208,14 @@ def rebuild_index(
             f'refusing to rebuild {target} in place: data.document_index must name a new '
             'path so the previous index survives the rebuild'
         )
+
+    if target.is_file() and not load_index(target).empty:
+        if not force:
+            raise DataError(
+                f'{target} already holds rows; rebuilding would replace it. '
+                'Pass --force to back it up and rebuild anyway.'
+            )
+        report.backup_path = _backup_target(target)
 
     problems = validate_index_rows(frame, config)
     bad_ids = {problem.document_id for problem in problems}
@@ -231,11 +243,21 @@ def rebuild_index(
     return report
 
 
+def _backup_target(target: Path) -> Path:
+    """Copy the existing target next to itself with a timestamp; never delete it."""
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    backup = target.with_name(f'{target.stem}.{stamp}{target.suffix}')
+    shutil.copy2(target, backup)
+    LOGGER.info('backed up existing index target=%s backup=%s', target, backup)
+    return backup
+
+
 def write_rebuild_report(config: Config, report: RebuildReport) -> Path:
     """Write the rebuild report next to the other run manifests."""
     from nowcast.config import manifests_dir
 
     target = manifests_dir(config) / 'rebuild_index.json'
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report.as_dict(), indent=2), encoding='utf-8')
     return target
 

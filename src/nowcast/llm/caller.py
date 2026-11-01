@@ -277,7 +277,10 @@ class LLMCaller:
         )
         empty = not text.strip()
         outcome = 'ok'
-        if empty:
+        if empty or finish == 'length':
+            # Non-empty content with finish_reason=length is a reply cut mid-sentence
+            # ("{\"schema_version\": ..."), which parses as garbage or not at all. It is
+            # the same failure as an empty one and the same fix: a larger budget.
             outcome = 'truncated' if finish == 'length' else 'empty'
         # Ledgered before any raise: the calls that fail are the ones a truncation or
         # cost analysis needs, and a raise must not be able to erase them.
@@ -289,7 +292,7 @@ class LLMCaller:
                 finish_reason=finish,
                 outcome=outcome,
             )
-        if empty:
+        if outcome != 'ok':
             reasoning = message.get('reasoning') or message.get('reasoning_content') or ''
             LOGGER.warning(
                 'empty completion model=%s finish_reason=%s completion_tokens=%d '
@@ -302,7 +305,7 @@ class LLMCaller:
             )
             if finish == 'length':
                 raise TruncatedCompletion(
-                    f'empty completion from {model}: finish_reason=length',
+                    f'incomplete completion from {model}: finish_reason=length ({len(text)} chars)',
                     max_tokens=budget,
                     finish_reason=finish,
                     completion_tokens=result.completion_tokens,

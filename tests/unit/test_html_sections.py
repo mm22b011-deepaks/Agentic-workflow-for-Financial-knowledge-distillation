@@ -64,3 +64,30 @@ def test_pick_sections_joins_named_spans() -> None:
     picked = pick_sections(text, patterns, ['body'])
     assert picked.startswith('BBB')
     assert 'AAA' not in picked
+
+
+def test_sgml_strip_only_when_wrapped_at_start() -> None:
+    """Inline SVG <text> in an ordinary page is not mistaken for an SGML envelope."""
+    from nowcast.parsing.html import strip_sgml_wrapper
+
+    page = (
+        '<html><body><p>Results.</p><svg><text>Revenue 1.2bn</text></svg><p>Tail.</p></body></html>'
+    )
+    assert strip_sgml_wrapper(page) == page
+
+
+def test_sgml_strip_keeps_everything_up_to_the_final_text_close() -> None:
+    """A nested </TEXT> inside the body must not truncate the document."""
+    from nowcast.parsing.html import strip_sgml_wrapper
+
+    raw = (
+        '<DOCUMENT><TYPE>EX-99.1<SEQUENCE>1<TEXT>'
+        '<html><body><p>Revenue was $5 million.</p>'
+        '<p>Inline </TEXT> marker inside the body.</p>'
+        '<p>Guidance unchanged.</p></body></html>'
+        '</TEXT></DOCUMENT>'
+    )
+    payload = strip_sgml_wrapper(raw)
+    assert 'Revenue was $5 million.' in payload
+    assert 'Guidance unchanged.' in payload
+    assert 'EX-99.1' not in payload

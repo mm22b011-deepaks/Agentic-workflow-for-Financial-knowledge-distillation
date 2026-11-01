@@ -159,6 +159,7 @@ def test_suppressed_below_min_constituents(tmp_path: Path, monkeypatch: pytest.M
     for column in (
         'beat_rate',
         'eps_growth_agg',
+        'revenue_growth_agg',
         'guidance_raise_share',
         'guidance_lower_share',
         'guidance_ratio',
@@ -253,8 +254,8 @@ def test_review_queue_documents_are_excluded(
         [
             {
                 'document_id': 'bad',
-                'field': 'reported_eps',
-                'reason': 'low_confidence',
+                'field': 'record',
+                'reason': 'llm_failed',
                 'model': 'fake/model:free',
             }
         ]
@@ -389,8 +390,8 @@ def test_review_excluded_is_per_asof(tmp_path: Path, monkeypatch: pytest.MonkeyP
         [
             {
                 'document_id': 'late',
-                'field': 'reported_eps',
-                'reason': 'low_confidence',
+                'field': 'record',
+                'reason': 'llm_failed',
                 'model': 'fake/model:free',
             }
         ]
@@ -526,18 +527,21 @@ def test_output_columns_exact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         'theme_pricing_share',
         'beat_rate',
         'eps_growth_agg',
+        'revenue_growth_agg',
         'guidance_raise_share',
         'guidance_lower_share',
         'guidance_ratio',
         'tone_score_mean',
         'n_obs_beat',
         'n_obs_growth',
+        'n_obs_revenue_growth',
         'n_obs_guidance',
         'n_obs_tone',
         'n_obs_theme_demand',
         'n_obs_theme_pricing',
         'metric_status_beat_rate',
         'metric_status_eps_growth_agg',
+        'metric_status_revenue_growth_agg',
         'metric_status_guidance_raise_share',
         'metric_status_guidance_lower_share',
         'metric_status_guidance_ratio',
@@ -888,3 +892,157 @@ def test_dedupe_uses_confidence_when_duplicates_disagree(
     assert frame.loc[0, 'n_reported'] == 1
     # The high-confidence row is a beat; the low-confidence one is a miss.
     assert frame.loc[0, 'beat_rate'] == pytest.approx(1.0)
+
+
+def test_truncated_doc_still_contributes_unflagged_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A field-level flag withdraws that field, not the company from every metric."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path)
+    queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                'document_id': 'doc-1',
+                'field': 'reported_eps',
+                'reason': 'doc_truncated',
+                'model': 'fake/model:free',
+            }
+        ]
+    ).to_parquet(queue_path, index=False)
+    rows = [
+        _compass(document_id='doc-1', cik='0000000001', reported_eps=9.0, consensus_eps=1.0),
+        _compass(document_id='doc-2', cik='0000000002', reported_eps=1.0, consensus_eps=1.0),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    # Both companies are still counted as reported.
+    assert frame.loc[0, 'n_reported'] == 2
+    # The flagged document's EPS is withdrawn, so only doc-2's inline result counts.
+    assert frame.loc[0, 'beat_rate'] == pytest.approx(0.0)
+
+
+def test_flagged_field_excluded_only_from_its_metric(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Flagging tone leaves the EPS metrics untouched."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path)
+    queue_path = tmp_path / 'data' / 'extractions' / 'review_queue.parquet'
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                'document_id': 'doc-1',
+                'field': 'tone',
+                'reason': 'vocab_invalid',
+                'model': 'fake/model:free',
+            }
+        ]
+    ).to_parquet(queue_path, index=False)
+    rows = [
+        _compass(
+            document_id='doc-1',
+            cik='0000000001',
+            reported_eps=2.0,
+            consensus_eps=1.0,
+            tone='confident',
+        ),
+        _compass(
+            document_id='doc-2',
+            cik='0000000002',
+            reported_eps=0.5,
+            consensus_eps=1.0,
+            tone='confident',
+        ),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert frame.loc[0, 'n_obs_tone'] == 1
+    assert frame.loc[0, 'n_obs_beat'] == 2
+    assert frame.loc[0, 'beat_rate'] == pytest.approx(0.5)
+    assert frame.loc[0, 'tone_score_mean'] == pytest.approx(1.0)
+
+
+def test_stale_fingerprint_excluded_from_aggregate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A consolidated row marked stale is not counted, and is not one of the observations."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path, count=4)
+    rows = [
+        _compass(
+            document_id='current',
+            cik='0000000001',
+            reported_eps=2.0,
+            consensus_eps=1.0,
+            record_confidence=0.9,
+        ),
+        _compass(
+            document_id='stale',
+            cik='0000000002',
+            reported_eps=0.5,
+            consensus_eps=1.0,
+            record_confidence=0.9,
+        ),
+    ]
+    frame = _extractions(rows)
+    frame['stale'] = [False, True]
+    result = aggregate_index(config, frame, str(constituents))
+    assert result.loc[0, 'n_reported'] == 1
+    assert result.loc[0, 'n_obs_beat'] == 1
+
+
+def test_beat_rate_nan_with_status_when_no_consensus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No consensus file means no beat data: the metric says so instead of vanishing."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path)
+    rows = [
+        _compass(document_id='a', cik='0000000001', consensus_eps=None),
+        _compass(document_id='b', cik='0000000002', consensus_eps=None),
+    ]
+    frame = aggregate_index(config, _extractions(rows), str(constituents))
+    assert pd.isna(frame.loc[0, 'beat_rate'])
+    assert frame.loc[0, 'metric_status_beat_rate'] == 'no_consensus'
+    # The other metrics still exist: a release supports growth and guidance without
+    # any analyst estimate.
+    assert frame.loc[0, 'metric_status_eps_growth_agg'] == 'ok'
+    assert frame.loc[0, 'metric_status_guidance_raise_share'] == 'ok'
+
+
+def test_revenue_growth_metric_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Revenue growth from the release itself is a metric in its own right."""
+    config = _config(
+        tmp_path,
+        monkeypatch,
+        **{'aggregation.min_constituents': 1, 'aggregation.min_observations': 1},
+    )
+    constituents = _constituents(tmp_path)
+    rows = [
+        _compass(document_id='a', cik='0000000001', revenue=2.0),
+        _compass(document_id='b', cik='0000000002', revenue=1.0),
+    ]
+    frame = _extractions(rows)
+    frame['revenue_yoy_growth_pct'] = [10.0, 0.0]
+    result = aggregate_index(config, frame, str(constituents))
+    assert 'revenue_growth_agg' in result.columns
+    assert result.loc[0, 'revenue_growth_agg'] == pytest.approx(5.0)
+    assert result.loc[0, 'metric_status_revenue_growth_agg'] == 'ok'

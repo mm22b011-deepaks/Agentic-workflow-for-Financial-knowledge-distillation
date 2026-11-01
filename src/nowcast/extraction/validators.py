@@ -64,19 +64,38 @@ def _digits_in(text: str) -> set[str]:
     return tokens
 
 
+def _number_forms(value: float) -> set[str]:
+    """Return the printed spellings of one magnitude."""
+    return {
+        repr(value),
+        f'{value:.2f}',
+        f'{value:.4f}'.rstrip('0').rstrip('.'),
+        f'{value:g}',
+    }
+
+
 def number_in_quote(value: float, quote: str) -> bool:
-    """Return True when the digits of a number appear in its evidence quote."""
+    """Return True when the value matches a number printed in its evidence quote.
+
+    Two readings are legitimate. The quote prints the scale word ("$1.20 billion"), and
+    the model recorded either the printed figure (1.2) or its expansion (1.2e9). Any
+    other scale is a mismatch: 1000 against "1.2 billion" is off by 1e6 however close its
+    digits look, and accepting it is how a wrong figure passes as evidence.
+    """
     if not quote:
         return False
     magnitude = abs(float(value))
-    candidates = {repr(magnitude), f'{magnitude:.2f}', f'{magnitude:.4f}'.rstrip('0').rstrip('.')}
-    for divisor, suffix in SCALE_SUFFIXES:
-        scaled = magnitude / divisor
-        candidates.add(f'{scaled:.2f}'.rstrip('0').rstrip('.'))
-        if suffix and suffix in quote.lower():
-            candidates.add(f'{scaled:.2f}')
     quote_tokens = _digits_in(quote)
-    return any(candidate and candidate in quote_tokens for candidate in candidates)
+    if not quote_tokens:
+        return False
+    lowered = quote.lower()
+    scale = next(
+        (divisor for divisor, suffix in SCALE_SUFFIXES if suffix and suffix in lowered), 1.0
+    )
+    readings = {magnitude, magnitude / scale}
+    return any(
+        form and form in quote_tokens for reading in readings for form in _number_forms(reading)
+    )
 
 
 def _check_field_quote(

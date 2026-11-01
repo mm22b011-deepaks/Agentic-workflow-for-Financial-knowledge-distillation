@@ -217,7 +217,8 @@ def test_runner_stores_diagnostics_and_corrected_values(config: Config, tmp_path
         (extractions_dir(cut) / runner.model_slug(MODEL) / 'doc0.json').read_text(encoding='utf-8')
     )
     assert result['diagnostics']['truncated'] is True
-    assert result['diagnostics']['chars_sent'] == 120
+    # The head is a third of the limit, plus any windows that fit inside it.
+    assert 0 < result['diagnostics']['chars_sent'] <= 120
     assert result['diagnostics']['chars_total'] > 120
     assert result['record']['units'] == 'USD'
     assert result['record']['revenue_yoy_growth']['value'] == pytest.approx(8.0)

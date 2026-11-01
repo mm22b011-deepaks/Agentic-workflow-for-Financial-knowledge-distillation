@@ -36,8 +36,11 @@ SUMMARY_COLUMNS = (
     'n_review_excluded',
 )
 BASE_METRICS = (
+    # Optional: only computable when a consensus source exists. A release states EPS and
+    # revenue, so growth and guidance are what the documents themselves support.
     'beat_rate',
     'eps_growth_agg',
+    'revenue_growth_agg',
     'guidance_raise_share',
     'guidance_lower_share',
     'guidance_ratio',
@@ -49,6 +52,7 @@ BASE_METRICS = (
 OBSERVATION_COLUMNS = (
     'n_obs_beat',
     'n_obs_growth',
+    'n_obs_revenue_growth',
     'n_obs_guidance',
     'n_obs_tone',
 )
@@ -124,17 +128,30 @@ def winsorize(series: pd.Series, proportion: float) -> pd.Series:
     return values.clip(lower=lower, upper=upper)
 
 
-def _review_excluded(config: Config, extractions: pd.DataFrame) -> set[tuple[str, str]]:
-    """Return the (document, model) pairs the review queue marked for attention.
+# Reasons that mean the record cannot be trusted at all. Any other reason names one
+# field, and only that field's contribution is withdrawn: a truncated document still
+# reports the revenue it did state before the cut.
+BLOCKING_REASONS = frozenset({'llm_failed', 'truncated', 'document_error', 'empty_extraction'})
 
-    Keyed by both, not by document alone: one model's flag must not exclude the other
-    model's good record of the same filing.
+
+def _review_excluded(config: Config, extractions: pd.DataFrame) -> dict[tuple[str, str], set[str]]:
+    """Return {(document, model): flagged fields} from the queue.
+
+    `field == 'record'` means the whole record is in question; a named field means only
+    that field. Keyed by model too: one model's flag must not remove another model's
+    good record of the same filing.
     """
     queue = load_queue(resolve_data_path(config, config.extraction.review_queue_path))
     if queue.empty:
-        return set()
-    pairs = queue[['document_id', 'model']].dropna()
-    return {(str(row.document_id), str(row.model)) for row in pairs.itertuples(index=False)}
+        return {}
+    flagged: dict[tuple[str, str], set[str]] = {}
+    for row in queue[['document_id', 'model', 'field', 'reason']].dropna().itertuples(index=False):
+        key = (str(row.document_id), str(row.model))
+        if str(row.reason) in BLOCKING_REASONS:
+            flagged.setdefault(key, set()).add('record')
+        else:
+            flagged.setdefault(key, set()).add(str(row.field))
+    return flagged
 
 
 def collapse_to_companies(
@@ -179,6 +196,10 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
         )
     queued = _review_excluded(config, extractions)
     frame = extractions.copy()
+    if 'stale' in frame.columns:
+        # consolidate sets this for a result written under other settings; it answers a
+        # different question and must not enter this run's counts.
+        frame = frame[~frame['stale'].fillna(False).astype(bool)].copy()
     frame['document_id'] = frame['document_id'].astype(str)
     # CIKs arrive as '2', '0000000002' and sometimes an int; one spelling only, or the
     # same company would be counted as two.
@@ -192,6 +213,14 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     )
     frame['in_review'] = [
         (document, str(name)) in queued
+        for document, name in zip(frame['document_id'], model, strict=True)
+    ]
+    frame['blocked'] = [
+        'record' in queued.get((document, str(name)), set())
+        for document, name in zip(frame['document_id'], model, strict=True)
+    ]
+    frame['flagged_fields'] = [
+        queued.get((document, str(name)), set())
         for document, name in zip(frame['document_id'], model, strict=True)
     ]
     if 'record_confidence' in frame.columns:
@@ -209,6 +238,21 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
         frame['confidence'] = 0.0
     if frame.empty:
         return DocumentMetrics(frame)
+
+    # A field the review queue flagged is withdrawn from its own metric and from
+    # nothing else: the company still counts as having reported, and its revenue still
+    # counts in a revenue metric. Blocking reasons already removed the row entirely.
+    flagged = frame['flagged_fields'] if 'flagged_fields' in frame.columns else None
+
+    def withdraw(column: str | pd.Series, fields: tuple[str, ...]) -> pd.Series:
+        values = frame[column] if isinstance(column, str) else column
+        if flagged is None:
+            return values
+        mask = pd.Series(
+            [bool(set(fields) & set(item if item is not None else ())) for item in flagged],
+            index=frame.index,
+        )
+        return values.where(~mask)
 
     frame['report_date'] = pd.to_datetime(frame['report_date'], errors='coerce')
     reported = pd.to_numeric(frame['reported_eps'], errors='coerce')
@@ -238,10 +282,19 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     # date's value depends on a document published after it.
     frame['eps_growth'] = (reported - prior) / prior.abs()
     frame.loc[prior.isna() | (prior == 0), 'eps_growth'] = np.nan
+    frame['beat'] = withdraw('beat', ('reported_eps', 'consensus_eps'))
+    frame['eps_growth'] = withdraw('eps_growth', ('reported_eps', 'prior_year_eps'))
+    if 'revenue_yoy_growth_pct' in frame.columns:
+        frame['revenue_growth'] = pd.to_numeric(frame['revenue_yoy_growth_pct'], errors='coerce')
+    else:
+        frame['revenue_growth'] = np.nan
+    frame['revenue_growth'] = withdraw('revenue_growth', ('revenue', 'revenue_yoy_growth'))
 
     direction = frame['guidance_direction'].astype('string').str.lower().str.strip()
     frame['guidance_raised'] = (direction == 'raised').astype(float)
     frame['guidance_lowered'] = (direction == 'lowered').astype(float)
+    frame['guidance_raised'] = withdraw('guidance_raised', ('guidance_direction',))
+    frame['guidance_lowered'] = withdraw('guidance_lowered', ('guidance_direction',))
     scores = {str(k).lower(): float(v) for k, v in config.extraction.tone_scores.items()}
     raw_tone = frame['tone'].astype('string').str.lower().str.strip()
     unknown = raw_tone.dropna()
@@ -249,12 +302,13 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     if not unknown.empty:
         # Counted, not silently NaN: an unknown tone is a vocabulary drift to fix.
         LOGGER.warning('unknown tone values: %s', dict(unknown.value_counts().head(5)))
-    frame['tone_score'] = raw_tone.map(scores)
+    frame['tone_score'] = withdraw(raw_tone.map(scores), ('tone',))
 
     for theme in config.extraction.themes:
         column = f'theme_{theme}_direction'
         values = frame[column] if column in frame.columns else pd.Series(index=frame.index)
-        frame[f'theme_{theme}_up'] = values.astype('string').str.lower().eq('up').astype(float)
+        up = values.astype('string').str.lower().eq('up').astype(float)
+        frame[f'theme_{theme}_up'] = withdraw(up, (column, f'theme.{theme}'))
 
     seasons = [season_of(value) for value in frame['report_date']]
     # These are calendar seasons derived from the filing date, not the company's own
@@ -346,7 +400,7 @@ def aggregate_index(
             # The queue is consulted at this date, so one company excluded later does
             # not appear as excluded from every earlier date in the season.
             excluded = int(reported_docs['in_review'].sum())
-            counted = reported_docs[~reported_docs['in_review']]
+            counted = reported_docs[~reported_docs['blocked']]
             counted, _duplicate_rows = collapse_to_companies(
                 counted, str(config.aggregation.dedupe_rule)
             )
@@ -414,6 +468,7 @@ def aggregate_index(
             observations = {
                 'beat_rate': counted['beat'].notna().sum(),
                 'eps_growth_agg': counted['eps_growth'].notna().sum(),
+                'revenue_growth_agg': counted['revenue_growth'].notna().sum(),
                 'guidance_raise_share': counted['guidance_raised'].notna().sum(),
                 'guidance_lower_share': counted['guidance_lowered'].notna().sum(),
                 'guidance_ratio': (
@@ -423,6 +478,7 @@ def aggregate_index(
             }
             row['n_obs_beat'] = int(observations['beat_rate'])
             row['n_obs_growth'] = int(observations['eps_growth_agg'])
+            row['n_obs_revenue_growth'] = int(observations['revenue_growth_agg'])
             row['n_obs_guidance'] = int(observations['guidance_ratio'])
             row['n_obs_tone'] = int(observations['tone_score_mean'])
             theme_obs = {
@@ -442,6 +498,7 @@ def aggregate_index(
                     else float('nan')
                 )
                 values['eps_growth_agg'] = _weighted_mean(counted['eps_growth'], weights)
+                values['revenue_growth_agg'] = _weighted_mean(counted['revenue_growth'], weights)
                 raise_share = _weighted_mean(counted['guidance_raised'], weights)
                 lower_share = _weighted_mean(counted['guidance_lowered'], weights)
                 values['guidance_raise_share'] = raise_share
@@ -467,8 +524,15 @@ def aggregate_index(
             # A metric also needs enough observations of its own. Twelve companies and
             # one consensus figure is a beat rate of 1.0: one company's result.
             metric_minimum = int(config.aggregation.min_observations)
+            has_consensus = bool(counted['consensus_eps'].notna().any())
             for name in BASE_METRICS:
                 count = int(observations[name])
+                if name == 'beat_rate' and not has_consensus:
+                    # No analyst estimate anywhere in the season: a beat rate would be a
+                    # computed number about nothing. Named, not merely absent.
+                    row[name] = float('nan')
+                    row[f'metric_status_{name}'] = 'no_consensus'
+                    continue
                 if suppressed or count < metric_minimum:
                     row[name] = float('nan')
                     row[f'metric_status_{name}'] = 'insufficient_observations'

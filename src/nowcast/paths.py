@@ -27,17 +27,14 @@ class Paths:
     def from_config(cls, config: Config) -> Paths:
         """Build the path set for a loaded config, honouring the data-dir env var."""
         override = os.environ.get(config.runtime.data_dir_env)
-        root = (
-            Path(override) if override else Path(config.paths.project_dir) / config.paths.data_dir
-        )
-        prompts = Path(config.paths.project_dir) / config.paths.prompts_dir
+        base = Path(config.config_dir or config.paths.project_dir)
+        root = Path(override) if override else base / config.paths.data_dir
+        prompts = base / config.paths.prompts_dir
         return cls(root=root.resolve(), prompts=prompts.resolve())
 
     def sub(self, name: str) -> Path:
-        """Return a subfolder of the data root, creating it on demand."""
-        target = self.root / name
-        target.mkdir(parents=True, exist_ok=True)
-        return target
+        """Return a subfolder of the data root. Creating it is the writer's job."""
+        return self.root / name
 
     def raw(self, config: Config) -> Path:
         """Return the raw document directory."""

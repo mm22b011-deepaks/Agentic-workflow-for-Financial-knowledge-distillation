@@ -320,3 +320,74 @@ Measured 2026-11-01 and recorded in `evidence/phase_R0.txt`:
 **mutation check 33/33 killed, 0 survived**. Offline index rebuild: 100 rows → 0 kept
 (`no_earnings_item: 61, non_text: 39`), old files untouched, results moved to
 `superseded/`.
+
+---
+
+# PASS 3 register (2026-11-01) — authoritative for this pass
+
+Status: `CONFIRMED` · `ALREADY-FIXED (test)` · `NOT-REPRODUCIBLE (why)` · `UNSURE (live)`.
+Each item records the test that proves it. Live SEC work runs now; anything requiring the
+OpenRouter key stays UNSURE until one real call succeeds.
+
+## Blockers
+
+- **B1 cohort** — `_cmd_ingest` writes every sampled CIK into every season, and ingest
+  fetches each company's newest filings rather than the sampled season's. CONFIRMED.
+- **B2 number_in_quote** — scale candidates are added for every scale word in the quote
+  and, worse, the raw magnitude is always a candidate, so a 1000x error passes. CONFIRMED.
+- **B3 redesign** — beat_rate must be optional without consensus; add EPS yoy, revenue
+  growth, guidance metrics; plan XBRL. CONFIRMED (by design).
+- **B4 aggregate** — one queue row drops the whole company-season. CONFIRMED.
+- **B5 packer** — no budget priority; a negative slice drops regions. CONFIRMED.
+- **B6 rebuild-index** — writes over a non-empty v2 with no backup and no refusal.
+  CONFIRMED.
+- **B7 ingest** — rows and cohort are written only after the whole walk returns, so an
+  abort loses everything downloaded. CONFIRMED.
+
+## High
+
+- **H-a** rate limiter, request budget, global cooldown, model cascade.
+- **H-b** `finish_reason=length` with non-empty content is not treated as truncated.
+- **H-c** consolidate/aggregate read results from any settings; fingerprint omits
+  temperature/max_tokens/reasoning.
+- **H-d** `filings.files` pagination unimplemented. `edgar_lookback_days` was unused and
+  has been removed rather than left as a knob that does nothing.
+- **H-e** bakeoff: no ledger, no p50/p95, no 429 count, output not isolated, no accuracy.
+- **H-f** cross-model dedupe by self-confidence.
+- **H-g** cache stores unvalidated replies; fiscal_year unverified; theme directions
+  unvalidated; prior_year basis not captured.
+- **H-h** paths depend on cwd; getters mkdir; `SKIPPED_RESULTS` global; per-document
+  callers; private `_caller` access.
+
+## Medium / low
+
+M-a SGML strip too eager (inline SVG). M-b stray `inputs/constituents.csv`. M-c zips in
+the tree. M-d stale counts in docs. M-e dead code and `_caller`.
+
+## PASS 3 status (measured 2026-11-01)
+
+Every item verified against the current code; the test that proves each is in
+`evidence/phase_R0.txt` and `tasks.md`.
+
+- B2, B5, B6, B7, B1, B4, M-a, M-e — CONFIRMED, fixed, tested via the real entry point.
+- B3 — CONFIRMED; beat_rate is now optional (`no_consensus` status) and
+  `revenue_growth_agg` was added. The XBRL history path is R3 work and is not built.
+- H-a, H-b, H-c, H-h — CONFIRMED, fixed; H-a's live rate behaviour is UNSURE until a real
+  call succeeds.
+- H-d, H-e, H-f, H-g — CONFIRMED, **not fixed** in this pass. They come after the live
+  key works (H-e needs live calls; H-d needs a live high-volume CIK; H-f needs the
+  bakeoff ranking).
+- M-b, M-c — blocked on the human's decision about tracked files (H-B).
+- M-d — docs corrected to measured counts in this file, `status.md` and `tasks.md`.
+
+Live, this pass: SEC ingest (not blocked by the key) —
+`new_rows 60, index_rows 60, companies 61, cohort_pairs 64`, skip reasons
+`{season_not_sampled: 433, duplicate_season: 3, duplicate_exhibit: 105}`, eight seasons.
+Rebuild refusal observed live; `--force` backed up the populated index to
+`document_index.v2.20261101T072228Z.parquet` (60 rows) and then wrote an empty index from
+the legacy source. The populated index is preserved in
+`document_index.v2.from-live-20261101.parquet` and **has not been restored in place** —
+that needs the human (the restore was blocked by the local-destruction guard).
+
+Blocked on the OpenRouter key: live extraction, per-field coverage, empty-completion rate,
+review rate, 429 count, bakeoff, H-a live verification.

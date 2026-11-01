@@ -41,7 +41,8 @@ def test_paths_all_inside_data_dir(monkeypatch, tmp_path: Path) -> None:
         reports_dir(config),
         manifests_dir(config),
     ):
-        assert path.is_dir()
+        # A getter returns a path; creating a directory is the writer's job (H-h).
+        assert path == root / path.name or root in path.parents
         # cache_dir is nested (.cache/llm), so check containment rather than the parent.
         assert root in path.parents
 

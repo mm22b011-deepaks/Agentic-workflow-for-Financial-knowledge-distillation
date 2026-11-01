@@ -31,6 +31,9 @@ UNITS = 'src/nowcast/extraction/units.py'
 PROMPTS = 'src/nowcast/llm/prompts.py'
 COMPOSITION = 'src/nowcast/llm/composition.py'
 REVIEW = 'src/nowcast/extraction/review_queue.py'
+THROTTLE = 'src/nowcast/llm/throttle.py'
+PACKING = 'src/nowcast/parsing/packing.py'
+CALLER = 'src/nowcast/llm/caller.py'
 
 VALIDATOR_TESTS = ['tests/unit/test_validators.py']
 EDGAR_TESTS = ['tests/unit/test_edgar.py']
@@ -39,6 +42,10 @@ AGGREGATE_TESTS = ['tests/unit/test_aggregate.py']
 UNITS_TESTS = ['tests/unit/test_units.py']
 PROMPT_TESTS = ['tests/unit/test_prompts.py']
 AUTH_TESTS = ['tests/unit/test_auth_errors.py']
+THROTTLE_TESTS = ['tests/unit/test_throttle.py']
+PACKING_TESTS = ['tests/unit/test_packing.py']
+TRUNCATION_TESTS = ['tests/unit/test_truncation.py']
+REBUILD_TESTS = ['tests/unit/test_rebuild.py']
 REVIEW_TESTS = ['tests/unit/test_runner.py', 'tests/unit/test_review_queue.py']
 
 
@@ -65,8 +72,8 @@ MUTANTS = (
     Mutant(
         'confidence penalty dropped',
         VALIDATORS,
-        'adjust(confidence * penalty)\n        return',
-        'adjust(confidence)\n        return',
+        "issues.append(Issue(field, 'quote_missing', 'value present without evidence'))\n        adjust(confidence * penalty)",
+        "issues.append(Issue(field, 'quote_missing', 'value present without evidence'))\n        adjust(confidence)",
         tuple(VALIDATOR_TESTS),
     ),
     Mutant(
@@ -251,6 +258,84 @@ MUTANTS = (
         "        frame['confidence'] = 0.0",
         tuple(AGGREGATE_TESTS),
     ),
+    # validators.py — B2
+    Mutant(
+        'number_in_quote accepts any scale',
+        VALIDATORS,
+        'readings = {magnitude, magnitude / scale}',
+        'readings = {magnitude} | {magnitude / divisor for divisor, _ in SCALE_SUFFIXES}',
+        tuple(VALIDATOR_TESTS),
+    ),
+    # throttle.py — H-a
+    Mutant(
+        'per-minute limit ignored',
+        THROTTLE,
+        'if len(self._sent) >= self._per_minute',
+        'if False',
+        tuple(THROTTLE_TESTS),
+    ),
+    Mutant(
+        'cooldown ignored',
+        THROTTLE,
+        'wait = max(wait_cooldown, wait_rate, 0.0)',
+        'wait = max(wait_rate, 0.0)',
+        tuple(THROTTLE_TESTS),
+    ),
+    # packing.py — B5
+    Mutant(
+        'phrase priority ignored',
+        PACKING,
+        'ordered = tuple(p for p in priority if p in pool) + tuple(p for p in pool if p not in priority)',
+        'ordered = pool',
+        tuple(PACKING_TESTS),
+    ),
+    # caller.py — H-b
+    Mutant(
+        'length truncation needs empty content',
+        CALLER,
+        "if empty or finish == 'length':",
+        'if empty:',
+        tuple(TRUNCATION_TESTS),
+    ),
+    # runner.py — H-c
+    Mutant(
+        'stale results consolidated anyway',
+        RUNNER,
+        "if str(payload.get('fingerprint') or '') != current:",
+        'if False:',
+        tuple(RUNNER_TESTS),
+    ),
+    # rebuild.py — B6
+    Mutant(
+        'populated target replaced without force',
+        'src/nowcast/ingestion/rebuild.py',
+        'if not force:',
+        'if False:',
+        tuple(REBUILD_TESTS),
+    ),
+    # aggregate.py — B3 / B4
+    Mutant(
+        'beat rate computed without consensus',
+        AGGREGATE,
+        "if name == 'beat_rate' and not has_consensus:",
+        'if False:',
+        tuple(AGGREGATE_TESTS),
+    ),
+    Mutant(
+        'field flag drops the whole row',
+        AGGREGATE,
+        "counted = reported_docs[~reported_docs['blocked']]",
+        "counted = reported_docs[~reported_docs['in_review']]",
+        tuple(AGGREGATE_TESTS),
+    ),
+    # packing.py — B5
+    Mutant(
+        'windows allocated in document order',
+        PACKING,
+        'ranked = sorted(spans, key=lambda item: (item[2], item[0]))',
+        'ranked = sorted(spans, key=lambda item: item[0])',
+        tuple(PACKING_TESTS),
+    ),
     # prompts.py
     Mutant(
         'prompt hash drops few-shots',
@@ -291,7 +376,7 @@ MUTANTS = (
     Mutant(
         'counted rows not excluded from metrics',
         AGGREGATE,
-        "counted = reported_docs[~reported_docs['in_review']]",
+        "counted = reported_docs[~reported_docs['blocked']]",
         'counted = reported_docs',
         tuple(AGGREGATE_TESTS),
     ),

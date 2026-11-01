@@ -181,27 +181,44 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     )
     report = IngestReport()
     report_path = manifests_dir(config) / 'ingest_report.json'
+    target_index = index_path(config)
+    cohort_path = manifests_dir(config) / 'cohort.csv'
+    # The cohort is the (company, season) pairs this run intends to fetch, so a company
+    # sampled for one quarter is not counted as expected in the others. CIKs and seasons
+    # only; it never enters a report. Written in the finally block: an abort must not
+    # lose the record of what the run was trying to do.
+    cohort = pd.DataFrame([{'cik': cik, 'season': season} for cik, season in sample.pairs])
+    cohort_path.parent.mkdir(parents=True, exist_ok=True)
+    cohort.to_csv(cohort_path, index=False)
+
+    def persist(row: dict[str, object]) -> None:
+        """Merge one downloaded row into the index as soon as it exists."""
+        merged_now = upsert_rows(load_index(target_index), [row])
+        write_index(merged_now, target_index)
+
+    rows: list[dict[str, object]] = []
     try:
         rows = ingest_edgar(
             config,
             ciks,
             max_documents=limit,
-            per_cik_limit=int(config.data.edgar_docs_per_cik),
+            per_cik_limit=per_cik,
             report=report,
+            on_row=persist,
+            target_seasons=sample.season_targets(),
         )
     finally:
-        # Written even on the abort path: the reason the run stopped is the most useful
-        # thing the file can say, and losing it to an exception would be absurd.
+        # Every one of these is written even on the abort path: how far a run got and why
+        # it stopped are the most useful things these files can say.
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report.as_dict(), indent=2), encoding='utf-8')
-    target_index = index_path(config)
-    existing = load_index(target_index)
-    merged = upsert_rows(existing, rows)
-    write_index(merged, target_index)
+        cohort.to_csv(cohort_path, index=False)
+    merged = load_index(target_index)
     summary = {
         'new_rows': len(rows),
         'index_rows': len(merged),
         'companies': len(ciks),
+        'cohort_pairs': len(sample.pairs),
         'cap': limit,
         'start_date': config.data.start_date,
         'end_date': config.data.end_date,
@@ -209,22 +226,17 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         'status_counts': report.status_counts,
         'skip_reasons': report.skip_reasons,
         'zero_disclosure_companies': len(report.zero_disclosure_ciks),
+        'aborted': report.aborted,
     }
     target = manifests_dir(config) / 'ingest_summary.json'
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(summary, indent=2), encoding='utf-8')
-    # The cohort is the denominator aggregation measures a share against: the companies
-    # this run set out to sample, per season. CIKs only; it never enters a report.
-    cohort_rows = [
-        {'cik': cik.zfill(10), 'season': season} for season in sample.seasons for cik in sample.ciks
-    ]
-    pd.DataFrame(cohort_rows).to_csv(manifests_dir(config) / 'cohort.csv', index=False)
-    small = [
-        season
-        for season in sample.seasons
-        if len(sample.ciks) < int(config.aggregation.min_constituents)
-    ]
-    for season in small:
-        LOGGER.warning('cohort_too_small:%s (%d companies)', season, len(sample.ciks))
+    per_season: dict[str, int] = {}
+    for season in cohort['season'].astype(str):
+        per_season[season] = per_season.get(season, 0) + 1
+    for season, count in sorted(per_season.items()):
+        if count < int(config.aggregation.min_constituents):
+            LOGGER.warning('cohort_too_small:%s (%d companies)', season, count)
     manifest.notes = f'indexed {len(rows)} new rows, {len(merged)} total'
     manifest.sample = sample.as_dict()
     _record_run(config, 'ingest', [str(constituents)], manifest)
@@ -283,7 +295,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
         outcomes = asyncio.run(run_extraction(config, documents, factory, models))
     finally:
         if shared is not None:
-            shared._caller.close()  # the composition owns exactly one client
+            shared.close()  # the composition owns exactly one client
         ledger.flush()
     ok = sum(1 for item in outcomes if item.status == 'ok')
     failed = sum(1 for item in outcomes if item.status == 'failed')
@@ -321,7 +333,7 @@ def _cmd_rebuild_index(args: argparse.Namespace) -> int:
     if not source.is_file():
         raise DataError(f'no index to rebuild at {source}')
     frame = load_index(source)
-    report = rebuild_index(config, frame, source_path=source)
+    report = rebuild_index(config, frame, source_path=source, force=bool(args.force))
     report_file = write_rebuild_report(config, report)
     LOGGER.info(
         'rebuilt %d rows from %s; %d kept, %d dropped; report at %s',
@@ -387,6 +399,7 @@ def _cmd_model_bakeoff(args: argparse.Namespace) -> int:
     models = args.model or list(config.llm.models)
     table = run_bakeoff(config, models, source, int(args.sample))
     target = manifests_dir(config) / 'bakeoff.json'
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(table, indent=2), encoding='utf-8')
     for row in table['models']:
         LOGGER.info('bakeoff %s', json.dumps(row))
@@ -449,6 +462,11 @@ def build_parser() -> argparse.ArgumentParser:
         if name == 'rebuild-index':
             sub.add_argument(
                 '--source', default='', help='index to validate (default: the pre-v2 index)'
+            )
+            sub.add_argument(
+                '--force',
+                action='store_true',
+                help='replace a populated data.document_index after backing it up',
             )
         if name == 'model-bakeoff':
             sub.add_argument(

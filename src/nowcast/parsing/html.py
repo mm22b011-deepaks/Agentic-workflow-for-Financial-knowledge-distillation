@@ -10,7 +10,10 @@ from bs4 import BeautifulSoup, Comment
 #   <DOCUMENT><TYPE>EX-99.1<SEQUENCE>3<FILENAME>d123dex991.htm<DESCRIPTION>...
 #   <TEXT> ...the document... </TEXT></DOCUMENT>
 # Everything before <TEXT> is metadata that would otherwise be read as body text.
-SGML_TEXT_RE = re.compile(r'<TEXT>(.*?)(?:</TEXT>|</DOCUMENT>|$)', re.S | re.I)
+# The envelope must be the *first* thing in the file: an ordinary HTML page can contain
+# an inline SVG <text>, and stripping from that would delete the page before it. Matching
+# to the final </TEXT> rather than the first keeps a body that mentions the marker.
+SGML_TEXT_RE = re.compile(r'^\s*<DOCUMENT>.*?<TEXT>(.*)</TEXT>', re.S | re.I)
 SGML_ENVELOPE_RE = re.compile(r'</?DOCUMENT>', re.I)
 
 BLOCK_TAGS = (
