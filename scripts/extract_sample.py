@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     finally:
         if 'caller' in shared:
-            shared['caller']._caller.close()  # type: ignore[attr-defined]
+            shared['caller'].close()
     ok = sum(1 for item in outcomes if item.status == 'ok')
     failed = sum(1 for item in outcomes if item.status == 'failed')
     LOGGER.info('ok=%d failed=%d', ok, failed)

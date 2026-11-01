@@ -65,6 +65,17 @@ class Sample:
     skipped: dict[str, int] = field(default_factory=dict)
     seed: int = 0
     seasons: tuple[str, ...] = ()
+    # (cik, season) pairs this run intends to fetch. A company sampled for one quarter
+    # must not be expected to have reported the others, and only these pairs may become
+    # the denominator of a share.
+    pairs: tuple[tuple[str, str], ...] = ()
+
+    def season_targets(self) -> dict[str, list[str]]:
+        """Return the target seasons per company, as ingest wants them."""
+        result: dict[str, list[str]] = {}
+        for cik, season in self.pairs:
+            result.setdefault(cik, []).append(season)
+        return result
 
     def as_dict(self) -> dict[str, object]:
         """Return the sample as JSON-serialisable data."""
@@ -73,6 +84,7 @@ class Sample:
             'ciks': len(self.ciks),
             'seed': self.seed,
             'seasons': list(self.seasons),
+            'pairs': len(self.pairs),
             'skipped': dict(sorted(self.skipped.items())),
         }
 
@@ -112,6 +124,7 @@ def season_sample(config: Config, frame: pd.DataFrame, limit: int | None = None)
     n = int(config.universe.subset_n)
     rng = random.Random(int(config.universe.subset_seed))
     chosen: list[str] = []
+    pairs: list[tuple[str, str]] = []
     skipped: dict[str, int] = {}
     for name, as_of in seasons:
         members = active_on(frame, as_of)
@@ -129,14 +142,18 @@ def season_sample(config: Config, frame: pd.DataFrame, limit: int | None = None)
         # members would fill the cap again.
         rng.shuffle(picked)
         chosen.extend(picked)
+        pairs.extend((cik, name) for cik in picked)
     ordered = list(dict.fromkeys(chosen))
     if limit is not None and len(ordered) > limit:
         skipped['left_out_by_cap'] = len(ordered) - limit
         ordered = ordered[:limit]
+    kept = set(ordered)
+    pairs = [(cik, season) for cik, season in pairs if cik in kept]
     return Sample(
         ciks=tuple(ordered),
         companies=len(ordered),
         skipped=skipped,
+        pairs=tuple(pairs),
         seed=int(config.universe.subset_seed),
         seasons=tuple(name for name, _ in seasons),
     )
@@ -173,6 +190,7 @@ def season_of_filing(value: date) -> tuple[int, int]:
 def select_filings(
     items: Sequence[T],
     priority: tuple[str, ...] = EXHIBIT_PRIORITY,
+    wanted_seasons: Sequence[str] | None = None,
 ) -> tuple[list[T], dict[str, int]]:
     """Return one exhibit per filing and one filing per season, newest season first.
 
@@ -184,7 +202,10 @@ def select_filings(
     2. Across accessions, keep one per (year, quarter), newest first, so a cap applied
        afterwards truncates seasons rather than exhibits of the same release.
 
-    The caller applies its per-company cap after this, so the cap counts seasons.
+    With `wanted_seasons`, only those seasons are kept, newest first: a company can
+    file more quarters than the sample asked for, and taking them anyway changes what
+    the run measured. The caller applies its per-company cap after this, so the cap
+    counts seasons.
     """
     if not items:
         return [], {}
@@ -201,10 +222,15 @@ def select_filings(
         ):
             best_by_accession[item.accession] = item
     ordered = sorted(best_by_accession.values(), key=lambda item: item.filing_date, reverse=True)
+    wanted = set(wanted_seasons) if wanted_seasons else None
     seen: set[tuple[int, int]] = set()
     kept: list[T] = []
     for item in ordered:
         season = season_of_filing(item.filing_date)
+        season_name = f'{season[0]}Q{season[1]}'
+        if wanted is not None and season_name not in wanted:
+            skips['season_not_sampled'] = skips.get('season_not_sampled', 0) + 1
+            continue
         if season in seen:
             skips['duplicate_season'] = skips.get('duplicate_season', 0) + 1
             continue

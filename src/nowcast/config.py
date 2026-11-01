@@ -100,7 +100,6 @@ class DataConfig:
     edgar_forms: tuple[str, ...] = ()
     edgar_document_suffixes: tuple[str, ...] = ()
     edgar_earnings_items: tuple[str, ...] = ()
-    edgar_lookback_days: int = 730
     edgar_max_documents: int = 100
     edgar_docs_per_cik: int = 3
     # Data-root-relative path of the index the pipeline reads and writes. A rebuild
@@ -142,6 +141,15 @@ class LLMConfig:
     retry_max_wait_seconds: float = 120.0
     app_name: str = ''
     referer_url: str = ''
+    # Free tiers are limited by requests, not by dollars: a spend cap of $0.05 stops
+    # nothing when every call is free. These are the real limit and the real budget.
+    requests_per_minute: int = 20
+    requests_per_day: int = 1000
+    # After a provider says "retry after", every caller waits this long, not just the
+    # one that was refused: the pool is shared, so the next call would be refused too.
+    cooldown_seconds: float = 30.0
+    # Try models in this order, moving on only on failure or low confidence.
+    cascade_min_confidence: float = 0.5
 
     def reasoning_params(self) -> dict[str, Any]:
         """Return the provider's `reasoning` object, or {} when none is configured."""
@@ -267,6 +275,9 @@ class ReportingConfig:
 class Config:
     """Root configuration object."""
 
+    # The directory the config file was loaded from. Paths resolve against it, so a
+    # run started from another working directory still finds its prompts.
+    config_dir: str = '.'
     runtime: RuntimeConfig = RuntimeConfig()
     paths: PathsConfig = PathsConfig()
     data: DataConfig = DataConfig()
@@ -408,6 +419,7 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
         raise ConfigError("config key 'parsing.section_patterns' must be a mapping")
 
     return Config(
+        config_dir=str(config_path.resolve().parent.parent),
         runtime=RuntimeConfig(**runtime),
         paths=PathsConfig(**paths),
         data=DataConfig(
@@ -542,6 +554,12 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         )
     if config.aggregation.min_observations < 1:
         problems.append('aggregation.min_observations must be >= 1')
+    if config.llm.requests_per_minute < 1:
+        problems.append('llm.requests_per_minute must be >= 1')
+    if config.llm.requests_per_day < 1:
+        problems.append('llm.requests_per_day must be >= 1')
+    if config.llm.cooldown_seconds < 0:
+        problems.append('llm.cooldown_seconds must be >= 0')
     if problems and strict:
         raise ConfigError('config validation failed: ' + '; '.join(problems))
     return problems

@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -176,6 +177,36 @@ def is_text_document(filename: str, allowed: tuple[str, ...]) -> bool:
     """Return whether an exhibit filename has a suffix we can parse as text."""
     suffix = Path(filename).suffix.lower()
     return bool(allowed) and suffix in {item.lower() for item in allowed}
+
+
+def _seasons_between(start: date | None, end: date | None) -> tuple[str, ...]:
+    """Return every calendar season in a window, newest first.
+
+    Derived from the window the run is actually using, not from config, so a test or a
+    caller that narrows the window gets the seasons it asked for.
+    """
+    if start is None or end is None or start > end:
+        return ()
+    seasons: list[str] = []
+    year, quarter = start.year, (start.month - 1) // 3 + 1
+    while (year, quarter) <= (end.year, (end.month - 1) // 3 + 1):
+        seasons.append(f'{year}Q{quarter}')
+        quarter += 1
+        if quarter > 4:
+            year, quarter = year + 1, 1
+    return tuple(reversed(seasons))
+
+
+def _targets_by_cik(
+    target_seasons: Sequence[str] | Iterable[str] | None,
+) -> dict[str, tuple[str, ...]]:
+    """Return explicit per-company seasons, when the caller supplies (cik, season) pairs."""
+    if not isinstance(target_seasons, dict):
+        return {}
+    return {
+        str(cik).zfill(10): tuple(sorted(seasons, reverse=True))
+        for cik, seasons in target_seasons.items()
+    }
 
 
 def _configured_date(config: Config, value: str) -> date | None:
@@ -351,6 +382,8 @@ def ingest_edgar(
     end_date: date | None = None,
     per_cik_limit: int | None = None,
     report: IngestReport | None = None,
+    on_row: Callable[[dict[str, object]], None] | None = None,
+    target_seasons: Iterable[str] | None = None,
 ) -> list[dict[str, object]]:
     """Download earnings exhibits for the given CIKs and return document index rows.
 
@@ -365,6 +398,8 @@ def ingest_edgar(
     per_cik = per_cik_limit if per_cik_limit is not None else int(config.data.edgar_docs_per_cik)
     window_start = start_date or _configured_date(config, config.data.start_date)
     window_end = end_date or _configured_date(config, config.data.end_date)
+    targets = _seasons_between(window_start, window_end)
+    targets_by_cik = _targets_by_cik(target_seasons)
     abort_after = int(config.data.sec_abort_after_blocked)
     # The run always counts; the caller only decides whether it gets to keep the counts.
     active_report = report if report is not None else IngestReport()
@@ -388,7 +423,10 @@ def ingest_edgar(
                 # One exhibit per filing and one filing per season, newest season first:
                 # sorting newest-first alone spends the per-company cap on the same
                 # quarter's release and supplement, leaving the other seasons unseen.
-                disclosures, filing_skips = select_filings(disclosures)
+                disclosures, filing_skips = select_filings(
+                    disclosures,
+                    wanted_seasons=targets_by_cik.get(cik.zfill(10)) or targets,
+                )
                 for reason, count in filing_skips.items():
                     for _ in range(count):
                         active_report.record_skip(reason)
@@ -413,24 +451,27 @@ def ingest_edgar(
                     taken += 1
                     active_report.documents += 1
                     text = _document_text(path)
-                    rows.append(
-                        {
-                            'document_id': f'{cik.zfill(10)}-{disclosure.accession}-{disclosure.document}',
-                            'cik': cik.zfill(10),
-                            'report_date': disclosure.filing_date.isoformat(),
-                            'document_type': disclosure.exhibit_type,
-                            'source': 'edgar',
-                            # Relative to the data root so a copied data directory
-                            # stays usable; loaders resolve it against DATA_DIR.
-                            'raw_path': str(path.relative_to(data_root(config))),
-                            'sha256': file_sha256(path),
-                            'chars': len(text),
-                            'downloaded_at': datetime.now(timezone.utc).isoformat(),
-                            # The earnings-item proof travels with the row so extraction
-                            # can refuse anything that was not a 2.02 filing.
-                            'items': disclosure.items,
-                        }
-                    )
+                    row = {
+                        'document_id': f'{cik.zfill(10)}-{disclosure.accession}-{disclosure.document}',
+                        'cik': cik.zfill(10),
+                        'report_date': disclosure.filing_date.isoformat(),
+                        'document_type': disclosure.exhibit_type,
+                        'source': 'edgar',
+                        # Relative to the data root so a copied data directory
+                        # stays usable; loaders resolve it against DATA_DIR.
+                        'raw_path': str(path.relative_to(data_root(config))),
+                        'sha256': file_sha256(path),
+                        'chars': len(text),
+                        'downloaded_at': datetime.now(timezone.utc).isoformat(),
+                        # The earnings-item proof travels with the row so extraction
+                        # can refuse anything that was not a 2.02 filing.
+                        'items': disclosure.items,
+                    }
+                    rows.append(row)
+                    if on_row is not None:
+                        # Written now, not at the end: an abort twenty companies later
+                        # must not lose what has already been downloaded.
+                        on_row(row)
             except (httpx.HTTPError, DataError) as exc:
                 # A bad configured date or window is the same for every company: it is
                 # the operator's bug, not this CIK's, so it must not be swallowed N times

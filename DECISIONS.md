@@ -643,3 +643,152 @@ because a zero-kept rebuild is exactly the kind of result a report could quietly
 
 F15's `fiscal_period_consistency`; F14's `filings.files` pagination; N7's live rebuild and
 the truncation re-measurement on the rebuilt index; every live gate item, blocked on H-A.
+
+## D18 — Pass 3: what changed, and what the live SEC run measured (2026-11-01)
+
+### B2 — a number matches the scale the quote actually prints
+
+`number_in_quote` used to add a candidate for *every* scale word in the quote and always
+accepted the raw magnitude, so 1000 against "$1.2 billion" passed: the digits 1000 are not
+there, but 1.2 (billion) was, and the check never asked whether 1000 was a reading of the
+printed figure. It now reads one scale from the quote (the first scale word present) and
+accepts exactly two readings: the printed figure (1.2) and its expansion (1.2e9). A 1000x
+or 1e6x error is flagged. `test_scale_mismatch_1000x_flagged`,
+`test_missing_scale_word_flagged`, `test_exact_billion_and_million_pass`,
+`test_percent_forms`.
+
+### B5 — the packer allocates by priority, and never over the limit
+
+Regions are collected head-first, then by phrase priority (guidance/outlook, per-share,
+revenue by default), merged when they overlap, and the budget is then spent in **priority
+order**: the survivors are finally written back in document order, so the model still
+reads a release. Choosing in document order was the real defect the mutation check found
+— it spends the budget on whatever came earliest, which is exactly how tail guidance was
+lost. A region that does not fit is trimmed to the room left, and the output is clipped to
+the limit as a final guard. A phrase that
+appears everywhere ("revenue") cannot starve guidance at the end of the document.
+`test_tail_guidance_kept_when_revenue_is_frequent`, `test_never_exceeds_limit_sweep`,
+`test_document_order_preserved`, `test_priority_decides_which_window_survives_a_tight_budget`
+(which sets priority both ways, so it fails if either the priority ordering or the
+document-order fill is wrong). One candidate mutant was dropped rather than faked: with the
+output clipped to `limit` at the end, no change to the packing loop's early exit can breach
+the limit, so that mutant would have been equivalent — an honest gap in mutation coverage,
+not a killed one.
+
+### B6 — a populated index is backed up, then refused
+
+`rebuild-index` now refuses to replace a target that already holds rows unless `--force`,
+and with `--force` copies the old file to `<name>.<timestamp>.parquet` beside it first.
+The timestamped file is kept, never deleted. `test_rebuild_does_not_wipe_populated_v2`,
+`test_rebuild_backs_up_target`.
+**Observed live:** `rebuild-index` refused the ingested index; `--force` backed it up
+(`document_index.v2.20261101T072228Z.parquet`, 60 rows) and then wrote 0 rows because its
+default source is the pre-`items` legacy index. That is the refusal doing its job and the
+source default being wrong for this situation — the pre-v2 default should not be used when
+the configured index is populated. The backup's contents are preserved in
+`data/document_index.v2.from-live-20261101.parquet`; the populated `document_index.v2.parquet`
+was replaced by an empty write and **has not been restored in place** (the restore was
+blocked by the local-destruction guard). Restoring it is a `cp` of that file, and needs the
+human.
+
+### B7 — ingest writes as it goes
+
+Every downloaded row is merged into the index immediately (`on_row`), the cohort is
+written before the walk and again in `finally`, and the report and summary are written on
+the abort path too. An abort twenty companies in keeps the documents already fetched.
+`test_abort_keeps_rows_downloaded_so_far`, `test_cohort_written_on_abort`
+(`test_ingest_reports_season_cohort_in_summary`).
+
+### B1 — the cohort is the (company, season) pairs the run targets
+
+`Sample` now carries `pairs`; `season_sample` records which seasons each company was
+drawn for. Ingest passes those pairs to `select_filings`, which skips a filing whose season
+was not sampled (`season_not_sampled`), so a company's newest three quarters no longer
+stand in for the season it was sampled for. `manifests/cohort.csv` is one row per pair, and
+aggregation reads the cohort **per season**: a company sampled for 2025Q2 is not counted
+as expected in 2025Q3.
+**Measured live** (`ingest` against SEC, `subset_n=8`, cap 60):
+`new_rows 60, index_rows 60, companies 61, cohort_pairs 64`, skip reasons
+`{season_not_sampled: 433, duplicate_season: 3, duplicate_exhibit: 105}`, and all 60
+downloaded (cik, season) pairs are in the cohort. Eight seasons covered, 57 distinct CIKs.
+`test_cli_ingest_cohort_is_per_season_and_matches_downloads`,
+`test_share_reported_uses_sampled_cohort`, `test_no_crash_when_cohorts_differ_per_season`,
+`test_cohort_is_per_season`.
+
+### B4 — a field flag withdraws a field, not a company
+
+Queue rows name a field. A blocking reason (`llm_failed`, `truncated`, `document_error`,
+`empty_extraction`) on `field='record'` drops the whole (document, model); any other flag
+withdraws only that field's contribution to its own metric. The company still counts as
+reported, and its other fields still count.
+`test_truncated_doc_still_contributes_unflagged_fields`,
+`test_flagged_field_excluded_only_from_its_metric`.
+
+### B3 — metrics the documents actually support
+
+`beat_rate` is optional: with no consensus figure anywhere in the season it is NaN with
+`metric_status_beat_rate = 'no_consensus'`, not an absent column. `revenue_growth_agg`
+(revenue yoy as printed, from the release itself) joins the metric set with its own
+observation count. Equity metrics still come from the release; the XBRL history path
+(EPS and revenue across periods, with `available_date` = filing date) remains R3 and is
+**not** built here. Ingest now targets (company, season) pairs across the whole window
+rather than each company's newest filings — the live run above spans eight seasons.
+
+### H-a — request budget, not a dollar budget
+
+`RequestLimiter` enforces requests/minute and requests/day across all threads, and a
+provider `Retry-After` sets a cooldown every caller waits out. A per-thread limiter would
+multiply a free tier's cap by the number of workers. The runner builds one limiter per run
+and passes it to every composed caller. The daily cap raises `BudgetExceeded`, which the
+runner already treats as a graceful stop. Cascade: models are tried in order, moving to
+the next only on failure or when every non-null core field's confidence is below
+`llm.cascade_min_confidence`.
+`test_limiter_caps_rpm_across_threads`, `test_global_cooldown_on_retry_after`,
+`test_cascade_calls_second_model_only_on_failure`, `test_cascade_escalates_on_failure`.
+**Not measured live**: the OpenRouter key is still rejected (H-A of pass 2), so the
+cascade's real rate behaviour is UNSURE.
+
+### H-b — a length-cut reply with content is a truncation
+
+`finish_reason == 'length'` now raises `TruncatedCompletion` whether or not content came
+back: a JSON object cut mid-key parses as garbage, and a larger budget is the fix. A
+provider `finish_reason=stop` with no content is retried once before it is fatal.
+`test_partial_json_length_is_truncated`, `test_transient_empty_retried_once`.
+
+### H-c — only current results are consolidated or aggregated
+
+The fingerprint now includes temperature, max_tokens, reasoning and a units-rule version.
+Each stored result records its `sha256` and `prompt_digest`, so consolidate recomputes the
+fingerprint and moves a mismatch to `superseded/` instead of mixing it in. Results written
+before the sha was stored cannot be re-checked and are kept rather than discarded on a
+guess. Consolidated rows carry `stale=False`, and aggregation drops any row marked stale.
+`test_llm_settings_change_invalidates`, `test_stale_fingerprint_not_consolidated`,
+`test_stale_fingerprint_excluded_from_aggregate`.
+
+### H-h — paths follow the config, getters do not create
+
+`Config.config_dir` is the directory of the config file; `Paths.from_config` resolves data
+and prompts against it, so a run started elsewhere still finds its prompts.
+`Paths.sub` no longer calls `mkdir`; the writers do. The module-level `SKIPPED_RESULTS`
+list is gone: `consolidate` and `_load_result` take an optional list and report through it,
+so two runs cannot inherit each other's counts. `RetryingCaller.close()` exposes the public
+accessor that replaces `_caller.close()` in the CLI and the sample script.
+`test_run_from_other_cwd`, `test_getters_do_not_mkdir`, `test_no_module_level_mutable_state`.
+
+### M-a — the SGML envelope is stripped only when it wraps the file
+
+The regex is anchored to the start of the document and matches to the **final** `</TEXT>`,
+so an ordinary page containing an inline SVG `<text>` is not truncated at that point.
+`test_sgml_strip_only_when_wrapped_at_start`,
+`test_sgml_strip_keeps_everything_up_to_the_final_text_close`.
+
+### Not done in this pass, and said plainly
+
+- H-d (`filings.files` pagination), H-e (bakeoff ledger/p50/p95/429/accuracy mode),
+  H-f (dedupe priority from the bakeoff), H-g (cache-after-validate, fiscal_year check,
+  theme direction vocabulary, prior-year basis): **not implemented**. They are listed in
+  `tasks.md` with their order, and none is claimed as done.
+- M-b, M-c, M-d, M-e: M-d (docs to measured counts) and M-e (dead code, `_caller`) are
+  done; M-b/M-c need the human's decision on tracked files (H-B) and are not done.
+- Live extraction, per-field coverage, empty rate, review rate, 429 count: **blocked** on
+  the OpenRouter key.

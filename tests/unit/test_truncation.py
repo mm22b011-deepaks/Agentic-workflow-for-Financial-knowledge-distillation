@@ -221,3 +221,39 @@ def test_reasoning_param_only_sent_when_supported(config: Config) -> None:
     with_param = run({'data': [{'id': MODEL, 'supported_parameters': ['reasoning']}]})
     assert 'reasoning' not in without
     assert with_param['reasoning'] == {'effort': config.llm.reasoning_effort}
+
+
+def test_partial_json_length_is_truncated(config: Config) -> None:
+    """Content cut off mid-object is a truncated reply, not something to parse."""
+    body = _length_body()
+    body['choices'] = [
+        {
+            'message': {'content': '{"schema_version": "v1", "document_id": "x", "repo'},
+            'finish_reason': 'length',
+        }
+    ]
+    caller, _seen = _caller(config, [body])
+    with pytest.raises(TruncatedCompletion) as excinfo:
+        caller.complete(MODEL, [{'role': 'user', 'content': 'hi'}])
+    assert excinfo.value.finish_reason == 'length'
+
+
+def test_transient_empty_retried_once(config: Config, tmp_path: Path) -> None:
+    """An empty reply with finish_reason=stop is retried once before it is fatal."""
+    empty = _length_body()
+    empty['choices'] = [{'message': {'content': ''}, 'finish_reason': 'stop'}]
+    seen: list[str] = []
+    queue = [empty, _ok_body()]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        seed = json.loads(request.content)['messages'][-1]['content']
+        seen.append(seed)
+        return _response(queue.pop(0))
+
+    inner = LLMCaller(config.llm, transport=httpx.MockTransport(handler))
+    wrapper = RetryingCaller(inner, ResponseCache(config.cache, tmp_path / 'cache'), config)
+    result = wrapper.complete(MODEL, [{'role': 'user', 'content': 'hi'}])
+    assert result.text == '{"ok": true}'
+    assert wrapper.calls == 2

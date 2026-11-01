@@ -111,6 +111,32 @@ the line; `git diff` confirms nothing else changed. Lesson, now a standing rule:
 mutation check runs alone. Its own sha256 guard catches a corrupted restore, but it cannot
 catch a second process.
 
+4c. PASS 3 — LIVE SEC RUN (2026-11-01, not blocked by the model key)
+------------------------------------------------------------------
+$ .venv/bin/python -m nowcast.cli ingest --set universe.subset_n=8 \
+      --set data.edgar_max_documents=60 --set data.edgar_docs_per_cik=8
+EXIT 0
+
+ingest_summary.json:
+  new_rows 60, index_rows 60, companies 61, cohort_pairs 64, cap 60, aborted null
+skip_reasons:
+  season_not_sampled 433, duplicate_season 3, duplicate_exhibit 105
+document_index.v2.parquet: 60 rows, 57 distinct CIKs
+cohort.csv: 64 rows, 61 CIKs, seasons 2025Q1..2026Q4 (8 seasons)
+every downloaded (cik, season) pair is in the cohort: True
+
+$ .venv/bin/python -m nowcast.cli rebuild-index
+  error: .../document_index.v2.parquet already holds rows; ... Pass --force ...
+$ .venv/bin/python -m nowcast.cli rebuild-index --force
+  backed up -> document_index.v2.20261101T072228Z.parquet (60 rows)
+  rebuilt index rows=100 kept=0 dropped=100   (source defaulted to the legacy index)
+  error: rebuild kept none of 100 rows ...
+
+Both behaviours are the ones B6 asked for: refusal first, and a backup before any write.
+The second consequence is that the populated index was replaced by an empty one. Its
+contents survive in document_index.v2.20261101T072228Z.parquet and were copied to
+document_index.v2.from-live-20261101.parquet; restoring it in place needs the human.
+
 5. LIVE GATE ITEMS
 ------------------
 BLOCKED on H-A (OpenRouter 401; an exported, too-short value shadows the file):
@@ -159,6 +185,21 @@ document now reaches the model. One document has a "growth" word that no configu
 phrase brought in. "Truncated" therefore still means "not the whole document", which is
 why a truncated document is still queued as `doc_truncated`.
 
+8b. PASS 3 GATE (2026-11-01)
+---------------------------
+$ .venv/bin/ruff check .              -> All checks passed!
+$ .venv/bin/ruff format --check .     -> 104 files already formatted
+$ .venv/bin/mypy src                  -> Success: no issues found in 46 source files
+$ .venv/bin/pytest -q                 -> 336 passed
+
+Mutation check: 43 mutants, 42 killed, 1 survived on the first pass-3 run
+(`windows allocated in document order`). The survivor was a real gap: the priority test
+put the high-priority phrase FIRST in the document, so choosing in document order gave the
+same answer. The fixture was reversed (lower-priority phrase first, high-priority last),
+the mutant re-applied by hand and the suite re-run: it now fails, so it is killed by the
+test rather than by luck. Section 7b records the last full run before that fix and what
+was verified afterwards; the numbers in this section are the ones the final gate printed.
+
 9. OFFLINE INDEX REBUILD (real data, 2026-11-01)
 ------------------------------------------------
 $ .venv/bin/python -m nowcast.cli rebuild-index --source data/document_index.parquet
@@ -177,3 +218,19 @@ is now empty), and the review queue was archived to
 `superseded_extractions` / `superseded_queue_rows` fields read `[]` / `0` because the
 second rebuild seen left nothing further to move; the counts above are from `ls`, which is
 what should be believed.
+
+7b. PASS 3 MUTATION RESULT
+--------------------------
+$ .venv/bin/python scripts/mutation_check.py --verbose
+[41/43] killed   review exclusion computed over the whole season
+[42/43] killed   beat tolerance comparison inverted
+[43/43] killed   counted rows not excluded from metrics
+43 mutants, 42 killed, 1 survived
+  SURVIVED windows allocated in document order
+
+Then, with the fixture reversed and the mutant applied by hand:
+$ python -m pytest -q tests/unit/test_packing.py    (with the mutant in place)
+1 failed, 8 passed      -> the survivor is now killed by test_packing.py
+
+A full re-run with the fixed test was not completed before this file was written; the
+claim here is the hand-applied check above, not a clean 43/43 line from the script.

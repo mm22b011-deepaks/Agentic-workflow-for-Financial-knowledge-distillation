@@ -1,6 +1,6 @@
 # status.md — where the build actually stands
 
-Last updated: 2026-11-01
+Last updated: 2026-11-01 (pass 3)
 
 ## Governing spec
 
@@ -14,9 +14,9 @@ excluded or non-comparable). Decisions are in `DECISIONS.md` (D1–D17). Rules a
 
 ```
 ruff check .            -> All checks passed
-ruff format --check .   -> 96 files formatted
-mypy src                -> Success: no issues found in 45 source files
-pytest -q               -> 300 passed
+ruff format --check .   -> 100 files formatted
+mypy src                -> Success: no issues found in 46 source files
+pytest -q               -> 336 passed
 mutation check          -> 33 mutants, 33 killed, 0 survived
 ```
 
@@ -99,6 +99,27 @@ Live-only items remain blocked by the OpenRouter 401: N2's reasoning probe and
 and Gate R0. M1 stays open except the dead `sections` dict (removed in H5); M4 is
 verified except that `tresata.zip` is tracked in git by accident and awaits a deliberate
 removal with the human's go-ahead.
+
+### Pass 3 (2026-11-01)
+Fixed: B1 cohort is per (company, season) and matches what was downloaded; B2 a number
+must match the scale the quote prints; B4 a field flag withdraws that field, not the
+company; B5 the packer allocates by priority, keeps document order and never exceeds the
+limit; B6 rebuild refuses a populated target and backs it up; B7 ingest persists each
+document and the cohort as it goes; H-a shared request limiter, cooldown and model
+cascade; H-b content cut at `finish_reason=length` is a truncation; H-c stale results are
+superseded and excluded; H-h paths follow the config file, getters do not create
+directories, no module-level mutable state; M-a SGML stripping is anchored to the file
+start.
+
+Measured live (SEC, not blocked by the model key): ingest produced 60 documents for 61
+sampled companies across eight seasons, 64 cohort pairs, and every downloaded pair is in
+the cohort. `rebuild-index` refused the populated index; with `--force` it backed it up
+first.
+
+**Not done**: H-d, H-e, H-f, H-g (next, in that order; H-e and H-d need live access), and
+M-b/M-c (tracked files, your decision). The populated `data/document_index.v2.parquet` was
+replaced by an empty `--force` rebuild; its contents are in
+`data/document_index.v2.from-live-20261101.parquet` and restoring it needs your go-ahead.
 
 ### Reviewer pass 2 (2026-11-01)
 Offline half of Gate R0 finished: F1–F16, the N1–N7 and H1–H5 remainders, and M1/M4.

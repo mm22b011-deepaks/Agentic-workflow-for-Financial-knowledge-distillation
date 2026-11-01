@@ -3,9 +3,36 @@
 Status legend: `[x]` done · `[~]` in progress · `[ ]` todo · `[!]` blocked on a decision
 
 Last gate run: `ruff check . && ruff format --check . && mypy src && pytest -q` →
-`ruff` clean, **100 files formatted**, `mypy` clean on **45 source files**,
-**303 tests passing** (2026-11-01, after reviewer pass 2: F1–F19, the N1–N7 and H1–H5
-remainders, M1/M4). `evidence/phase_R0.txt` maps each item to its test.
+`ruff` clean, **100 files formatted**, `mypy` clean on **46 source files**,
+**336 tests passing** (2026-11-01, after pass 3: B1–B7, H-a/H-b/H-c/H-h, M-a).
+`evidence/phase_R0.txt` maps each item to its test.
+
+## Pass 3 (2026-11-01) — item status
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| B1 cohort | FIXED | per-(company, season) pairs; live ingest: 64 pairs, 60 downloads all in cohort, 8 seasons |
+| B2 number_in_quote | FIXED | one scale reading; 1000x and 1e6x flagged |
+| B3 redesign | PARTIAL | beat_rate optional (`no_consensus`), revenue growth added; XBRL path stays R3 |
+| B4 aggregate exclusion | FIXED | blocking reasons drop the row, field flags drop one metric |
+| B5 packer | FIXED | priority budget, document order, limit never exceeded |
+| B6 rebuild | FIXED | refuses populated target, backs up with timestamp; live refusal observed |
+| B7 incremental ingest | FIXED | rows persisted per document, cohort/report in `finally` |
+| H-a limiter/cascade | FIXED offline, UNSURE live | shared rpm/day limit + cooldown + cascade; no live call yet |
+| H-b length truncation | FIXED | content + `finish_reason=length` is truncated; transient empty retried once |
+| H-c stale results | FIXED | settings in fingerprint; stale moved to `superseded/`, excluded from aggregates |
+| H-d pagination | NOT DONE | needs a live high-volume CIK; template is in config |
+| H-e bakeoff rework | NOT DONE | ledger/p50/p95/429/accuracy mode |
+| H-f dedupe priority | NOT DONE | still self-confidence; needs the bakeoff ranking |
+| H-g validation extras | NOT DONE | cache-after-validate, fiscal_year check, theme directions, prior-year basis |
+| H-h paths | FIXED | config-dir anchoring, no mkdir in getters, no module globals, public `close()` |
+| M-a SGML strip | FIXED | anchored to file start, final `</TEXT>` |
+| M-b/M-c | BLOCKED on your decision | tracked `inputs/constituents.csv` and `tresata.zip` |
+| M-d/M-e | FIXED | docs to measured counts; dead code and `_caller` removed |
+
+Step 4 of the order was run: a live SEC ingest (order item 4) and the rebuild refusal.
+Steps 5–6's live items remain blocked on the OpenRouter key. H-d, H-e, H-f, H-g were not
+reached; they are next, in that order, and are not claimed as done.
 
 ## Reviewer pass 2 (2026-11-01) — item status
 

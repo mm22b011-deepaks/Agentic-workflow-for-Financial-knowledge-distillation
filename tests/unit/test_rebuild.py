@@ -149,3 +149,24 @@ def test_rebuild_cli_keeps_the_legacy_index(
     assert cli._cmd_rebuild_index(args) == 0
     assert source.is_file()
     assert load_index(index_path(config)).shape[0] == 1
+
+
+def test_rebuild_does_not_wipe_populated_v2(config: Config, tmp_path: Path) -> None:
+    """A populated v2 target is refused unless the caller says --force."""
+    target = index_path(config)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([_row('existing')]).to_parquet(target, index=False)
+    with pytest.raises(DataError, match='already holds'):
+        rebuild_index(config, pd.DataFrame([_row('new')]), source_path=None)
+
+
+def test_rebuild_backs_up_target(config: Config, tmp_path: Path) -> None:
+    """With force, the file being replaced is kept with a timestamp before the write."""
+    target = index_path(config)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([_row('existing')]).to_parquet(target, index=False)
+    report = rebuild_index(config, pd.DataFrame([_row('new')]), source_path=None, force=True)
+    assert report.backup_path is not None and report.backup_path.is_file()
+    backups = pd.read_parquet(report.backup_path)
+    assert backups['document_id'].tolist() == ['existing']
+    assert load_index(target)['document_id'].tolist() == ['new']

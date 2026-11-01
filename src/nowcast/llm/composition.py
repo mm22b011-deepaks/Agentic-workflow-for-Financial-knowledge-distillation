@@ -24,6 +24,7 @@ from nowcast.errors import (
 )
 from nowcast.llm.cache import ResponseCache, cache_key
 from nowcast.llm.caller import LLMResult
+from nowcast.llm.throttle import RequestLimiter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -69,9 +70,11 @@ class RetryingCaller:
         cache: ResponseCache,
         config: Config,
         sleep: Any = None,
+        limiter: Any = None,
     ) -> None:
-        """Store the inner caller, the cache and the retry settings."""
+        """Store the inner caller, the cache, the retry settings and the shared limiter."""
         self._caller = caller
+        self._limiter = limiter
         self._cache = cache
         self._config = config
         self._sleep = sleep or time.sleep
@@ -80,6 +83,12 @@ class RetryingCaller:
         # Extraction calls this from a thread pool; an unsynchronised counter loses hits
         # and makes a cache measurement wrong.
         self._lock = threading.Lock()
+
+    def close(self) -> None:
+        """Close the wrapped caller if it owns a client; safe to call twice."""
+        close = getattr(self._caller, 'close', None)
+        if close is not None:
+            close()
 
     def _key(self, model: str, messages: list[dict[str, str]]) -> str:
         """Return the cache key for one request, including every sampling setting.
@@ -117,11 +126,21 @@ class RetryingCaller:
         budget = int(max_tokens or self._config.llm.max_tokens)
         last_error: Exception | None = None
         truncated_retry_used = False
+        empty_retry_used = False
         for attempt in range(attempts):
             try:
                 with self._lock:
                     self.calls += 1
-                result = self._caller.complete(model, messages, max_tokens=budget)
+                if self._limiter is not None:
+                    self._limiter.acquire()
+                try:
+                    result = self._caller.complete(model, messages, max_tokens=budget)
+                except RateLimited as exc:
+                    # One refusal means the shared pool is busy: pause every caller, not
+                    # just this one, or the next thread walks straight into the same 429.
+                    if self._limiter is not None and exc.retry_after_seconds:
+                        self._limiter.cooldown(float(exc.retry_after_seconds))
+                    raise
             except (BudgetExceeded, AuthError, ModelNotFound):
                 # A spend cap, a rejected credential and a missing model are facts about
                 # the run, not transient states: retrying them spends the budget on the
@@ -130,8 +149,13 @@ class RetryingCaller:
             except EmptyCompletion as exc:
                 last_error = exc
                 if not isinstance(exc, TruncatedCompletion):
-                    # Nothing to parse and no budget to raise: hand it up as it is.
-                    break
+                    # A provider that returns finish_reason=stop with no content is
+                    # transient, not fatal: one more attempt, then hand it up as it is.
+                    if empty_retry_used:
+                        break
+                    empty_retry_used = True
+                    LOGGER.warning('empty completion: retrying once model=%s', model)
+                    continue
                 if truncated_retry_used or exc.max_tokens >= ceiling:
                     break
                 truncated_retry_used = True
@@ -187,4 +211,9 @@ def make_caller(
         inner if inner is not None else LLMCaller(config.llm, ledger=ledger, transport=transport)
     )
     active_cache = cache if cache is not None else ResponseCache(config.cache, cache_dir(config))
-    return RetryingCaller(caller, active_cache, config, sleep=sleep)
+    limiter = RequestLimiter(
+        per_minute=int(config.llm.requests_per_minute),
+        per_day=int(config.llm.requests_per_day),
+        cooldown_seconds=float(config.llm.cooldown_seconds),
+    )
+    return RetryingCaller(caller, active_cache, config, sleep=sleep, limiter=limiter)

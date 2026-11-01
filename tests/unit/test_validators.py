@@ -295,3 +295,33 @@ def test_truncated_document_queued_as_doc_truncated(config: Config) -> None:
     reasons = needs_review(_record(), [], config, truncated=True)
     assert 'doc_truncated' in reasons
     assert 'doc_truncated' not in needs_review(_record(), [], config, truncated=False)
+
+
+def test_scale_mismatch_1000x_flagged() -> None:
+    """1000 against a printed "$1.2 billion" is a scale error, not a match."""
+    assert not number_in_quote(1000.0, 'Revenue was $1.2 billion')
+    # The same error the other way: 0.0012 printed as "1.2 million" is fine, but
+    # 0.0012 against "1.2 billion" is not.
+    assert not number_in_quote(0.0012, 'Revenue was $1.2 billion')
+    assert not number_in_quote(1_200_000.0, 'Revenue was $1.2 billion')
+
+
+def test_missing_scale_word_flagged() -> None:
+    """A value that only matches by inventing a scale word is rejected."""
+    assert not number_in_quote(1_200_000_000.0, 'Revenue was $1.2')
+    assert not number_in_quote(1.2, 'Revenue was $1,200')
+
+
+def test_exact_billion_and_million_pass() -> None:
+    """The printed figure in its printed scale matches; the raw expansion matches too."""
+    assert number_in_quote(1.2, 'Revenue was $1.20 billion')
+    assert number_in_quote(1_200_000_000.0, 'Revenue was $1.20 billion')
+    assert number_in_quote(480.0, 'Revenue for the year was GBP 480 million')
+    assert number_in_quote(480_000_000.0, 'Revenue for the year was GBP 480 million')
+
+
+def test_percent_forms() -> None:
+    """A printed percent matches the percent value and nothing scaled."""
+    assert number_in_quote(4.0, 'up 4% year over year')
+    assert number_in_quote(0.5, 'up 0.5% year over year')
+    assert not number_in_quote(400.0, 'up 4% year over year')

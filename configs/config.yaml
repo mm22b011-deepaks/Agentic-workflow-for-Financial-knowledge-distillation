@@ -55,7 +55,6 @@ data:
     - .txt
   edgar_earnings_items:
     - '2.02'
-  edgar_lookback_days: 730
   edgar_max_documents: 100
   edgar_docs_per_cik: 3
 
@@ -86,6 +85,13 @@ llm:
   app_name: index-earnings-nowcast
   # OpenRouter reads HTTP-Referer as a URL; empty omits the header.
   referer_url: ''
+  # Free models are limited by requests, not dollars. This is the real budget.
+  requests_per_minute: 20
+  requests_per_day: 1000
+  # A provider "retry after" pauses every caller, not just the refused one.
+  cooldown_seconds: 30.0
+  # Cascade: move to the next configured model only on failure or below this confidence.
+  cascade_min_confidence: 0.5
 
 cache:
   enabled: true

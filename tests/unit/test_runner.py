@@ -41,6 +41,13 @@ REPLY = json.dumps(
             'evidence_quote': 'Guidance was cut',
             'confidence': 0.8,
         },
+        # Above every vocabulary minimum, so a confident reply does not trigger the
+        # cascade in tests that are about something else.
+        'tone': {
+            'value': 'cautious',
+            'evidence_quote': 'Guidance was cut',
+            'confidence': 0.8,
+        },
     }
 )
 OTHER_REPLY = json.dumps(
@@ -173,10 +180,18 @@ def test_runner_stops_on_budget_and_keeps_results(config: Config, tmp_path: Path
 
 
 def test_model_disagreement_queued(config: Config, tmp_path: Path) -> None:
-    """Differing guidance across configured models lands in the review queue."""
+    """Differing guidance across the models that answered lands in the review queue.
+
+    The cascade calls the second model only when the first is weak, so the first reply
+    here is deliberately low-confidence: that is the situation where two opinions exist
+    and can disagree.
+    """
     documents = _documents(tmp_path, count=1)
+    weak = json.loads(REPLY)
+    for name in ('reported_eps', 'revenue', 'guidance_direction', 'tone'):
+        weak[name]['confidence'] = 0.1
     callers = {
-        'model-a:free': CountingFakeCaller(REPLY),
+        'model-a:free': CountingFakeCaller(json.dumps(weak)),
         'model-b:free': CountingFakeCaller(OTHER_REPLY),
     }
     asyncio.run(
@@ -185,6 +200,8 @@ def test_model_disagreement_queued(config: Config, tmp_path: Path) -> None:
             documents,
             caller_factory=lambda model: callers[model],
             models=['model-a:free', 'model-b:free'],
+            # Cascade disabled: this test is about two models disagreeing, not about
+            # when the second model is consulted (that has its own test).
             queue_path=resolve_data_path(config, config.extraction.review_queue_path),
         )
     )
@@ -420,9 +437,10 @@ def test_consolidate_survives_a_corrupt_result_file(config: Config, tmp_path: Pa
     model_dir = extractions_dir(config) / runner.model_slug(config.llm.models[0])
     (model_dir / 'broken.json').write_text('{"document_id": "broken", "rec', encoding='utf-8')
 
-    frame = runner.consolidate(config, [config.llm.models[0]])
+    skipped: list[str] = []
+    frame = runner.consolidate(config, [config.llm.models[0]], skipped=skipped)
     assert len(frame) == 2
-    assert runner.skipped_result_count() >= 1
+    assert len(skipped) >= 1
 
 
 def test_dedupe_prefers_higher_confidence_from_real_consolidate_output(
@@ -469,3 +487,75 @@ def test_dedupe_prefers_higher_confidence_from_real_consolidate_output(
     assert frame['record_confidence'].notna().all()
     best = frame.sort_values('record_confidence', ascending=False).iloc[0]
     assert best['reported_eps'] == pytest.approx(0.55)
+
+
+def test_cascade_calls_second_model_only_on_failure(config: Config, tmp_path: Path) -> None:
+    """A confident first answer is not re-extracted by the second model."""
+    documents = _documents(tmp_path, count=2)
+    callers = {
+        'model-a:free': CountingFakeCaller(REPLY),
+        'model-b:free': CountingFakeCaller(OTHER_REPLY),
+    }
+    asyncio.run(
+        run_extraction(
+            config,
+            documents,
+            caller_factory=lambda model: callers[model],
+            models=['model-a:free', 'model-b:free'],
+            queue_path=resolve_data_path(config, config.extraction.review_queue_path),
+        )
+    )
+    assert callers['model-b:free'].calls == []
+
+
+def test_cascade_escalates_on_failure(config: Config, tmp_path: Path) -> None:
+    """When the first model fails outright, the second is asked."""
+    documents = _documents(tmp_path, count=1)
+    callers = {
+        'model-a:free': CountingFakeCaller(fail_document='doc0'),
+        'model-b:free': CountingFakeCaller(OTHER_REPLY),
+    }
+    outcomes = asyncio.run(
+        run_extraction(
+            config,
+            documents,
+            caller_factory=lambda model: callers[model],
+            models=['model-a:free', 'model-b:free'],
+            queue_path=resolve_data_path(config, config.extraction.review_queue_path),
+        )
+    )
+    assert callers['model-b:free'].calls == ['doc0']
+    assert [outcome.status for outcome in outcomes] == ['ok']
+
+
+def test_llm_settings_change_invalidates(
+    config: Config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Temperature, max_tokens and reasoning are part of the fingerprint."""
+    import dataclasses
+
+    document = _documents(tmp_path, count=1)[0]
+    base = runner.fingerprint(config, document, 'model:free', 'prompt-digest')
+
+    def changed(**llm: object) -> str:
+        variant = dataclasses.replace(config, llm=dataclasses.replace(config.llm, **llm))
+        return runner.fingerprint(variant, document, 'model:free', 'prompt-digest')
+
+    assert changed(temperature=0.7) != base
+    assert changed(max_tokens=int(config.llm.max_tokens) * 2) != base
+    assert changed(reasoning_effort='high') != base
+
+
+def test_stale_fingerprint_not_consolidated(config: Config, tmp_path: Path) -> None:
+    """A result written under different settings is left out, not silently mixed in."""
+    documents = _documents(tmp_path, count=2)
+    _run(config, documents, CountingFakeCaller())
+    model_dir = extractions_dir(config) / runner.model_slug(config.llm.models[0])
+    path = model_dir / 'doc1.json'
+    payload = json.loads(path.read_text(encoding='utf-8'))
+    payload['fingerprint'] = 'stale-fingerprint'
+    path.write_text(json.dumps(payload), encoding='utf-8')
+
+    frame = runner.consolidate(config, [config.llm.models[0]])
+    assert frame['document_id'].tolist() == ['doc0']
+    assert (extractions_dir(config) / 'superseded').is_dir()
