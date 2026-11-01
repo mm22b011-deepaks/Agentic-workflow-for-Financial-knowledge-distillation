@@ -228,3 +228,45 @@ def test_runner_stores_diagnostics_and_corrected_values(config: Config, tmp_path
     assert row['revenue_yoy_growth_pct'] == pytest.approx(8.0)
     assert bool(row['truncated']) is True
     assert row['chars_sent'] < row['chars_total']
+
+
+def test_no_pack_phrases_sends_the_document_whole(config: Config, tmp_path: Path) -> None:
+    """With packing off, nothing is cut: the model sees the whole release."""
+    import dataclasses as dc
+
+    body = 'HEADLINE ' + ('filler ' * 2000) + 'Outlook: guidance unchanged. ' + ('tail ' * 2000)
+    path = tmp_path / 'doc.txt'
+    path.write_text(body, encoding='utf-8')
+    document = runner.Document(
+        document_id='doc0',
+        cik='0000000001',
+        report_date='2026-01-15',
+        document_type='EX-99.1',
+        raw_path=path,
+        sha256='h0',
+    )
+    unpacked = dc.replace(
+        config,
+        extraction=dc.replace(config.extraction, max_doc_chars=24_000, pack_phrases=()),
+    )
+    prepared = runner.prepare_text(unpacked, document)
+    assert prepared.chars_sent == prepared.chars_total
+    assert not prepared.truncated
+    assert 'HEADLINE' in prepared.text and 'Outlook: guidance unchanged.' in prepared.text
+
+
+def test_pack_phrases_change_the_fingerprint(config: Config, tmp_path: Path) -> None:
+    """Turning packing off must invalidate records written with it on."""
+    import dataclasses as dc
+
+    document = runner.Document(
+        document_id='doc0',
+        cik='0000000001',
+        report_date='2026-01-15',
+        document_type='EX-99.1',
+        raw_path=tmp_path / 'doc.txt',
+        sha256='h0',
+    )
+    packed = runner.fingerprint(config, document, 'model:free', 'digest')
+    unpacked_config = dc.replace(config, extraction=dc.replace(config.extraction, pack_phrases=()))
+    assert runner.fingerprint(unpacked_config, document, 'model:free', 'digest') != packed

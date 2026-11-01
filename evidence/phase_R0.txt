@@ -139,13 +139,35 @@ document_index.v2.from-live-20261101.parquet; restoring it in place needs the hu
 
 5. LIVE GATE ITEMS
 ------------------
-BLOCKED on H-A (OpenRouter 401; an exported, too-short value shadows the file):
-  - 10+ real Item 2.02 releases across >=5 companies and >=2 seasons with --sample
-  - per-field coverage, empty-completion rate, review rate by reason, 429 count,
-    truncated share
+5a. Key (2026-11-01): RESOLVED. `env -u OPENROUTER_API_KEY scripts/smoke_llm.py`
+    -> api key source=env, key_len=73, no shadow warning; both models answered 'ready'.
+    The 401 was the exported 31-character variable shadowing `.env`. The key's value was
+    pasted into a chat transcript and must be rotated.
+
+5b. Live extraction (2026-11-01):
+$ env -u OPENROUTER_API_KEY python -m nowcast.cli extract \
+      --set data.document_index=document_index.v2.from-live-20261101.parquet \
+      --set extraction.pack_phrases= --set extraction.max_doc_chars=200000 \
+      --set llm.max_tokens=16384 --sample 60 --seed 42
+  documents 60, companies 57, seasons 8 (2025Q1..2026Q4), whole text
+  result: 60 ok, 0 failed; review 38/60; empty extractions 1; truncated 0
+  model calls: 102 POSTs = 60 documents + 42 truncation retries; 0 x 429
+  cascade escalations: 0 (no 'cascade:' line; every record from the first model)
+
+  coverage (non-null / 60): reported_eps 59, tone 59, eps_basis 59, prior_year_eps 58,
+  revenue 54, revenue_yoy_growth_pct 43, guidance_direction 36
+  review reasons: validation_issues 37, number_not_in_source 31, quote_not_found 31,
+  low_confidence 13, empty_extraction 1, number_not_in_quote 1, quote_too_long 1
+
+  NOT a passing gate: 31/60 documents carry a number absent from the text their quote
+  matched. Diagnosis is the next step; no threshold was relaxed.
+
+5c. Still BLOCKED / NOT DONE
   - model-bakeoff table over every configured ':free' model
-  - rebuilt index counts by drop reason and measure_truncation on the rebuilt index
   - 5 records read against the source text by the human
+  - H-d pagination, H-e, H-f, H-g
+  - the populated index was replaced by an empty `--force` rebuild; its contents are
+    preserved in document_index.v2.from-live-20261101.parquet and await the human
 
 6. FINAL GATE OUTPUT (2026-11-01, run with no other process touching the tree)
 --------------------------------------------------------------------------

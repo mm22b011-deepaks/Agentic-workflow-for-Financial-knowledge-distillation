@@ -44,6 +44,9 @@ class Document:
     document_type: str
     raw_path: Path
     sha256: str
+    # Which (company, season) this document was sampled for. It is part of the result
+    # key: run A must not resume run B's result just because it is the same accessions.
+    season: str = ''
 
 
 @dataclass
@@ -154,7 +157,12 @@ def prepare_text(config: Config, document: Document) -> DocumentText:
         text = pick_sections(
             text, dict(config.parsing.section_patterns), list(config.parsing.section_patterns)
         )
-    packed = pack(text, int(config.extraction.max_doc_chars), tuple(config.extraction.pack_phrases))
+    limit = int(config.extraction.max_doc_chars)
+    phrases = tuple(config.extraction.pack_phrases)
+    # With no phrases configured the document is sent whole: packing exists to rescue
+    # facts from a long release, and splitting when it is off could separate a figure
+    # from the sentence that qualifies it.
+    packed = pack(text, limit, phrases) if phrases else pack(text, max(limit, len(text)), ())
     return DocumentText(
         text=packed.text,
         chars_total=packed.chars_total,
@@ -195,6 +203,10 @@ def validation_settings(config: Config) -> dict[str, object]:
         'max_tokens': int(config.llm.max_tokens),
         'reasoning': config.llm.reasoning_params(),
         'units_rule': UNITS_RULE_VERSION,
+        # Packing decides which sentences exist in the prompt, so a different phrase set
+        # is a different question. Without this, turning packing off would resume the
+        # old packed records as if they answered it.
+        'pack_phrases': [str(phrase) for phrase in extraction.pack_phrases],
     }
 
 
@@ -202,15 +214,22 @@ def fingerprint(config: Config, document: Document, model: str, prompt_digest: s
     """Return the resume fingerprint for one document/model/prompt/settings combination."""
     digest = hashlib.sha256()
     digest.update(document.sha256.encode('utf-8'))
+    digest.update(str(document.season).encode('utf-8'))
     digest.update(prompt_digest.encode('utf-8'))
     digest.update(model.encode('utf-8'))
     digest.update(json.dumps(validation_settings(config), sort_keys=True).encode('utf-8'))
     return digest.hexdigest()
 
 
-def result_path(config: Config, model: str, document_id: str) -> Path:
-    """Return the JSON result path for a document under one model."""
-    return extractions_dir(config) / model_slug(model) / f'{document_id}.json'
+def result_path(config: Config, model: str, document_id: str, season: str = '') -> Path:
+    """Return the JSON result path for a document under one model.
+
+    A run samples (company, season) pairs, and the same filing can be sampled for one
+    season and not another. The season is therefore part of the file name: two runs with
+    different cohorts must not read each other's results.
+    """
+    stem = f'{document_id}.{season}' if season else document_id
+    return extractions_dir(config) / model_slug(model) / f'{stem}.json'
 
 
 def _already_done(path: Path, expected: str) -> bool:
@@ -385,7 +404,7 @@ async def run_extraction(
     async def _process_document(model: str, document: Document) -> ExtractionOutcome:
         """The unguarded per-document path; every exception is handled by _process."""
         expected = fingerprint(config, document, model, digest)
-        target = result_path(config, model, document.document_id)
+        target = result_path(config, model, document.document_id, document.season)
         if _already_done(target, expected):
             return ExtractionOutcome(document.document_id, model, 'skipped', skipped=True)
         async with semaphore:
@@ -481,6 +500,7 @@ async def run_extraction(
                     'report_date': document.report_date,
                     'document_type': document.document_type,
                     'sha256': document.sha256,
+                    'season_sampled': document.season,
                     'prompt_digest': digest,
                     'raw_text': raw_text,
                     'record': record.model_dump(mode='json'),
@@ -524,7 +544,10 @@ async def run_extraction(
                 first,
                 outcome.status,
             )
-            return await _process(active_models[1], document)
+            # The escalated attempt is the last one for this document: a document gets
+            # one extraction per model at most, never a retry loop across models.
+            fallback = _process(active_models[1], document)
+            return await fallback
         payload = _load_result(config, first, document.document_id)
         record = (payload or {}).get('record')
         if not isinstance(record, dict):
@@ -553,14 +576,18 @@ async def run_extraction(
 
 
 def _load_result(
-    config: Config, model: str, document_id: str, skipped: list[str] | None = None
+    config: Config,
+    model: str,
+    document_id: str,
+    skipped: list[str] | None = None,
+    season: str = '',
 ) -> dict[str, Any] | None:
     """Load one stored result payload, returning None when absent or unreadable.
 
     A truncated or corrupted file is skipped and counted, not raised: one bad file must
     not abort consolidation after a long extraction run.
     """
-    path = result_path(config, model, document_id)
+    path = result_path(config, model, document_id, season)
     if not path.is_file():
         return None
     try:
@@ -631,6 +658,7 @@ def _settings_digest(config: Config, payload: dict[str, Any], model: str) -> str
         document_type=str(payload.get('document_type') or ''),
         raw_path=Path(),
         sha256=sha,
+        season=str(payload.get('season_sampled') or ''),
     )
     return fingerprint(config, proxy, model, str(payload.get('prompt_digest') or ''))
 
@@ -661,7 +689,11 @@ def consolidate(
         directory = extractions_dir(config) / model_slug(model)
         rows: list[dict[str, Any]] = []
         for path in sorted(directory.glob('*.json')):
-            payload = _load_result(config, model, path.stem, skipped)
+            # The file stem is "<document_id>.<season>"; a legacy stem has no season.
+            document_id, _, season = path.stem.rpartition('.')
+            if not document_id:
+                document_id, season = path.stem, ''
+            payload = _load_result(config, model, document_id, skipped, season)
             if payload is None:
                 continue
             # Only the document hash and the settings need re-checking here; the prompt
@@ -680,6 +712,7 @@ def consolidate(
                 continue
             row = {
                 'document_id': payload['document_id'],
+                'season_sampled': season or payload.get('season_sampled'),
                 'cik': payload.get('cik'),
                 'report_date': payload.get('report_date'),
                 'document_type': payload.get('document_type'),

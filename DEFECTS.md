@@ -389,5 +389,22 @@ the legacy source. The populated index is preserved in
 `document_index.v2.from-live-20261101.parquet` and **has not been restored in place** —
 that needs the human (the restore was blocked by the local-destruction guard).
 
-Blocked on the OpenRouter key: live extraction, per-field coverage, empty-completion rate,
-review rate, 429 count, bakeoff, H-a live verification.
+**Live extraction ran 2026-11-01** (the key works; the earlier 401 was an exported
+variable shadowing `.env`): 60 documents, 57 companies, 8 seasons, whole text, one call per
+document per model in the normal case — 60 ok, 0 failed, 102 calls, 0 × 429. The extra
+42 were truncation retries (`finish_reason=length` at `max_tokens=16384`), not
+escalations, empty extractions 1, truncated 0,
+review 38/60. Coverage: reported_eps 59, tone 59, eps_basis 59, prior_year_eps 58,
+revenue 54, growth 43, guidance_direction 36.
+
+The run is **not a clean pass**: 31/60 documents carry a number absent from the text
+their quote matched (`number_not_in_source`) and 31 have `quote_not_found`. Diagnosing
+that is the next task; no threshold was relaxed to make the numbers look better.
+
+The 102 calls were 60 documents plus 42 truncation retries, not 42 escalations: the log
+contains no `cascade:` line and every consolidated record came from the first model. So
+H-h's one-call rule is **not yet demonstrated** — 42 documents needed a second call because
+the reply was cut at `max_tokens` — and the cascade and limiter still have no live
+verification.
+
+Still open: bakeoff, H-d pagination, H-e, H-f, H-g, H-a live verification.

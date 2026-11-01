@@ -1,6 +1,6 @@
 # status.md — where the build actually stands
 
-Last updated: 2026-11-01 (pass 3)
+Last updated: 2026-11-02
 
 ## Governing spec
 
@@ -14,16 +14,19 @@ excluded or non-comparable). Decisions are in `DECISIONS.md` (D1–D17). Rules a
 
 ```
 ruff check .            -> All checks passed
-ruff format --check .   -> 100 files formatted
+ruff format --check .   -> 104 files formatted
 mypy src                -> Success: no issues found in 46 source files
-pytest -q               -> 336 passed
-mutation check          -> 33 mutants, 33 killed, 0 survived
+pytest -q               -> 338 passed
+mutation check          -> 43 mutants, 42 killed; last survivor re-verified as killed
+                           by test after its fixture was corrected
+live extraction         -> 60 documents, 60 ok, 0 failed (2026-11-01)
 ```
 
-These cover the offline suite after reviewer pass 2 (F1–F19, N1–N7 and H1–H5
-remainders, M1/M4). **Gate R0 is not green**: its live half is blocked on H-A, an
-exported API key shadowing the one in `.env` (see Open, item 1). `evidence/phase_R0.txt`
-holds the commands, the outputs and the per-item test map.
+These cover the offline suite after pass 3 (B1–B7, H-a/b/c/h, M-a). The key now works,
+so the live half of Gate R0 has run once; its result is in "Live extraction" below and in
+`evidence/phase_R0.txt`. **Gate R0 is still not green**: the run's review rate is too high
+to call it a passing extraction (31 of 60 documents carry a number that is absent from
+the text their quote matched), and H-d/H-e/H-f/H-g remain unbuilt.
 
 ## Done and verified
 
@@ -94,11 +97,12 @@ report/abort/atomic-download items, N7's rebuild into `data.document_index` with
 `items` column and `superseded/` handling, H1 (whole-path per-document guard), H2
 (mutation check, extended), H3 (one dotenv path, portable scripts, split locks), H4
 (settings-complete fingerprint), M2 (unknown top-level section rejected).
-Live-only items remain blocked by the OpenRouter 401: N2's reasoning probe and
-`model-bakeoff`, N3's per-field coverage rerun, N6's high-volume CIK, N7's real rebuild,
-and Gate R0. M1 stays open except the dead `sections` dict (removed in H5); M4 is
-verified except that `tresata.zip` is tracked in git by accident and awaits a deliberate
-removal with the human's go-ahead.
+The live items that were blocked on the 401 are now **unblocked** (2026-11-01): N3's
+per-field coverage has been measured (see "Live extraction"), and the 401's cause was
+the shadowing export, not the key. Still unbuilt: N2's `model-bakeoff` live run, N6's
+high-volume CIK check, H-d's pagination, H-e, H-f, H-g. M1 stays open except the dead
+`sections` dict (removed in H5); M4 is verified except that `tresata.zip` is tracked in
+git by accident and awaits a deliberate removal with the human's go-ahead.
 
 ### Pass 3 (2026-11-01)
 Fixed: B1 cohort is per (company, season) and matches what was downloaded; B2 a number
@@ -120,6 +124,32 @@ first.
 M-b/M-c (tracked files, your decision). The populated `data/document_index.v2.parquet` was
 replaced by an empty `--force` rebuild; its contents are in
 `data/document_index.v2.from-live-20261101.parquet` and restoring it needs your go-ahead.
+
+### Live extraction (2026-11-01) — first real run, and what it says
+
+60 documents, 57 companies, 8 seasons (2025Q1–2026Q4), whole text sent (no packing),
+**60 ok, 0 failed, 102 model calls, 0 × 429**. The 102 is 60 documents + **42 truncation retries** (no cascade escalation: the log has zero `cascade:` lines and only one model produced records).
+Empty extractions 1, truncated 0, flagged for review 38 of 60.
+
+| Field | Non-null / 60 |
+|---|---|
+| reported_eps | 59 |
+| tone | 59 |
+| eps_basis | 59 |
+| prior_year_eps | 58 |
+| revenue | 54 |
+| revenue_yoy_growth_pct | 43 |
+| guidance_direction | 36 |
+
+Review reasons: `validation_issues` 37, `number_not_in_source` 31, `quote_not_found` 31,
+`low_confidence` 13, `empty_extraction` 1, `number_not_in_quote` 1, `quote_too_long` 1.
+
+**Reading:** the extraction works — EPS and revenue are found in almost every release and
+nothing was truncated. It is **not** a clean pass: 31 of 60 documents contain a number
+absent from the text their quote matched. Two candidate causes, neither yet proven: the
+model paraphrasing instead of copying, and fuzzy matching landing on the wrong window in
+a long uncut document. The next step is reading several flagged records against source,
+not loosening the threshold.
 
 ### Reviewer pass 2 (2026-11-01)
 Offline half of Gate R0 finished: F1–F16, the N1–N7 and H1–H5 remainders, and M1/M4.
@@ -146,7 +176,11 @@ that R4's SQL is checked against (D7).
 
 ## Open
 
-1. **OpenRouter still returns 401 `User not found` — and the cause is now measured.**
+1. **RESOLVED 2026-11-01: the key works.** The 401 was the exported variable shadowing
+   `.env`; with `env -u OPENROUTER_API_KEY` the 73-character key in `~/tresata/.env`
+   authenticates and both models answer. **Rotate that key**: its value was pasted into a
+   chat transcript and must be treated as compromised.
+2. **(was) OpenRouter still returns 401 `User not found` — and the cause is now measured.**
    `scripts/smoke_llm.py` reports where the key came from: an **exported**
    `OPENROUTER_API_KEY` (far shorter than an OpenRouter key) shadows the one in `.env`, so the file's key has
    never been tried. `unset OPENROUTER_API_KEY`, then rerun the smoke test; if it still
