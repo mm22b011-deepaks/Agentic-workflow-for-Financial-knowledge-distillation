@@ -226,3 +226,25 @@ pre-1.0 and follow the phase gates in `tasks.md`.
 H-d (`filings.files` pagination), H-e (bakeoff ledger, p50/p95, 429, accuracy mode), H-f
 (model-priority dedupe), H-g (cache-after-validate, fiscal_year, theme directions,
 prior-year basis). M-b/M-c await the decision on tracked files.
+
+### Added — 2026-11-02 (live run follow-ups)
+
+- **Whole-document extraction is now configurable.** With `extraction.pack_phrases` empty
+  the runner sends the converted document whole instead of cutting it; packing stays
+  available by listing phrases. `pack_phrases` is part of the fingerprint, so switching
+  between packed and whole can no longer resume records written the other way.
+- **A result is keyed by (document, sampled season).** The file is
+  `<document_id>.<season>.json`, and the consolidated frame carries `season_sampled`.
+  Two runs with different cohorts cannot read each other's records.
+- `extraction.max_repairs` defaults to **0**: a parse failure escalates in the model
+  cascade rather than re-prompting the same model.
+
+### Measured — 2026-11-01 live extraction
+
+60 documents, 57 companies, eight seasons, whole text: 60 ok, 0 failed, 102 calls
+(60 + 42 truncation retries), 0 × 429, 1 empty extraction, 0 truncated, 38/60 flagged.
+Coverage: reported_eps 59, tone 59, eps_basis 59, prior_year_eps 58, revenue 54,
+revenue_yoy_growth 43, guidance_direction 36. Review reasons: validation_issues 37,
+number_not_in_source 31, quote_not_found 31, low_confidence 13.
+**Not a clean pass** — the 31 `number_not_in_source` records are the next thing to
+diagnose.

@@ -104,7 +104,10 @@ budget:
 extraction:
   schema_version: v1
   max_doc_chars: 24000
-  max_repairs: 2
+  # One document is one model call. A parse failure escalates in the cascade rather than
+  # re-prompting the same model, so a document can never cost more than one call per
+  # model (plus a single larger-budget retry when the provider cut the reply).
+  max_repairs: 0
   quote_match_min_ratio: 0.85
   confidence_penalty_on_issue: 0.7
   min_confidence: 0.5

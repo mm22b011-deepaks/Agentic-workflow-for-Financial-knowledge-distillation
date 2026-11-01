@@ -3,8 +3,8 @@
 Status legend: `[x]` done · `[~]` in progress · `[ ]` todo · `[!]` blocked on a decision
 
 Last gate run: `ruff check . && ruff format --check . && mypy src && pytest -q` →
-`ruff` clean, **100 files formatted**, `mypy` clean on **46 source files**,
-**336 tests passing** (2026-11-01, after pass 3: B1–B7, H-a/H-b/H-c/H-h, M-a).
+`ruff` clean, **104 files formatted**, `mypy` clean on **46 source files**,
+**338 tests passing** (2026-11-02, after pass 3 and the first live extraction).
 `evidence/phase_R0.txt` maps each item to its test.
 
 ## Pass 3 (2026-11-01) — item status
@@ -146,14 +146,23 @@ Two structural changes to existing keys:
       `evidence/phase_R0.txt` written with the per-item test map.
 - [!] Gate R0 live half: 10+ real documents with `--sample`, per-field coverage, bakeoff
       table, rebuild counts, `measure_truncation` on the rebuilt index, 5 human-read
-      records. Blocked on H-A.
+      records. **Live run done 2026-11-01**; the review rate (38/60) means it is not yet
+      a passing gate. Remaining: diagnose the 31 `number_not_in_source` records, the
+      bakeoff, and 5 records read by the human.
 
 ### Live work outstanding for R0
-- [!] **H-A first**: `unset OPENROUTER_API_KEY`, rerun `scripts/smoke_llm.py`. The
-  smoke test now proves the exported key was shadowing `.env` and is not a valid key length.
-- `[ ]` Then `scripts/extract_sample.py --sample 10 --seed 42`: 10 releases, ≥5 companies,
-  ≥2 seasons; report per-field coverage, empty-completion rate, review rate by reason.
-- `[x]` `evidence/phase_R0.txt` written; its live sections are marked BLOCKED.
+- [x] **H-A resolved 2026-11-01.** The exported variable was shadowing `.env`; with
+  `env -u OPENROUTER_API_KEY` the file's 73-character key authenticates and both models
+  answer. **Rotate the key** — its value was pasted into a chat transcript.
+- [x] Live extraction run 2026-11-01: 60 documents, 57 companies, 8 seasons, whole text,
+  one call per document per model. **60 ok, 0 failed, 102 calls, 0 × 429**. The extra 42 calls are truncation retries, not escalations: the log has zero `cascade:` lines and every record came from the first model. Empty
+  extractions 1, truncated 0, review 38/60. Coverage: EPS 59, tone 59, basis 59,
+  prior EPS 58, revenue 54, growth 43, guidance 36.
+- [!] **The run is not a clean pass.** 31/60 documents have a number absent from the
+  text their quote matched (`number_not_in_source`), 31 have `quote_not_found`. Diagnose
+  by reading flagged records against source before touching any threshold.
+- `[x]` `evidence/phase_R0.txt` written; the live extraction numbers were added
+  2026-11-02.
 - [x] **Resolved by Q4:** nothing is overwritten or moved. The rebuilt index is written
   to `data.document_index` (default `data/document_index.v2.parquet`); the old files
   stay under `data/index_backup/`. The rebuild was then **run offline** on 2026-11-01:

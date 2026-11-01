@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import logging
 from pathlib import Path
@@ -265,10 +266,16 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     # takes one document per company first, spread across seasons, so a capped run
     # describes the index rather than the alphabet.
     if args.sample:
-        from nowcast.extraction.selection import describe, stratified_sample
+        from nowcast.extraction.selection import describe, season_of_date, stratified_sample
 
         seeds = int(args.seed) if args.seed is not None else int(config.aggregation.sample_seed)
         documents = stratified_sample(documents, int(args.sample), seeds)
+        # The season a document was sampled for is part of its result key, so a different
+        # cohort cannot silently resume this run's records.
+        sampled = [
+            dataclasses.replace(item, season=season_of_date(item.report_date)) for item in documents
+        ]
+        documents = sampled
         LOGGER.info('sampled %s seed=%d', describe(documents), seeds)
     elif args.limit:
         LOGGER.warning('--limit takes the head of the index, which is not a representative sample')

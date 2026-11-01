@@ -792,3 +792,49 @@ so an ordinary page containing an inline SVG `<text>` is not truncated at that p
   done; M-b/M-c need the human's decision on tracked files (H-B) and are not done.
 - Live extraction, per-field coverage, empty rate, review rate, 429 count: **blocked** on
   the OpenRouter key.
+
+
+## D19 — 2026-11-02: whole-document extraction, one call per document (human instruction)
+
+Two instructions from the human, and what each needed in code rather than in flags:
+
+1. **"Don't split the text and send."** `extraction.pack_phrases` now decides: with an
+   empty list the runner sends the converted document whole; with phrases listed it packs.
+   Simply setting `max_doc_chars` high would not have done it — the old path always cut at
+   the limit, so "packing off" still silently split.
+2. **"One doc needs only one extraction/llm call if it passes without errors."**
+   `extraction.max_repairs` is now 0: a parse failure escalates in the cascade instead of
+   re-prompting the same model. Results are keyed `<document_id>.<season>.json` and carry
+   `season_sampled`, so a run with a different cohort cannot resume another run's records
+   and count that as done.
+
+**`pack_phrases` had to enter the fingerprint.** Without it, turning packing off would
+have resumed the old packed records — a run that looked successful while the model had
+never seen the full text. This is the same class of bug as the missing few-shot hash in
+D16.
+
+### What the live run then measured, and the correction to my own first report
+
+60 documents, 57 companies, 8 seasons: 60 ok, 0 failed, 0 × 429, 1 empty extraction,
+0 truncated, 38/60 flagged for review.
+
+**I first reported the 102 model calls as "60 + 42 escalations". That was wrong.** The log
+contains zero `cascade:` lines and every consolidated record is from the first model; the
+other 42 calls were truncation retries — the reply was cut at `max_tokens=16384` and
+retried once at double. So the one-call rule is **not yet demonstrated**: 42 of 60
+documents needed a second call because the answer was too long for the budget, which is a
+real finding for the bakeoff (a bigger reply budget is cheaper than a retry).
+
+### The run is not a clean pass
+
+31 of 60 documents carry a number absent from the text their quote matched, and 31 have a
+quote not found in the source. No threshold was changed. The next step is reading several
+flagged records against their source to decide whether the model paraphrases or the fuzzy
+match lands on the wrong window in a long uncut document — with the text now sent whole,
+both are plausible and neither is proven.
+
+### Corrected doc lag
+
+The docs were last written at 13:31 on 2026-11-01, before the live runs and the final code
+edits. They now carry the measured numbers above, the 338-test gate, 104 formatted files
+and the corrected call-count interpretation.
