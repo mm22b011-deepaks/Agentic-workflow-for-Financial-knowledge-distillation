@@ -4,6 +4,7 @@ A private Linux workstation pipeline for index-level earnings proxies, with a Re
 
 ```bash
 ./setup.sh bootstrap
+./setup.sh init
 ./setup.sh check
 ./setup.sh demo
 ./setup.sh website
@@ -11,9 +12,9 @@ A private Linux workstation pipeline for index-level earnings proxies, with a Re
 
 Open http://127.0.0.1:8767 after starting the website. The launcher resolves its checkout and works from another directory. Bootstrap installs pinned Python, Node and uv through mise, synchronizes locked dependencies and builds the frontend. It does not edit shell profiles or require root. Linux prerequisites: curl, tar, make and git. The local setup was exercised on Ubuntu 24.04 ARM64; other declared CI targets remain unverified until exercised.
 
-Normal commands use environment variables exclusively. Supply `OPENROUTER_API_KEY`, a contact-bearing `SEC_USER_AGENT`, and optionally `DATA_DIR` in the launching process. Do not put secrets in configuration or command arguments. Only `scripts/smoke_llm.py` may internally read an untracked .env file. Key rotation remains an account-owner task.
+`./setup.sh init` accepts a hidden key and SEC contact, stores local credentials in an ignored mode-600 `.env`, and writes non-secret scope/quota choices to ignored `configs/local.yaml`. The dedicated launcher reads dotenv without overriding exported values; direct library execution reads the environment. Keys never belong in arguments, logs or archives. `./setup.sh init --yes --no-key --scope standard` configures offline operation without prompts.
 
-The website has Pipeline, Quality, Optimise, inspector and shared Markdown Help views. Live controls use the same services as the CLI, persistent SQLite jobs and independent workers. Replay loads validated Index JSON and disables execution. API events can be read again after a restart; cancellation occurs between items. Fingerprinted resume replays stages and uses the extraction cache and downloaded-file checks.
+The website is a node canvas with Flow, Quality and Cost overlays. Double-click a node to inspect input, parameters and output; CLI-generated controls and schemas share the backend contracts. Evidence and human verdicts require explicit Internal trace. Replay disables execution and accepts only identifier-free Index JSON. The schedule strip uses the same durable jobs, events and quota reservations as the CLI.
 
 ```bash
 ./setup.sh cli --help
@@ -26,7 +27,7 @@ The website has Pipeline, Quality, Optimise, inspector and shared Markdown Help 
 ./setup.sh cli aggregate
 ```
 
-The old `python -m nowcast.cli` interface remains available. Configuration lives in [configs/config.yaml](configs/config.yaml); KPI definitions, workflow DAGs, node ports, limits and XBRL concept candidates are in [configs/registry.yaml](configs/registry.yaml). Project-relative paths resolve against the actual configuration directory plus paths.project_dir. Runtime artifacts live beneath the configured data root. Production defaults visit the full eligible scope; sampling and limits require explicit verification settings.
+The old `python -m nowcast.cli` interface remains available. Configuration lives in [configs/config.yaml](configs/config.yaml); KPI definitions, workflow DAGs, node ports, limits and XBRL concept candidates are in [configs/registry.yaml](configs/registry.yaml). Project-relative paths resolve against the actual configuration directory plus paths.project_dir. Runtime artifacts live beneath the configured data root. The default is a frozen 40-company × four-season panel (seed 42). The configured custom profile retains full-window capability; changing a frozen panel never silently redraws it.
 
 The API binds to `0.0.0.0:8767` and checks workstation Host, Origin and CSRF tokens. Open `http://<workstation-ip>:8767` from another device. It supports one trusted workstation operator, one active artifact writer and no uploaded code. Default Index view omits identifiers. Internal trace is disabled unless the server operator explicitly enables it after NDA confirmation; it is session-only and excluded from exports. Do not expose this server through a public tunnel.
 
@@ -37,3 +38,5 @@ See [CLI reference](docs/cli.md), [shared Help](docs/help.md), [architecture](do
 For exact local results, operating limits and remaining human actions, read [HANDOVER.md](HANDOVER.md). Public receipts are under [evidence](evidence/local-acceptance.json); private filings, panels, logs and screenshots remain under the ignored data root.
 
 Network binding was requested explicitly. Port 8765 is occupied by the auto-restarting system taskd service on the development workstation, so Tresata defaults to 8767. Override with `./setup.sh website --port 9000`. There is no login: reachable network clients can obtain a session and operate jobs. Same-origin/CSRF checks protect browser requests but do not authenticate network users. See [ADR 006](docs/adr/006-network-binding.md).
+
+Schedule: `./setup.sh schedule plan`, `status`, `run --once`, `pause`, and `resume`. Timer installation is explicit. Free-only models, persisted UTC request limits and a shared writer guard apply to both API and scheduler jobs. Current delivery order is CLI acceptance, website acceptance, then the approved model batch. See [ADR 012](docs/adr/012-verified-allowance-and-delivery-order.md).

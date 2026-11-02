@@ -1,0 +1,39 @@
+{
+  "checked_at_utc": "2026-11-02T15:27:10.313392+00:00",
+  "scope": {
+    "companies": 40,
+    "planned_pairs": 160,
+    "releases": 156
+  },
+  "bakeoff_requests": 20,
+  "selected_model": "nvidia/nemotron-3.5-lightning:free",
+  "requests_reserved_today": 31,
+  "configured_cap": 1000,
+  "minute_cap": 20,
+  "primary_status": "running",
+  "primary_saved_results_in_scope": 12,
+  "models_hold": null,
+  "tasks": {
+    "doctor": "done",
+    "members": "done",
+    "panel": "done",
+    "ingest": "done",
+    "index": "done",
+    "estimate": "done",
+    "bakeoff": "done",
+    "extract": "running",
+    "aggregate": "pending",
+    "export": "pending",
+    "labels": "pending",
+    "quality": "pending",
+    "report": "pending",
+    "labels-30": "pending",
+    "spot-check-5": "pending",
+    "nda": "pending",
+    "xbrl": "blocked"
+  },
+  "real_accuracy": null,
+  "final_kpis": "pending aggregation",
+  "api_privacy_endpoints_passed": 10,
+  "saved_results_note": "Counts existing result files in scope; not a count of new calls, usable observations or human-verified records."
+}

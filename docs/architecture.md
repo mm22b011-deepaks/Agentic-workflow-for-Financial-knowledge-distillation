@@ -15,3 +15,11 @@ The single-writer guard covers API-managed jobs in one DATA_DIR. Direct legacy C
 The registry supplies the closed KPI definitions to prompts, generated Help and UI. The four supported metric algorithms and field validation rules remain Python code, using configured vocabularies and thresholds. Arbitrary metric formulas and the missing requested tier specification are not implemented by editing registry metadata.
 
 The website binds to 0.0.0.0:8767 following an explicit network-access request. taskd owns port 8765 on the development workstation. Host validation accepts the connection's actual local address plus localhost/workstation names. Origin and CSRF checks remain enforced, but there is no login; reachable network clients have operator access. See ADR 006.
+
+## Canvas and inspection contracts
+
+`cli_registry.catalogue` reads argparse, including parent commands and flags. `configs/workflow-canvas.json` adds layout, icons, ports, subnodes and configuration bindings; `workflow_registry` validates the combined catalogue. `scripts/export_contracts.py` generates the built registry, response schemas, CLI reference and shared Help; the frontend generator emits TypeScript plus standalone Ajv validators. Runtime settings are served separately to prevent local overlays from drifting the built registry.
+
+`phase_services` exposes independently inspectable steps using existing parser, index, extraction and aggregation services. `inspection` reads known artifacts and immutable job snapshots; default responses project anonymous rows and aggregate values. Explicit session trace is additionally gated by the server. The labels endpoint validates record/field/value and atomically updates the private CSV under CSRF protection. `knowledge` publishes only the closed index KPI contract. No RAPTOR hierarchy is implemented.
+
+The feature folders under web/src separate canvas, inspector, lenses, runs and Help. Zustand persists layout/lens/theme only; privacy and artifact state remain in session memory. Graph files contain layout/typed edges only. Live jobs retain canonical CLI order and server-validated upstream artifacts. Replay never makes mutation requests.
