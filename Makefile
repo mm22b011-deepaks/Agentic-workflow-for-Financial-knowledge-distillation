@@ -1,5 +1,6 @@
 PYTHON ?= .venv/bin/python
 RUFF = .venv/bin/ruff
+MISE_BIN = $(if $(wildcard .tools/bin/mise),.tools/bin/mise,mise)
 .PHONY: bootstrap check lint format typecheck test demo website references web-build mutations audit-online
 bootstrap:
 	./setup.sh bootstrap
@@ -20,7 +21,7 @@ website:
 references:
 	$(PYTHON) scripts/export_contracts.py
 web-build:
-	cd web && npm run build
+	$(MISE_BIN) exec -- npm --prefix web run build
 mutations:
 	$(PYTHON) scripts/mutation_check.py --verbose
 audit-online:

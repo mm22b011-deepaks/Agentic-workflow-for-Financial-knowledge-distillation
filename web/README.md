@@ -1,4 +1,4 @@
 Install: `../setup.sh bootstrap`
-Dev: `npm run dev`
-Build: `npm run build`
-Regenerate registry: `npm run registry`
+Dev: `"$(command -v mise || printf ../.tools/bin/mise)" exec -- npm run dev`
+Build: `make -C .. web-build`
+Regenerate registry: `make -C .. references`
