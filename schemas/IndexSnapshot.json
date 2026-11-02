@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "label": {
+      "const": "index-level proxies",
+      "default": "index-level proxies",
+      "title": "Label",
+      "type": "string"
+    },
+    "source": {
+      "default": "pipeline",
+      "enum": [
+        "pipeline",
+        "synthetic"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "status": {
+      "default": "available",
+      "enum": [
+        "available",
+        "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "snapshots": {
+      "items": {
+        "additionalProperties": {
+          "type": [
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "patternProperties": {
+          "^metric_status_": {
+            "enum": [
+              "ok",
+              "insufficient_observations",
+              "no_consensus",
+              "unavailable",
+              "unverified"
+            ]
+          }
+        },
+        "properties": {
+          "as_of_date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?)?$",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "propertyNames": {
+          "pattern": "^(?:as_of_date|season_year|season_quarter|n_reported|n_expected|n_review_excluded|n_planned|n_attempted|execution_complete|n_eligible_releases|n_guidance_providers|share_reported|share_of_cohort|share_of_index|beat_rate|eps_growth_agg|revenue_growth_agg|guidance_raise_share|guidance_lower_share|guidance_ratio|tone_score_mean|suppressed|n_obs_[a-z_]+|theme_[a-z_]+_share|metric_status_[a-z_]+)$"
+        },
+        "type": "object"
+      },
+      "title": "Snapshots",
+      "type": "array"
+    }
+  },
+  "required": [
+    "snapshots"
+  ],
+  "title": "IndexSnapshot",
+  "type": "object"
+}

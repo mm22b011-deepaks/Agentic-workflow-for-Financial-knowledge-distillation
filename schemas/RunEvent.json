@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "sequence": {
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stage"
+    },
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sequence",
+    "job_id",
+    "stage",
+    "kind",
+    "created_at"
+  ],
+  "title": "RunEvent",
+  "type": "object"
+}
