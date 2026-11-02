@@ -53,21 +53,6 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
     return None
 
 
-def _provider_message(response: httpx.Response) -> str:
-    """Return the provider's own error text, or '' when the body has none."""
-    try:
-        payload = response.json()
-    except ValueError:
-        return response.text[:200]
-    if isinstance(payload, dict):
-        error = payload.get('error')
-        if isinstance(error, dict):
-            return str(error.get('message') or '').strip()
-        if error:
-            return str(error).strip()
-    return ''
-
-
 def _find_wait_seconds(payload: object, depth: int = 0) -> float | None:
     """Search a provider error body, at any depth, for a stated retry delay.
 
@@ -121,6 +106,8 @@ class LLMCaller:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         """Store settings and resolve the API key from the configured environment variable."""
+        if config.offline:
+            raise ConfigError('model requests are disabled in offline mode')
         self._config = config
         self._ledger = ledger
         api_key = os.environ.get(config.api_key_env, '')
@@ -258,11 +245,10 @@ class LLMCaller:
         if response.is_success:
             return
         status = response.status_code
-        detail = _provider_message(response)
         if status in AUTH_STATUSES:
-            raise AuthError(f'{status} from {response.request.url}: {detail}')
+            raise AuthError(f'{status}: credential rejected')
         if status in MODEL_STATUSES:
-            raise ModelNotFound(f'{status} from {response.request.url}: {detail}')
+            raise ModelNotFound(f'{status}: model or parameter rejected')
         retry_after = _retry_after_seconds(response)
         if retry_after is not None:
             raise RateLimited(
@@ -296,6 +282,8 @@ class LLMCaller:
         try:
             response = self._client.post('/chat/completions', json=payload)
             self._raise_for_status(response)
+            if self._api_key.encode() in response.content:
+                raise AuthError('provider response contained credential material')
             body = response.json()
         except Exception:
             if self._ledger is not None:

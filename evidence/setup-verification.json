@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "key_info_real_response": {
+    "key_info": "verified",
+    "pricing": "verified",
+    "authenticated": true,
+    "http_status": 200,
+    "model_requests": 0,
+    "account_usage": {
+      "used": 0,
+      "limit": 1000,
+      "remaining": 1000
+    }
+  },
+  "configured_daily_limit": 50,
+  "exported_key_check": {
+    "http_status": 401,
+    "model_requests": 0
+  },
+  "stored_key_check": {
+    "http_status": 200,
+    "model_requests": 0
+  },
+  "dotenv_mode": "0o600",
+  "focused_tests_passed": 14,
+  "mypy_source_files": 61,
+  "hidden_input_pty": "passed",
+  "secrets_scan": "passed",
+  "model_batches_started": false,
+  "timers_installed": false
+}

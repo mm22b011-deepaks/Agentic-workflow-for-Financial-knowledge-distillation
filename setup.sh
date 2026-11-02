@@ -23,13 +23,25 @@ if [[ "$action" == bootstrap ]]; then
   "$mise_bin" exec -- uv sync --locked --python 3.12.12 --extra dev
   "$mise_bin" exec -- npm --prefix web ci
   "$mise_bin" exec -- make references web-build
+  .venv/bin/python - <<'PY_STAMP'
+import hashlib
+from pathlib import Path
+paths = [Path('uv.lock'), Path('web/package-lock.json'), Path('mise.toml')]
+Path('.tools').mkdir(exist_ok=True)
+Path('.tools/bootstrap.sha256').write_text(hashlib.sha256(b''.join(path.read_bytes() for path in paths)).hexdigest() + '\n')
+PY_STAMP
   exit
+fi
+if [[ "$action" == init ]]; then
+  [[ -x "$checkout/.venv/bin/python" ]] || "$checkout/setup.sh" bootstrap
+  exec "$checkout/.venv/bin/python" -m nowcast.setup_wizard "$@"
 fi
 [[ -x "$mise_bin" ]] || { echo 'Run setup.sh bootstrap first.' >&2; exit 2; }
 case "$action" in
-  cli) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.app "$@" ;;
-  website) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.app serve "$@" ;;
+  cli) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher "$@" ;;
+  website) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher serve "$@" ;;
+  schedule|doctor) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher "$action" "$@" ;;
   demo) exec "$mise_bin" exec -- make demo ;;
   check) exec "$mise_bin" exec -- make check ;;
-  *) echo 'Usage: setup.sh {bootstrap|cli|website|demo|check}' >&2; exit 2 ;;
+  *) echo 'Usage: setup.sh {bootstrap|init|cli|website|schedule|doctor|demo|check}' >&2; exit 2 ;;
 esac

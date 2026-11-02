@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,9 @@ import pytest
 
 from nowcast.config import Config, load_config
 from nowcast.llm.caller import LLMResult
+
+# Checks never inherit the operator's local profile; layering has explicit tests.
+os.environ['TRESATA_IGNORE_LOCAL_CONFIG'] = '1'
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

@@ -49,7 +49,8 @@ def test_401_not_retried(config: Config) -> None:
     with pytest.raises(AuthError) as excinfo:
         wrapper.complete(MODEL, [{'role': 'user', 'content': 'hi'}])
     assert len(calls) == 1
-    assert 'User not found' in str(excinfo.value)
+    assert '401' in str(excinfo.value)
+    assert 'User not found' not in str(excinfo.value)
     assert wrapper.calls == 1
 
 
