@@ -8,7 +8,6 @@ from _bootstrap import ROOT
 from typer.testing import CliRunner
 
 from nowcast.app import app
-from nowcast.config import load_config
 from nowcast.contracts import (
     IndexSnapshot,
     Registry,
@@ -17,17 +16,34 @@ from nowcast.contracts import (
     RunStatus,
     ScheduleSnapshot,
 )
-from nowcast.registry import load_registry
 
 
 def main() -> None:
-    config = load_config(ROOT / 'configs/config.yaml')
-    registry = load_registry(config)
     for model in (Registry, RunRequest, RunStatus, RunEvent, IndexSnapshot, ScheduleSnapshot):
         path = ROOT / 'schemas' / (model.__name__ + '.json')
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(model.model_json_schema(), indent=2) + '\n')
-    (ROOT / 'web/src/registry.json').write_text(registry.model_dump_json(indent=2) + '\n')
+    from nowcast import contracts
+    from nowcast.workflow_registry import canvas_registry
+
+    (ROOT / 'web/src/registry.json').write_text(canvas_registry().model_dump_json(indent=2) + '\n')
+    for name in (
+        'CanvasRegistry',
+        'GraphDocument',
+        'StageSnapshot',
+        'PaneResponse',
+        'MetricSnapshot',
+        'EvidenceResponse',
+        'LabelRequest',
+        'LabelResponse',
+        'KPIKnowledgeBase',
+        'SessionResponse',
+        'SettingsResponse',
+    ):
+        model = getattr(contracts, name)
+        (ROOT / 'schemas' / (name + '.json')).write_text(
+            json.dumps(model.model_json_schema(), indent=2) + '\n'
+        )
     fixture = IndexSnapshot(
         source='synthetic',
         snapshots=[
@@ -41,14 +57,7 @@ def main() -> None:
         ],
     )
     (ROOT / 'web/src/index-fixture.json').write_text(fixture.model_dump_json(indent=2) + '\n')
-    help_text = (
-        '# Pipeline help\n\nAll metrics are index-level proxies. Replay never starts a job.\n\n'
-    )
-    for node in registry.nodes:
-        help_text += f'## {node.label}\n\n{node.help}\n\nCapability: {node.capability}.\n\n'
-    for kpi in registry.kpis:
-        help_text += f'## {kpi.label}\n\n{kpi.definition}\n\n'
-    (ROOT / 'docs/help.md').write_text(help_text)
+    help_text = (ROOT / 'docs/help.md').read_text()
     (ROOT / 'web/src/help.md').write_text(help_text)
     runner = CliRunner()
     cli = (
@@ -56,6 +65,24 @@ def main() -> None:
         + runner.invoke(app, ['--help'], color=False).stdout
         + '\n```\n'
     )
+    from nowcast.cli_registry import catalogue
+
+    for command in catalogue():
+        cli += (
+            '\n## '
+            + (' '.join(command['command']) or 'nowcast')
+            + '\n\n| Flag | Default | Meaning |\n|---|---|---|\n'
+        )
+        for control in command['controls']:
+            cli += (
+                '| '
+                + ', '.join(control['flags'])
+                + ' | '
+                + str(control['default']).replace('|', '\\|')
+                + ' | '
+                + control['help'].replace('|', '\\|')
+                + ' |\n'
+            )
     (ROOT / 'docs/cli.md').write_text(cli)
 
 

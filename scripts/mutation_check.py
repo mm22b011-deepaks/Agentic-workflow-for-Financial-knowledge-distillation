@@ -62,10 +62,45 @@ class Mutant:
 
 MUTANTS = (
     Mutant(
+        'delivery: private bakeoff sample exposed',
+        'src/nowcast/inspection.py',
+        "if node == 'model-bakeoff':",
+        'if False:',
+        ('tests/integration/test_inspection.py',),
+    ),
+    Mutant(
+        'delivery: demo hides real releases',
+        'src/nowcast/api.py',
+        'show_demo = not path.is_file() and not real_releases',
+        'show_demo = not path.is_file()',
+        ('tests/integration/test_inspection.py',),
+    ),
+    Mutant(
+        'delivery: paid CLI override accepted',
+        'src/nowcast/cli.py',
+        "if any(not model.endswith(':free') for model in models):",
+        'if False:',
+        ('tests/integration/test_inspection.py',),
+    ),
+    Mutant(
+        'delivery: acceptance hold ignored',
+        'src/nowcast/scheduler.py',
+        "if model and self.state('models_hold'):",
+        'if False:',
+        ('tests/integration/test_schedule.py',),
+    ),
+    Mutant(
+        'delivery: upstream inspector hash ignored',
+        'src/nowcast/artifacts.py',
+        "raise ValueError('upstream artifacts changed')",
+        'pass',
+        ('tests/integration/test_inspection.py',),
+    ),
+    Mutant(
         'network: reserved default port restored',
-        'src/nowcast/app.py',
-        'port: int = 8767',
-        'port: int = 8765',
+        'src/nowcast/cli.py',
+        "sub.add_argument('--port', type=int, default=8767, help='website TCP port')",
+        "sub.add_argument('--port', type=int, default=8765, help='website TCP port')",
         ('tests/unit/test_contract_properties.py',),
     ),
     Mutant(

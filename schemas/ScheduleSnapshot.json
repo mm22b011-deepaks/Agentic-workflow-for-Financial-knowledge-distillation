@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "ScheduleDay": {
+      "additionalProperties": false,
+      "properties": {
+        "utc_day": {
+          "title": "Utc Day",
+          "type": "string"
+        },
+        "local_time": {
+          "title": "Local Time",
+          "type": "string"
+        },
+        "used": {
+          "title": "Used",
+          "type": "integer"
+        },
+        "budget": {
+          "title": "Budget",
+          "type": "integer"
+        },
+        "configured_limit": {
+          "title": "Configured Limit",
+          "type": "integer"
+        },
+        "today": {
+          "title": "Today",
+          "type": "boolean"
+        },
+        "planned_requests": {
+          "title": "Planned Requests",
+          "type": "integer"
+        },
+        "retry_reserve": {
+          "title": "Retry Reserve",
+          "type": "integer"
+        },
+        "planned_by_task": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Planned By Task",
+          "type": "object"
+        }
+      },
+      "required": [
+        "utc_day",
+        "local_time",
+        "used",
+        "budget",
+        "configured_limit",
+        "today",
+        "planned_requests",
+        "retry_reserve",
+        "planned_by_task"
+      ],
+      "title": "ScheduleDay",
+      "type": "object"
+    },
+    "ScheduleTask": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "due",
+            "running",
+            "done",
+            "blocked",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "earliest_day": {
+          "title": "Earliest Day",
+          "type": "string"
+        },
+        "quota_cost": {
+          "title": "Quota Cost",
+          "type": "integer"
+        },
+        "attempts": {
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Error"
+        },
+        "next_eligible": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Eligible"
+        },
+        "human": {
+          "title": "Human",
+          "type": "boolean"
+        },
+        "capability": {
+          "default": "executable",
+          "enum": [
+            "executable",
+            "planned",
+            "human"
+          ],
+          "title": "Capability",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "earliest_day",
+        "quota_cost",
+        "attempts",
+        "last_error",
+        "next_eligible",
+        "human"
+      ],
+      "title": "ScheduleTask",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "utc_day": {
+      "title": "Utc Day",
+      "type": "string"
+    },
+    "local_time": {
+      "title": "Local Time",
+      "type": "string"
+    },
+    "paused": {
+      "title": "Paused",
+      "type": "boolean"
+    },
+    "models_confirmed": {
+      "title": "Models Confirmed",
+      "type": "boolean"
+    },
+    "auth_blocked": {
+      "title": "Auth Blocked",
+      "type": "boolean"
+    },
+    "next_run_utc": {
+      "title": "Next Run Utc",
+      "type": "string"
+    },
+    "next_run_local": {
+      "title": "Next Run Local",
+      "type": "string"
+    },
+    "forecast": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Forecast",
+      "type": "object"
+    },
+    "days": {
+      "items": {
+        "$ref": "#/$defs/ScheduleDay"
+      },
+      "title": "Days",
+      "type": "array"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/ScheduleTask"
+      },
+      "title": "Tasks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "utc_day",
+    "local_time",
+    "paused",
+    "models_confirmed",
+    "auth_blocked",
+    "next_run_utc",
+    "next_run_local",
+    "forecast",
+    "days",
+    "tasks"
+  ],
+  "title": "ScheduleSnapshot",
+  "type": "object"
+}

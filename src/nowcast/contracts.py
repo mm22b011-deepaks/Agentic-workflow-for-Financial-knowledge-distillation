@@ -227,3 +227,226 @@ class ScheduleSnapshot(Contract):
     forecast: dict[str, str | int | float | list[str] | None]
     days: list[ScheduleDay]
     tasks: list[ScheduleTask]
+
+
+class CLIControl(Contract):
+    name: str
+    flags: list[str]
+    kind: Literal['help', 'boolean', 'integer', 'number', 'string']
+    default: str | int | float | bool | list[str] | None
+    choices: list[str] | None
+    multiple: bool
+    help: str
+
+
+class FlowPort(Contract):
+    id: str
+    direction: Literal['in', 'out']
+    kind: str
+    required: bool = False
+
+
+class CanvasNode(Contract):
+    ports: list[FlowPort] = Field(default_factory=list)
+    help_question: int = Field(default=0, ge=0, le=13)
+    id: str
+    command: list[str] = Field(default_factory=list)
+    controls: list[CLIControl] = Field(default_factory=list)
+    help: str = ''
+    label_key: str
+    icon: str
+    variant: Literal['square', 'trigger', 'wide', 'branch', 'sub'] = 'square'
+    group: str
+    capability: Literal['executable', 'planned', 'inspect', 'terminal'] = 'executable'
+    subnodes: list[str] = Field(default_factory=list)
+    open_output: bool = False
+    x: float | None = None
+    y: float | None = None
+
+
+class CanvasEdge(Contract):
+    target_port: str | None = None
+    source: str
+    target: str
+    port: str | None = None
+    sub: bool = False
+
+
+class GraphPoint(Contract):
+    id: str = Field(pattern=r'^[a-z][a-z-]*$')
+    x: float = Field(ge=-100000, le=100000, allow_inf_nan=False)
+    y: float = Field(ge=-100000, le=100000, allow_inf_nan=False)
+
+
+class GraphLink(Contract):
+    source_port: str | None = None
+    target_port: str | None = None
+    source: str
+    target: str
+
+
+class GraphDocument(Contract):
+    version: Literal['v1'] = 'v1'
+    nodes: list[GraphPoint] = Field(min_length=1, max_length=100)
+    edges: list[GraphLink] = Field(max_length=200)
+
+    @model_validator(mode='after')
+    def dag(self) -> GraphDocument:
+        ids = [node.id for node in self.nodes]
+        if len(set(ids)) != len(ids) or not ids:
+            raise ValueError('unique nodes required')
+        remaining = set(ids)
+        if any(edge.source not in remaining or edge.target not in remaining for edge in self.edges):
+            raise ValueError('unknown graph port')
+        while remaining:
+            ready = {
+                node
+                for node in remaining
+                if not any(e.target == node and e.source in remaining for e in self.edges)
+            }
+            if not ready:
+                raise ValueError('cycle')
+            remaining -= ready
+        from nowcast.workflow_registry import validate_ports
+
+        validate_ports(self)
+        return self
+
+
+class CanvasRegistry(Contract):
+    version: Literal['v1'] = 'v1'
+    nodes: list[CanvasNode]
+    edges: list[CanvasEdge]
+    graph_schema: dict
+
+
+class StageState(Contract):
+    id: str
+    status: Literal['idle', 'running', 'done', 'attention', 'error', 'planned']
+    in_count: int | None = None
+    out_count: int | None = None
+    duration: float | None = None
+    skipped_by_reason: dict[str, int] = Field(default_factory=dict)
+    last_run: str | None = None
+
+
+class StageSnapshot(Contract):
+    version: Literal['v1'] = 'v1'
+    source: Literal['pipeline', 'synthetic'] = 'pipeline'
+    nodes: list[StageState]
+
+
+class FieldProfile(Contract):
+    field: str
+    inferred_type: Literal['number', 'boolean', 'string', 'null', 'mixed']
+    null_rate: float | None
+    example: str | float | bool | None
+
+
+class PaneResponse(Contract):
+    profiles: list[FieldProfile] = Field(default_factory=list)
+    view: Literal['index', 'trace'] = 'index'
+    version: Literal['v1'] = 'v1'
+    node: str
+    side: Literal['input', 'output']
+    status: Literal['available', 'unavailable', 'private'] = 'available'
+    total: int
+    offset: int
+    columns: list[str]
+    rows: list[dict[str, str | float | int | bool | None]]
+    runs: list[str] = Field(default_factory=list)
+    upstream: list[str] = Field(default_factory=list)
+    duration: float | None = None
+    config_hash: str
+    run: str | None = None
+
+
+class ChartPoint(Contract):
+    category: str
+    metric: str = ''
+    season: str = ''
+    value: float | None = None
+    denominator: float | None = None
+    status: str = 'unavailable'
+
+
+class MetricSnapshot(Contract):
+    version: Literal['v1'] = 'v1'
+    metrics: dict[str, float | None] = Field(default_factory=dict)
+    series: list[ChartPoint] = Field(default_factory=list)
+
+
+class EvidenceField(Contract):
+    field: str
+    value: str | float | None
+    unit: str | None = None
+    confidence: float | None = None
+    quote: str | None = None
+    start: int | None = None
+    end: int | None = None
+    row_start: int | None = None
+    row_end: int | None = None
+    number_present: bool | None = None
+    issues: list[str]
+
+
+class EvidenceResponse(Contract):
+    version: Literal['v1'] = 'v1'
+    record_id: str
+    source: str
+    fields: list[EvidenceField]
+    verdicts: dict[str, Literal['correct', 'wrong', 'unsure']] = Field(default_factory=dict)
+
+
+class LabelRequest(Contract):
+    record_id: str = Field(min_length=1, max_length=200)
+    field: str = Field(pattern=r'^[a-z_]{1,40}$')
+    value: str | float | None = None
+    verdict: Literal['correct', 'wrong', 'unsure']
+
+
+class LabelResponse(Contract):
+    version: Literal['v1'] = 'v1'
+    checked: int
+    total: int
+    fields: dict[str, dict[str, int]]
+
+
+class KPIObservation(Contract):
+    metric: Literal['eps_growth', 'revenue_growth', 'guidance', 'tone']
+    season: str = Field(pattern=r'^20\d{2}Q[1-4]$')
+    as_of: str = Field(pattern=r'^20\d{2}-\d{2}-\d{2}$')
+    value: float | None = Field(allow_inf_nan=False)
+    unit: Literal['fraction', 'percent', 'score']
+    n_obs: int | None
+    n_expected: int | None
+    coverage: float | None
+    status: Literal[
+        'ok', 'insufficient_observations', 'no_consensus', 'unavailable', 'unverified', 'suppressed'
+    ]
+    source_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+    config_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
+class KPIKnowledgeBase(Contract):
+    version: Literal['v1'] = 'v1'
+    kind: Literal['index-level proxies'] = 'index-level proxies'
+    records: list[KPIObservation]
+
+
+class SessionResponse(Contract):
+    version: Literal['v1'] = 'v1'
+    csrf_token: str
+    internal_trace_available: bool
+
+
+class ConfigControl(Contract):
+    path: str
+    kind: Literal['boolean', 'integer', 'number', 'string']
+    value: str | int | float | bool | list[str]
+    multiple: bool = False
+
+
+class SettingsResponse(Contract):
+    version: Literal['v1'] = 'v1'
+    nodes: dict[str, list[ConfigControl]]

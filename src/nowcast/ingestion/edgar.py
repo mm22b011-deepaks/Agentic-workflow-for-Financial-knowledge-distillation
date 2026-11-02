@@ -42,6 +42,8 @@ class IngestReport:
     pair_outcomes: dict[str, str] = field(default_factory=dict)
     # Not serialised: the run fails on it rather than reporting it afterwards.
     consecutive_blocked: int = field(default=0, repr=False)
+    filings: list[dict[str, object]] = field(default_factory=list, repr=False)
+    downloaded_rows: list[dict[str, object]] = field(default_factory=list, repr=False)
 
     def record_status(self, status: int) -> None:
         """Count one HTTP status code and track a run of 403/429 answers."""
@@ -402,6 +404,27 @@ def download_document(
     return target
 
 
+def index_row(config: Config, disclosure: Disclosure, path: Path) -> dict[str, object]:
+    """Build the same provenance-preserving row for combined and separate downloads."""
+    text = _document_text(path)
+    return {
+        'document_id': f'{disclosure.cik.zfill(10)}-{disclosure.accession}-{disclosure.document}',
+        'cik': disclosure.cik.zfill(10),
+        'report_date': disclosure.filing_date.isoformat(),
+        'document_type': disclosure.exhibit_type,
+        'source': 'edgar',
+        # Relative to the data root so a copied data directory
+        # stays usable; loaders resolve it against DATA_DIR.
+        'raw_path': str(path.relative_to(data_root(config))),
+        'sha256': file_sha256(path),
+        'chars': len(text),
+        'downloaded_at': datetime.now(timezone.utc).isoformat(),
+        # The earnings-item proof travels with the row so extraction
+        # can refuse anything that was not a 2.02 filing.
+        'items': disclosure.items,
+    }
+
+
 def ingest_edgar(
     config: Config,
     ciks: list[str],
@@ -479,6 +502,18 @@ def ingest_edgar(
                         active_report.record_skip(reason)
                 if not disclosures:
                     active_report.zero_disclosure_ciks.append(cik.zfill(10))
+                active_report.filings.extend(
+                    {
+                        'cik': d.cik,
+                        'accession': d.accession,
+                        'filing_date': d.filing_date.isoformat(),
+                        'document': d.document,
+                        'exhibit_type': d.exhibit_type,
+                        'items': d.items,
+                        'form': '8-K',
+                    }
+                    for d in disclosures
+                )
                 for disclosure in disclosures:
                     check_cancelled()
                     if (limit and len(rows) >= limit) or (per_cik and taken >= per_cik):
@@ -500,24 +535,9 @@ def ingest_edgar(
                     active_report.pair_outcomes[cik.zfill(10) + ':' + season] = 'downloaded'
                     taken += 1
                     active_report.documents += 1
-                    text = _document_text(path)
-                    row = {
-                        'document_id': f'{cik.zfill(10)}-{disclosure.accession}-{disclosure.document}',
-                        'cik': cik.zfill(10),
-                        'report_date': disclosure.filing_date.isoformat(),
-                        'document_type': disclosure.exhibit_type,
-                        'source': 'edgar',
-                        # Relative to the data root so a copied data directory
-                        # stays usable; loaders resolve it against DATA_DIR.
-                        'raw_path': str(path.relative_to(data_root(config))),
-                        'sha256': file_sha256(path),
-                        'chars': len(text),
-                        'downloaded_at': datetime.now(timezone.utc).isoformat(),
-                        # The earnings-item proof travels with the row so extraction
-                        # can refuse anything that was not a 2.02 filing.
-                        'items': disclosure.items,
-                    }
+                    row = index_row(config, disclosure, path)
                     rows.append(row)
+                    active_report.downloaded_rows.append(row)
                     if on_row is not None:
                         # Written now, not at the end: an abort twenty companies later
                         # must not lose what has already been downloaded.

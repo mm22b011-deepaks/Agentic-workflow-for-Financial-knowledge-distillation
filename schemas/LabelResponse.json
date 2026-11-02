@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "checked": {
+      "title": "Checked",
+      "type": "integer"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
+    },
+    "fields": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "type": "object"
+      },
+      "title": "Fields",
+      "type": "object"
+    }
+  },
+  "required": [
+    "checked",
+    "total",
+    "fields"
+  ],
+  "title": "LabelResponse",
+  "type": "object"
+}

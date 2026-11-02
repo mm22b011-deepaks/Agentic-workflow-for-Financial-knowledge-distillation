@@ -82,6 +82,9 @@ def export_index(config: Config) -> dict[str, Any]:
         snapshot = IndexSnapshot(status='unavailable', snapshots=[])
     result = snapshot.model_dump(mode='json')
     atomic_json(result, paths.resolve('exports/index.json'))
+    from nowcast.knowledge import knowledge_base
+
+    knowledge_base(config, write=True)
     return {'rows': len(snapshot.snapshots), 'status': snapshot.status}
 
 
@@ -113,6 +116,15 @@ def execute(name: str, config: Config, args: argparse.Namespace) -> int:
     result: dict[str, Any] = {}
     if name == 'doctor':
         result = doctor(config)
+        if getattr(args, 'verify_provider', False):
+            import httpx
+
+            from nowcast.setup_wizard import verify_provider
+
+            with httpx.Client(timeout=30) as client:
+                result['verification'] = verify_provider(
+                    config, os.environ.get(config.llm.api_key_env, ''), client
+                )
     elif name == 'freeze-panel':
         from nowcast.ingestion.constituents import load_constituents
         from nowcast.scope import freeze_scope

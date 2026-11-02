@@ -1,0 +1,1427 @@
+{
+  "nodes": [
+    {
+      "id": "run-all",
+      "label_key": "run-all",
+      "icon": "run",
+      "variant": "trigger",
+      "group": "main",
+      "capability": "executable",
+      "x": 0,
+      "y": 0,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "trigger"
+        }
+      ]
+    },
+    {
+      "id": "validate-config",
+      "label_key": "validate-config",
+      "icon": "config",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 176,
+      "y": 0,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "trigger",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "config"
+        }
+      ]
+    },
+    {
+      "id": "build-constituents",
+      "label_key": "build-constituents",
+      "icon": "members",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 352,
+      "y": 0,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 2,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "membership"
+        }
+      ]
+    },
+    {
+      "id": "estimate-scope",
+      "label_key": "estimate-scope",
+      "icon": "plan",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 528,
+      "y": 0,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "membership",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "plan"
+        }
+      ]
+    },
+    {
+      "id": "ingest",
+      "label_key": "ingest",
+      "icon": "ingest",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 704,
+      "y": 0,
+      "subnodes": [
+        "sec",
+        "rate"
+      ],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "plan",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "documents"
+        },
+        {
+          "id": "sec",
+          "direction": "out",
+          "kind": "sec_config",
+          "required": false
+        },
+        {
+          "id": "rate",
+          "direction": "out",
+          "kind": "rate_config",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "extract",
+      "label_key": "extract",
+      "icon": "extract",
+      "variant": "wide",
+      "group": "main",
+      "capability": "executable",
+      "x": 880,
+      "y": 0,
+      "subnodes": [
+        "model",
+        "cache",
+        "limiter",
+        "validators"
+      ],
+      "open_output": false,
+      "help_question": 12,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "documents",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        },
+        {
+          "id": "model",
+          "direction": "out",
+          "kind": "model_config",
+          "required": true
+        },
+        {
+          "id": "cache",
+          "direction": "out",
+          "kind": "cache_config",
+          "required": false
+        },
+        {
+          "id": "limiter",
+          "direction": "out",
+          "kind": "limiter_config",
+          "required": false
+        },
+        {
+          "id": "validators",
+          "direction": "out",
+          "kind": "validators_config",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "aggregate",
+      "label_key": "aggregate",
+      "icon": "aggregate",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 1280,
+      "y": 0,
+      "subnodes": [
+        "kpi"
+      ],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "index"
+        },
+        {
+          "id": "kpi",
+          "direction": "out",
+          "kind": "kpi_config",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "label_key": "gate",
+      "icon": "gate",
+      "variant": "branch",
+      "group": "main",
+      "capability": "executable",
+      "x": 1456,
+      "y": 0,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 4,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "index",
+          "required": true
+        },
+        {
+          "id": "true",
+          "direction": "out",
+          "kind": "gate"
+        },
+        {
+          "id": "false",
+          "direction": "out",
+          "kind": "gate"
+        }
+      ]
+    },
+    {
+      "id": "publish",
+      "label_key": "publish",
+      "icon": "publish",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 1632,
+      "y": -90,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "gate",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "kpis"
+        }
+      ]
+    },
+    {
+      "id": "suppressed",
+      "label_key": "suppressed",
+      "icon": "suppressed",
+      "variant": "square",
+      "group": "main",
+      "capability": "executable",
+      "x": 1632,
+      "y": 110,
+      "subnodes": [],
+      "open_output": false,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "gate",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "index"
+        }
+      ]
+    },
+    {
+      "id": "nowcast",
+      "label_key": "nowcast",
+      "icon": "plan",
+      "variant": "square",
+      "group": "main",
+      "capability": "planned",
+      "x": 1808,
+      "y": -90,
+      "subnodes": [],
+      "open_output": true,
+      "help_question": 6,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "kpis",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "forecast"
+        }
+      ]
+    },
+    {
+      "id": "cohort",
+      "label_key": "cohort",
+      "icon": "members",
+      "group": "ingest",
+      "capability": "executable",
+      "x": 0,
+      "y": 0,
+      "help_question": 2,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "membership",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "pairs"
+        }
+      ]
+    },
+    {
+      "id": "discover",
+      "label_key": "discover",
+      "icon": "search",
+      "group": "ingest",
+      "capability": "executable",
+      "x": 176,
+      "y": 0,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "pairs",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "filings"
+        }
+      ]
+    },
+    {
+      "id": "download",
+      "label_key": "download",
+      "icon": "ingest",
+      "group": "ingest",
+      "capability": "executable",
+      "x": 352,
+      "y": 0,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "filings",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "documents"
+        }
+      ]
+    },
+    {
+      "id": "parse",
+      "label_key": "parse",
+      "icon": "parse",
+      "group": "ingest",
+      "capability": "executable",
+      "x": 528,
+      "y": 0,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "documents",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "documents"
+        }
+      ]
+    },
+    {
+      "id": "extract-step",
+      "label_key": "extract",
+      "icon": "extract",
+      "group": "extract",
+      "capability": "executable",
+      "x": 0,
+      "y": 0,
+      "help_question": 12,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "documents",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "label_key": "validate",
+      "icon": "validate",
+      "group": "extract",
+      "capability": "executable",
+      "x": 176,
+      "y": 0,
+      "help_question": 12,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        }
+      ]
+    },
+    {
+      "id": "consolidate",
+      "label_key": "consolidate",
+      "icon": "aggregate",
+      "group": "extract",
+      "capability": "executable",
+      "x": 352,
+      "y": 0,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        },
+        {
+          "id": "facts",
+          "direction": "in",
+          "kind": "facts",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "label_key": "review",
+      "icon": "review",
+      "group": "extract",
+      "capability": "executable",
+      "x": 528,
+      "y": 0,
+      "help_question": 5,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "issues"
+        }
+      ]
+    },
+    {
+      "id": "xbrl",
+      "label_key": "xbrl",
+      "icon": "model",
+      "group": "extract",
+      "capability": "planned",
+      "x": 704,
+      "y": 0,
+      "help_question": 6,
+      "ports": [
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "facts"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "label_key": "model",
+      "icon": "model",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 864,
+      "y": 208,
+      "help_question": 10,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "model_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "cache",
+      "label_key": "cache",
+      "icon": "cache",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 950,
+      "y": 208,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "cache_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "limiter",
+      "label_key": "limiter",
+      "icon": "limiter",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 1036,
+      "y": 208,
+      "help_question": 11,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "limiter_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "validators",
+      "label_key": "validators",
+      "icon": "validate",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 1122,
+      "y": 208,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "validators_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "sec",
+      "label_key": "sec",
+      "icon": "ingest",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 688,
+      "y": 208,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "sec_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "rate",
+      "label_key": "rate",
+      "icon": "limiter",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 774,
+      "y": 208,
+      "help_question": 11,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "rate_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "kpi",
+      "label_key": "kpi",
+      "icon": "aggregate",
+      "group": "sub",
+      "variant": "sub",
+      "capability": "inspect",
+      "x": 1288,
+      "y": 208,
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "kpi_config",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "rebuild-index",
+      "label_key": "rebuild-index",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "model-bakeoff",
+      "label_key": "model-bakeoff",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 10,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "doctor",
+      "label_key": "doctor",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "freeze-panel",
+      "label_key": "freeze-panel",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "validate-index",
+      "label_key": "validate-index",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "supersede-stale",
+      "label_key": "supersede-stale",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "demo",
+      "label_key": "demo",
+      "icon": "flask",
+      "group": "demo",
+      "variant": "trigger",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "demo"
+        }
+      ]
+    },
+    {
+      "id": "serve",
+      "label_key": "serve",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "terminal",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "label_key": "export",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "prepare-labels",
+      "label_key": "prepare-labels",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "quality-summary",
+      "label_key": "quality-summary",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "label_key": "report",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-plan",
+      "label_key": "schedule-plan",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-status",
+      "label_key": "schedule-status",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-run",
+      "label_key": "schedule-run",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "terminal",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-pause",
+      "label_key": "schedule-pause",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-resume",
+      "label_key": "schedule-resume",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-install",
+      "label_key": "schedule-install",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "terminal",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "schedule-uninstall",
+      "label_key": "schedule-uninstall",
+      "icon": "clock",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "terminal",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ]
+    },
+    {
+      "id": "raptor",
+      "label_key": "raptor",
+      "icon": "model",
+      "group": "extract",
+      "capability": "planned",
+      "x": 520,
+      "y": 220,
+      "help_question": 6,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "narrative"
+        }
+      ]
+    },
+    {
+      "id": "demo-ingest",
+      "label_key": "ingest",
+      "icon": "ingest",
+      "group": "demo",
+      "capability": "inspect",
+      "x": 176,
+      "y": 0,
+      "help_question": 7,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "demo"
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "documents"
+        }
+      ]
+    },
+    {
+      "id": "demo-parse",
+      "label_key": "parse",
+      "icon": "parse",
+      "group": "demo",
+      "capability": "inspect",
+      "x": 352,
+      "y": 0,
+      "help_question": 7,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "documents"
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "documents"
+        }
+      ]
+    },
+    {
+      "id": "demo-extract",
+      "label_key": "extract",
+      "icon": "extract",
+      "group": "demo",
+      "capability": "inspect",
+      "x": 528,
+      "y": 0,
+      "help_question": 7,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "documents"
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        }
+      ]
+    },
+    {
+      "id": "demo-validate",
+      "label_key": "validate",
+      "icon": "validate",
+      "group": "demo",
+      "capability": "inspect",
+      "x": 704,
+      "y": 0,
+      "help_question": 7,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records"
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "records"
+        }
+      ]
+    },
+    {
+      "id": "demo-aggregate",
+      "label_key": "aggregate",
+      "icon": "aggregate",
+      "group": "demo",
+      "capability": "inspect",
+      "x": 880,
+      "y": 0,
+      "help_question": 7,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "records"
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "index"
+        }
+      ]
+    },
+    {
+      "id": "cli",
+      "label_key": "cli",
+      "icon": "config",
+      "group": "maintenance",
+      "capability": "terminal",
+      "ports": []
+    },
+    {
+      "id": "schedule",
+      "label_key": "schedule",
+      "icon": "clock",
+      "group": "maintenance",
+      "capability": "terminal",
+      "ports": []
+    }
+  ],
+  "edges": [
+    {
+      "source": "run-all",
+      "target": "validate-config"
+    },
+    {
+      "source": "validate-config",
+      "target": "build-constituents"
+    },
+    {
+      "source": "build-constituents",
+      "target": "estimate-scope"
+    },
+    {
+      "source": "estimate-scope",
+      "target": "ingest"
+    },
+    {
+      "source": "ingest",
+      "target": "extract"
+    },
+    {
+      "source": "extract",
+      "target": "aggregate"
+    },
+    {
+      "source": "aggregate",
+      "target": "gate"
+    },
+    {
+      "source": "gate",
+      "target": "publish",
+      "port": "true"
+    },
+    {
+      "source": "gate",
+      "target": "suppressed",
+      "port": "false"
+    },
+    {
+      "source": "publish",
+      "target": "nowcast"
+    },
+    {
+      "source": "cohort",
+      "target": "discover"
+    },
+    {
+      "source": "discover",
+      "target": "download"
+    },
+    {
+      "source": "download",
+      "target": "parse"
+    },
+    {
+      "source": "extract-step",
+      "target": "validate"
+    },
+    {
+      "source": "validate",
+      "target": "consolidate"
+    },
+    {
+      "source": "validate",
+      "target": "review"
+    },
+    {
+      "source": "xbrl",
+      "target": "consolidate",
+      "sub": true,
+      "target_port": "facts"
+    },
+    {
+      "source": "extract",
+      "target": "model",
+      "port": "model",
+      "sub": true
+    },
+    {
+      "source": "extract",
+      "target": "cache",
+      "port": "cache",
+      "sub": true
+    },
+    {
+      "source": "extract",
+      "target": "limiter",
+      "port": "limiter",
+      "sub": true
+    },
+    {
+      "source": "extract",
+      "target": "validators",
+      "port": "validators",
+      "sub": true
+    },
+    {
+      "source": "ingest",
+      "target": "sec",
+      "port": "sec",
+      "sub": true
+    },
+    {
+      "source": "ingest",
+      "target": "rate",
+      "port": "rate",
+      "sub": true
+    },
+    {
+      "source": "aggregate",
+      "target": "kpi",
+      "port": "kpi",
+      "sub": true
+    },
+    {
+      "source": "consolidate",
+      "target": "raptor",
+      "sub": false
+    },
+    {
+      "source": "demo",
+      "target": "demo-ingest"
+    },
+    {
+      "source": "demo-ingest",
+      "target": "demo-parse"
+    },
+    {
+      "source": "demo-parse",
+      "target": "demo-extract"
+    },
+    {
+      "source": "demo-extract",
+      "target": "demo-validate"
+    },
+    {
+      "source": "demo-validate",
+      "target": "demo-aggregate"
+    }
+  ],
+  "bindings": {
+    "model": [
+      "llm.models",
+      "llm.max_tokens",
+      "llm.reasoning_control",
+      "llm.reasoning_effort"
+    ],
+    "cache": [
+      "cache.enabled"
+    ],
+    "limiter": [
+      "llm.requests_per_day",
+      "llm.requests_per_minute",
+      "llm.cooldown_seconds"
+    ],
+    "validators": [
+      "extraction.quote_match_min_ratio",
+      "extraction.min_confidence",
+      "extraction.max_evidence_words",
+      "extraction.eps_tolerance_abs"
+    ],
+    "sec": [
+      "data.sec_max_requests_per_sec"
+    ],
+    "rate": [
+      "data.sec_max_requests_per_sec"
+    ],
+    "ingest": [
+      "data.start_date",
+      "data.end_date"
+    ],
+    "extract": [
+      "extraction.max_doc_chars",
+      "extraction.max_repairs"
+    ],
+    "aggregate": [
+      "aggregation.min_observations",
+      "aggregation.min_constituents"
+    ],
+    "kpi": [
+      "aggregation.min_observations",
+      "aggregation.min_constituents"
+    ]
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "KPIObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "eps_growth",
+            "revenue_growth",
+            "guidance",
+            "tone"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "season": {
+          "pattern": "^20\\d{2}Q[1-4]$",
+          "title": "Season",
+          "type": "string"
+        },
+        "as_of": {
+          "pattern": "^20\\d{2}-\\d{2}-\\d{2}$",
+          "title": "As Of",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "enum": [
+            "fraction",
+            "percent",
+            "score"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "n_obs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "N Obs"
+        },
+        "n_expected": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "N Expected"
+        },
+        "coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Coverage"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "insufficient_observations",
+            "no_consensus",
+            "unavailable",
+            "unverified",
+            "suppressed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "source_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Hash",
+          "type": "string"
+        },
+        "config_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Config Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "season",
+        "as_of",
+        "value",
+        "unit",
+        "n_obs",
+        "n_expected",
+        "coverage",
+        "status",
+        "source_hash",
+        "config_hash"
+      ],
+      "title": "KPIObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "kind": {
+      "const": "index-level proxies",
+      "default": "index-level proxies",
+      "title": "Kind",
+      "type": "string"
+    },
+    "records": {
+      "items": {
+        "$ref": "#/$defs/KPIObservation"
+      },
+      "title": "Records",
+      "type": "array"
+    }
+  },
+  "required": [
+    "records"
+  ],
+  "title": "KPIKnowledgeBase",
+  "type": "object"
+}

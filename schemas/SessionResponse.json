@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "csrf_token": {
+      "title": "Csrf Token",
+      "type": "string"
+    },
+    "internal_trace_available": {
+      "title": "Internal Trace Available",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "csrf_token",
+    "internal_trace_available"
+  ],
+  "title": "SessionResponse",
+  "type": "object"
+}

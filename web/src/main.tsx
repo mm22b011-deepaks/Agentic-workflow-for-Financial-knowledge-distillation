@@ -1,109 +1,456 @@
-import { StrictMode, useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import Markdown from 'react-markdown';
-import registryData from './registry.json';
-import help from './help.md?raw';
-import type { Registry } from './Registry';
-import type { RunStatus } from './RunStatus';
-import type { RunEvent } from './RunEvent';
-import type { IndexSnapshot } from './IndexSnapshot';
-import './style.css';
-
-import {validRegistry,validIndex} from './validators.js';
-if (!validRegistry(registryData)) throw new Error('Invalid registry fixture');
-const registry: Registry = registryData as unknown as Registry;
-type Page = 'Pipeline'|'Quality'|'Optimise'|'Help';
-const nav: Page[] = ['Pipeline','Quality','Optimise','Help'];
-
+import { StrictMode, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { createRoot } from "react-dom/client";
+import { AnimatePresence, motion } from "framer-motion";
+import { Canvas } from "./features/canvas/Canvas";
+import { Panel, inspectionState } from "./features/inspector/Panel";
+const Drawer = lazy(() =>
+  import("./features/lenses/Drawer").then((module) => ({
+    default: module.Drawer,
+  })),
+);
+import { Help, Tour } from "./features/help/Help";
+import { usePipeline } from "./features/runs/usePipeline";
+import { usePreferences, useSession } from "./shared/state";
+import { Button } from "./shared/Button";
+import { Icon } from "./shared/Icon";
+import { copy, label } from "./copy";
+import { api } from "./shared/api";
+import {
+  validIndexSnapshot,
+  validKPIKnowledgeBase,
+  validPaneResponse,
+} from "./validators.js";
+import "./style.css";
 function App() {
- const [page,setPage]=useState<Page>('Pipeline');
- const [mode,setMode]=useState<'live'|'replay'>('live');
- const [dark,setDark]=useState(false);
- const [workflow,setWorkflow]=useState('demo');
- const [selected,setSelected]=useState('demo');
- const [csrf,setCsrf]=useState('');
- const [runs,setRuns]=useState<RunStatus[]>([]);
- const [events,setEvents]=useState<RunEvent[]>([]);
- const [index,setIndex]=useState<IndexSnapshot>({version:'v1',label:'index-level proxies',source:'pipeline',status:'unavailable',snapshots:[]});
- const [quality,setQuality]=useState<Record<string,unknown>>({});
- const [optimise,setOptimise]=useState<Record<string,unknown>>({});
- const [error,setError]=useState('');
- const [connectionError,setConnectionError]=useState('');
- const [traceAvailable,setTraceAvailable]=useState(false);
- const [trace,setTrace]=useState<unknown>(null);
- const [busy,setBusy]=useState(false);
- const active=runs[0];
- const definition=registry.workflows.find(w=>w.id===workflow)!;
- const node=registry.nodes.find(n=>n.id===selected);
- async function api(path:string,body?:unknown) {
-  const response=await fetch('/api/v1/'+path,{method:body===undefined?'GET':'POST',
-   headers:body===undefined?{}:{'Content-Type':'application/json','x-tresata-csrf':csrf},
-   body:body===undefined?undefined:JSON.stringify(body)});
-  if(!response.ok) { const data=await response.json(); throw new Error(typeof data.detail==='string'?data.detail:'Request rejected'); }
-  return response.json();
- }
- useEffect(()=>{document.documentElement.dataset.theme=dark?'dark':'light'},[dark]);
- useEffect(()=>{
-  if(mode!=='live') return;
-  let alive=true;
-  async function refresh() {
-   try {
-    const session=await api('session');
-    const [list,snapshot,q,o,liveRegistry]=await Promise.all([api('runs'),api('index'),api('quality'),api('optimise'),api('registry')]);
-    if(!validRegistry(liveRegistry)) throw new Error('Server registry schema rejected');
-    if(JSON.stringify(liveRegistry)!==JSON.stringify(registryData)) throw new Error('Registry changed. Rebuild the website before running jobs.');
-    if(!validIndex(snapshot)) throw new Error('Index schema rejected');
-    const ev=list[0]?await api('runs/'+list[0].id+'/events'):[];
-    if(alive){setCsrf(session.csrf_token);setTraceAvailable(session.internal_trace_available);setRuns(list);setEvents(ev);setIndex(snapshot);setQuality(q);setOptimise(o);setConnectionError('')}
-   }catch(e){if(alive)setConnectionError((e as Error).message)}
+  const pipeline = usePipeline();
+  const session = useSession();
+  const preferences = usePreferences();
+  const [palette, setPalette] = useState(false);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [confirmation, setConfirmation] = useState<null | (() => void)>(null);
+  const paletteInput = useRef<HTMLInputElement>(null);
+  function download(value: unknown, name: string) {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(value)], { type: "application/json" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
-  void refresh(); const timer=setInterval(refresh,2000);
-  return ()=>{alive=false;clearInterval(timer)};
- },[mode]);
- async function mutate(path:string,body:unknown={}) {
-  setBusy(true);setError('');
-  try { const result=await api(path,body);setRuns(old=>[result,...old.filter(r=>r.id!==result.id)]); }
-  catch(e){setError((e as Error).message)} finally {setBusy(false)}
- }
- function exportIndex(){
-  if(!validIndex(index)){setError('Export failed schema validation');return}
-  const url=URL.createObjectURL(new Blob([JSON.stringify(index,null,2)],{type:'application/json'}));
-  const a=document.createElement('a');a.href=url;a.download='tresata-index.json';a.click();URL.revokeObjectURL(url);
- }
- async function loadReplay(file:File|undefined){
-  if(!file)return;
-  try {const data=JSON.parse(await file.text());if(!validIndex(data))throw new Error('Replay schema rejected');
-   setMode('replay');setIndex(data);setRuns([]);setEvents([]);setTrace(null);setError('');
-  }catch(e){setError((e as Error).message)}
- }
- return <div className="shell">
-  <a href="#main" className="skip">Skip to workspace</a>
-  <aside className="sidebar"><a className="brand" href="#main"><span className="brand-mark">t</span> tresata<span className="small">RESEARCH WORKSPACE</span></a>
-   <div className="workspace-label">WORKSPACE <span>01</span></div>
-   <nav aria-label="Main navigation">{nav.map((p,i)=><button key={p} aria-current={page===p?'page':undefined} className={page===p?'active':''} onClick={()=>setPage(p)}><span className="nav-number">0{i+1}</span>{p}<span className="nav-arrow">↗</span></button>)}</nav>
-   <div className="sidebar-foot"><span className="dot"/> PRIVATE WORKSTATION<p>Index-level earnings proxies.<br/>Evidence before inference.</p><button className="theme" onClick={()=>setDark(!dark)}>{dark?'Light appearance':'Dark appearance'}</button></div>
-  </aside>
-  <div className="content"><header><span>Research / <strong>{page}</strong></span><span className="session"><button className="mobile-theme" onClick={()=>setDark(!dark)}>{dark?'Light appearance':'Dark appearance'}</button><span className="dot"/> Local session <span className="avatar">OP</span></span></header>
-   <main id="main"><div className="eyebrow">EARNINGS INTELLIGENCE / {mode.toUpperCase()}</div>
-    <div className="title-row"><div><h1>{page==='Pipeline'?'From release to signal.':page==='Quality'?'Know what holds up.':page==='Optimise'?'Measure the work.':'A shared field guide.'}</h1><p className="intro">{page==='Pipeline'?'A traceable workflow for index-level earnings proxies.':page==='Quality'?'Coverage, review reasons and acceptance gates.':page==='Optimise'?'Observed calls and token use. Missing measurements stay unavailable.':'The same definitions used by the pipeline, controls and documentation.'}</p></div><span className={'mode-badge '+mode}>{mode==='live'?'LIVE CONTROLS':'REPLAY · NO EXECUTION'}</span></div>
-    {(error||connectionError)&&<div role="alert" className="error">{error||connectionError}</div>}
-    <section className="stats" aria-label="Workspace summary"><div><span>EXECUTION</span><strong>{mode==='replay'?'Replay':active?.status??'Ready'}</strong><small>{active?`${active.completed} of ${active.total} stages`:'No job running'}</small></div><div><span>INDEX SNAPSHOTS</span><strong>{index.snapshots.length.toString().padStart(2,'0')}</strong><small>{index.status==='unavailable'?'Unavailable':index.source==='synthetic'?'Synthetic verification':'Validated index view'}</small></div><div><span>QUALITY GATE</span><strong className="amber">Open</strong><small>Gate R0 requires review</small></div><div><span>VISIBILITY</span><strong>{trace?'Internal trace':'Index only'}</strong><small>{trace?'Session only · private':'Identifier-free exports'}</small></div></section>
-    {page==='Pipeline'&&<>
-     <section className="panel"><div className="panel-head"><div><span className="eyebrow">01 / WORKFLOW</span><h2>The pipeline</h2></div><label>Workflow<select value={workflow} onChange={e=>{setWorkflow(e.target.value);setSelected(registry.workflows.find(w=>w.id===e.target.value)!.nodes[0])}}>{registry.workflows.map(w=><option key={w.id} value={w.id}>{w.label}</option>)}</select></label></div>
-      <div className="canvas" aria-label="Workflow graph"><div className="graph">{definition.nodes.map((id,i)=>{const n=registry.nodes.find(x=>x.id===id)!;return <div className="node-wrap" key={id}><button className={'node '+(selected===id?'selected':'')} aria-pressed={selected===id} onClick={()=>setSelected(id)}><span className="node-step">{String(i+1).padStart(2,'0')}<span>{active?.stage===id?'RUNNING':n.capability.toUpperCase()}</span></span><strong>{n.label}</strong><small>{n.inputs.join(', ')||'Start'} → {n.output}</small></button>{i<definition.nodes.length-1&&<span className="connector" aria-hidden="true">→</span>}</div>})}</div></div>
-      <div className="run-bar"><span>{mode==='replay'?'Loaded artifacts · execution disabled':'Validated dependencies · server-side execution'}</span><div>{mode==='replay'?<button onClick={()=>{setMode('live');setTrace(null)}}>Return to live</button>:<button className="primary" disabled={busy||!csrf||!!active&&['running','queued'].includes(active.status)} onClick={()=>void mutate('runs',{version:'v1',workflow_id:workflow,submission_id:crypto.randomUUID()})}>{busy?'Starting…':'Run workflow'} <span>↗</span></button>}</div></div>
-     </section>
-     <div className="two-columns"><section className="panel inspector"><div className="eyebrow">02 / INSPECTOR</div><h2>{node?.label}</h2><p>{node?.help}</p><dl><dt>Input ports</dt><dd>{node?.inputs.join(', ')||'None'}</dd><dt>Output artifact</dt><dd>{node?.output}</dd><dt>Capability</dt><dd>{node?.capability}</dd></dl>{(node?.parameters??[]).length?<dl>{(node?.parameters??[]).map(p=><div key={p.config_path}><dt>{p.label}</dt><dd>{Array.isArray(p.value)?p.value.join(', '):p.value??'Unavailable'}</dd></div>)}</dl>:null}<p className="muted">Inspector execution checks server-owned upstream artifact fingerprints.</p><button disabled={mode!=='live'||busy||!csrf||!!active&&['running','queued'].includes(active.status)} onClick={()=>void mutate('runs',{version:'v1',workflow_id:workflow,submission_id:crypto.randomUUID(),node_id:selected,upstream_run_id:active?.id??null})}>Run selected stage</button></section>
-      <section className="panel"><div className="eyebrow">03 / ACTIVITY</div><h2>Run events</h2>{events.length?<ol className="events">{events.slice(-8).map(e=><li key={e.sequence}><span>{e.stage||'Workflow'}</span><strong>{e.kind}</strong></li>)}</ol>:<div className="empty">Your next run starts here.<p>Stage progress is retained across restarts.</p></div>}{active&&mode==='live'&&<div className="actions">{['queued','running'].includes(active.status)?<button onClick={()=>void mutate('runs/'+active.id+'/cancel')}>Cancel between items</button>:['interrupted','failed','cancelled'].includes(active.status)?<button onClick={()=>void mutate('runs/'+active.id+'/resume')}>Resume with fingerprint check</button>:null}</div>}</section></div>
-    </>}
-    {page==='Quality'&&<section className="panel"><div className="eyebrow">COVERAGE & ACCEPTANCE</div><h2>Evidence quality</h2><p>Gate R0 remains failed until live validation and the separate human spot-check pass.</p><dl>{Object.entries(quality).map(([key,value])=><div key={key}><dt>{key.replaceAll('_',' ')}</dt><dd>{typeof value==='object'?JSON.stringify(value):String(value)}</dd></div>)}</dl><h3>Index observations</h3><p>{index.snapshots.length?JSON.stringify(index.snapshots[index.snapshots.length-1]):'No aggregate artifacts available. Run the pipeline or load a validated replay.'}</p></section>}
-    {page==='Optimise'&&<section className="panel"><div className="eyebrow">MEASURED OPPORTUNITIES</div><h2>Request efficiency</h2><dl>{Object.entries(optimise).map(([key,value])=><div key={key}><dt>{key.replaceAll('_',' ')}</dt><dd>{value===null?'Unavailable':String(value)}</dd></div>)}</dl><p>Truncation retries consume requests. XBRL token savings do not by themselves demonstrate saved calls.</p></section>}
-    {page==='Help'&&<article className="panel markdown"><Markdown>{help}</Markdown></article>}
-    <section className="artifact-bar"><div><strong>Artifacts & visibility</strong><p>Exports contain the Index view. Replay files are validated before loading.</p></div><div className="actions"><button onClick={exportIndex}>Export Index JSON ↓</button><label className="file-button">Load replay<input type="file" accept="application/json,.json" onChange={e=>void loadReplay(e.target.files?.[0])}/></label></div></section>
-    {traceAvailable&&mode==='live'&&<section className="panel"><label><input type="checkbox" checked={trace!==null} onChange={async e=>{if(!e.target.checked){setTrace(null);return}try{const response=await fetch('/api/v1/trace',{headers:{'x-tresata-trace':'session'}});if(!response.ok)throw new Error('Trace unavailable');setTrace(await response.json())}catch(e){setError((e as Error).message)}}}/> Internal trace for this session</label>{trace!==null&&<pre>{JSON.stringify(trace,null,2)}</pre>}</section>}
-    <footer><span>TRESATA / PRERELEASE 0.1</span><span>Built for evidence. Human acceptance remains explicit.</span></footer>
-   </main></div>
- </div>
-}
+  async function loadReplay(file?: File) {
+    if (!file) return;
+    try {
+      if (file.size > 2000000) throw Error();
+      pipeline.loadReplay(JSON.parse(await file.text()));
+    } catch {
+      session.set({ error: copy.rejected });
+    }
+  }
+  async function exportKpis() {
+    try {
+      download(await api("kpis", validKPIKnowledgeBase), copy.kpiFile);
+    } catch {
+      session.set({ error: copy.unavailable });
+    }
+  }
+  async function runSelected() {
+    const node = pipeline.registry.nodes.find(
+      (item) => item.id === session.selected,
+    );
+    if (!node || node.capability !== "executable" || session.mode === "replay")
+      return;
+    try {
+      const saved = inspectionState(node.id);
+      const input = await api("nodes/" + node.id + "/input", validPaneResponse);
+      execute(
+        (node.command ?? []).join("-"),
+        saved?.parameters ?? {},
+        saved?.runs?.input || input.runs?.[0],
+      );
+    } catch {
+      session.set({ error: copy.unavailable });
+    }
+  }
+  useEffect(() => {
+    document.documentElement.dataset.theme = preferences.theme;
+    document.title = copy.app;
+  }, [preferences.theme]);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const typing = !!(event.target as HTMLElement).closest(
+        "input,textarea,select",
+      );
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        session.set({ panel: null, help: null });
+        setPalette((old) => !old);
+      }
+      if (!typing && event.key === "?")
+        session.set({ help: session.help === null ? -1 : null });
+      if (event.key === "Escape") {
+        setPalette(false);
+        setConfirmation(null);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [session]);
+  useEffect(() => {
+    if (palette) paletteInput.current?.focus();
+  }, [palette]);
+  useEffect(() => {
+    const target = document.querySelector<HTMLElement>(
+      session.help !== null
+        ? ".help-drawer"
+        : palette
+          ? ".command-palette"
+          : confirmation
+            ? ".confirm-dialog"
+            : session.panel
+              ? ".node-panel"
+              : "[data-no-dialog]",
+    );
+    if (!target) return;
+    const before = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      [
+        ...target.querySelectorAll<HTMLElement>(
+          'button:not(:disabled),input:not(:disabled),select,textarea,summary,[tabindex="0"]',
+        ),
+      ].filter((element) => element.getBoundingClientRect().width > 0);
+    window.setTimeout(() => focusable()[0]?.focus(), 100);
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault();
+        items.at(-1)?.focus();
+      } else if (!event.shiftKey && document.activeElement === items.at(-1)) {
+        event.preventDefault();
+        items[0].focus();
+      }
+    };
+    target.addEventListener("keydown", trap);
+    return () => {
+      target.removeEventListener("keydown", trap);
+      if (before?.isConnected) before.focus();
+    };
+  }, [session.panel, session.help, palette, confirmation]);
+  const selected = pipeline.registry.nodes.find(
+    (n) => n.id === session.selected,
+  );
+  const disabled =
+    pipeline.busy || !!pipeline.active || session.mode === "replay";
+  function execute(
+    command: string,
+    parameters: Record<string, string | number | boolean | string[]> = {},
+    upstream?: string,
+  ) {
+    if (command === "rebuild-index" && parameters.force) {
+      setConfirmation(
+        () => () => pipeline.execute(command, parameters, upstream),
+      );
+      return;
+    }
+    pipeline.execute(command, parameters, upstream);
+  }
+  const choices = pipeline.registry.nodes.filter((n) =>
+    label(n.label_key).toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <main>
+      <div
+        className="workstation"
+        inert={
+          !!session.panel || session.help !== null || palette || !!confirmation
+        }
+      >
+        <header className="topbar">
+          <div className="pipeline-badge">
+            <i className="status-dot done" />
+            <span>
+              {pipeline.index.source === "synthetic"
+                ? copy.demo
+                : copy.production}
+            </span>
+          </div>
+          <div className="toolbar" role="toolbar" aria-label={copy.runAll}>
+            <Button
+              icon="run"
+              title={copy.runAll}
+              className="primary"
+              disabled={disabled}
+              onClick={() => execute("run-all")}
+            />
+            <Button
+              icon="flask"
+              title={copy.runSelected}
+              disabled={disabled || selected?.capability !== "executable"}
+              onClick={() => void runSelected()}
+            />
+            <Button
+              icon="stop"
+              title={copy.stop}
+              disabled={!pipeline.active || session.mode === "replay"}
+              onClick={pipeline.cancel}
+            />
+            <Button
+              icon="resume"
+              title={copy.resume}
+              disabled={
+                disabled ||
+                !pipeline.runs.some((r) =>
+                  ["failed", "cancelled", "interrupted"].includes(r.status),
+                )
+              }
+              onClick={pipeline.resume}
+            />
+            <i className="toolbar-divider" />
+            <Button
+              icon="lens"
+              title={copy.lens}
+              className={preferences.lens !== "flow" ? "active" : ""}
+              onClick={() =>
+                preferences.set({
+                  lens:
+                    preferences.lens === "flow"
+                      ? "quality"
+                      : preferences.lens === "quality"
+                        ? "cost"
+                        : "flow",
+                })
+              }
+            />
+            <Button
+              icon="privacy"
+              title={copy.privacy}
+              className={session.trace ? "active" : ""}
+              disabled={!pipeline.traceAvailable || session.mode === "replay"}
+              onClick={() => session.set({ trace: !session.trace })}
+            />
+            <Button
+              icon="theme"
+              title={copy.theme}
+              onClick={() =>
+                preferences.set({
+                  theme: preferences.theme === "dark" ? "light" : "dark",
+                })
+              }
+            />
+            <Button
+              icon="help"
+              title={copy.help}
+              onClick={() => session.set({ help: -1 })}
+            />
+          </div>
+          <div className="mode-switch">
+            <button
+              className={session.mode === "live" ? "active" : ""}
+              onClick={() => session.set({ mode: "live" })}
+            >
+              {copy.live}
+            </button>
+            <button
+              className={session.mode === "replay" ? "active" : ""}
+              onClick={() =>
+                session.set({ mode: "replay", trace: false, error: "" })
+              }
+            >
+              {copy.replay}
+            </button>
+            {session.mode === "replay" && (
+              <label className="icon-upload" title={copy.importReplay}>
+                <Icon name="import" />
+                <input
+                  type="file"
+                  accept="application/json"
+                  aria-label={copy.importReplay}
+                  onChange={(event) => void loadReplay(event.target.files?.[0])}
+                />
+              </label>
+            )}
+          </div>
+        </header>
 
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
+        <Canvas
+          registry={pipeline.registry}
+          stages={pipeline.stages}
+          active={!!pipeline.active || session.mode === "replay"}
+          coverage={pipeline.coverage}
+          cost={pipeline.cost}
+        />
+        <div className="public-exports">
+          <Button
+            icon="export"
+            title={copy.exportIndex}
+            onClick={() => {
+              if (validIndexSnapshot(pipeline.index))
+                download(pipeline.index, copy.indexFile);
+              else session.set({ error: copy.rejected });
+            }}
+          />
+          <Button
+            icon="aggregate"
+            title={copy.exportKpis}
+            disabled={session.mode === "replay"}
+            onClick={() => void exportKpis()}
+          />
+        </div>
+        <div className="lens-badge" title={copy.lens}>
+          <Icon
+            name={
+              preferences.lens === "flow"
+                ? "run"
+                : preferences.lens === "quality"
+                  ? "validate"
+                  : "limiter"
+            }
+          />
+          <span>{copy[preferences.lens]}</span>
+          <i className="status-dot" />
+        </div>
+        <Suspense fallback={null}>
+          <Drawer {...pipeline} />
+        </Suspense>
+        <Tour />
+      </div>
+      {session.trace && (
+        <div className="trace-banner" role="status">
+          <Icon name="privacy" size={16} />
+          {copy.trace}
+        </div>
+      )}
+      <Panel
+        registry={pipeline.registry}
+        active={!!pipeline.active || pipeline.busy}
+        onExecute={execute}
+      />
+      <Help />
+      <AnimatePresence>
+        {session.error && (
+          <motion.button
+            role="alert"
+            className="error-chip"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => session.set({ error: "" })}
+            title={session.error}
+          >
+            <Icon name="cross" />
+            <span>{session.error}</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {palette && (
+          <motion.div
+            className="palette-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setPalette(false);
+            }}
+          >
+            <section
+              className="command-palette"
+              role="dialog"
+              aria-modal="true"
+              aria-label={copy.palette}
+            >
+              <div>
+                <Icon name="search" />
+                <input
+                  ref={paletteInput}
+                  aria-label={copy.palette}
+                  placeholder={copy.palette}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(0);
+                  }}
+                />
+                <Button
+                  icon="close"
+                  title={copy.close}
+                  onClick={() => setPalette(false)}
+                />
+              </div>
+              {choices.slice(page * 6, page * 6 + 6).map((n) => (
+                <button
+                  data-command={n.id}
+                  key={n.id}
+                  onClick={() => {
+                    preferences.set({
+                      hidden: (preferences.hidden ?? []).filter(
+                        (id) => id !== n.id,
+                      ),
+                    });
+                    session.set({ selected: n.id, panel: n.id });
+                    setPalette(false);
+                  }}
+                >
+                  <Icon name={n.icon} />
+                  {label(n.label_key)}
+                  <span
+                    className={`status-dot ${n.capability === "planned" ? "idle" : ""}`}
+                  />
+                </button>
+              ))}
+              <div className="pager">
+                <Button
+                  icon="previous"
+                  title={copy.previous}
+                  disabled={!page}
+                  onClick={() => setPage(page - 1)}
+                />
+                <span>
+                  {page + 1}/{Math.max(1, Math.ceil(choices.length / 6))}
+                </span>
+                <Button
+                  icon="next"
+                  title={copy.next}
+                  disabled={(page + 1) * 6 >= choices.length}
+                  onClick={() => setPage(page + 1)}
+                />
+              </div>
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {confirmation && (
+        <div className="palette-backdrop">
+          <section
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={copy.force}
+          >
+            <Icon name="cache" />
+            <span>{copy.backup}</span>
+            <strong>{copy.force}</strong>
+            <button onClick={() => setConfirmation(null)}>{copy.cancel}</button>
+            <button
+              className="primary"
+              onClick={() => {
+                confirmation();
+                setConfirmation(null);
+              }}
+            >
+              {copy.confirm}
+            </button>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
