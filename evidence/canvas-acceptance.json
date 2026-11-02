@@ -1,0 +1,160 @@
+{
+  "checked_at_utc": "2026-11-02T15:27:39.020907+00:00",
+  "source_commits": [
+    "9f989f0",
+    "1ededaa",
+    "59d4c8e",
+    "004c5d8",
+    "5ab2c80",
+    "52f5b63",
+    "972cdf7",
+    "443f3ad",
+    "44a4653",
+    "12575e2",
+    "487aefd",
+    "e139129"
+  ],
+  "offline_check": {
+    "tests_passed": 454,
+    "seconds": 175.17,
+    "coverage_percent": 84.95,
+    "format_files": 136,
+    "typed_source_files": 71,
+    "network_refused": true,
+    "log": "data/final-delivery-check.log"
+  },
+  "web": {
+    "widths": [
+      1280,
+      1440
+    ],
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "unique_project_cases": 52,
+    "canvas_cases_passed": 40,
+    "axe_violations": 0,
+    "typecheck": "passed",
+    "lint": "passed",
+    "build": "passed",
+    "node_panels": 54,
+    "incremental_executed_cases": 64,
+    "provenance_live_cases_passed": 12,
+    "graph_canvas_cases_passed": 8,
+    "contextual_help_cases_passed": 4,
+    "runs_are_incremental_not_one_final_full_suite": true,
+    "screenshots_reviewed": [
+      "production-1440-dark",
+      "evidence-1280-light",
+      "canvas-1280-light"
+    ]
+  },
+  "mutants": {
+    "selected": 8,
+    "killed": 8,
+    "survived": 0,
+    "malformed": 0,
+    "batches": [
+      6,
+      1,
+      1
+    ],
+    "historical_61_not_rerun": true
+  },
+  "synthetic": {
+    "version": "v1",
+    "documents": 500,
+    "companies": 125,
+    "seasons": 4,
+    "calls": 500,
+    "resumed": 0,
+    "validator_classes": {
+      "clean": {
+        "documents": 100,
+        "flagged": 0,
+        "precision": null,
+        "recall": null,
+        "false_positives": 0
+      },
+      "missing_quote": {
+        "documents": 100,
+        "flagged": 100,
+        "precision": 1.0,
+        "recall": 1.0,
+        "false_positives": 0
+      },
+      "wrong_number": {
+        "documents": 100,
+        "flagged": 100,
+        "precision": 1.0,
+        "recall": 1.0,
+        "false_positives": 0
+      },
+      "wrong_period": {
+        "documents": 100,
+        "flagged": 100,
+        "precision": 1.0,
+        "recall": 1.0,
+        "false_positives": 0
+      },
+      "wrong_sign": {
+        "documents": 100,
+        "flagged": 100,
+        "precision": 1.0,
+        "recall": 1.0,
+        "false_positives": 0
+      }
+    },
+    "validator_reason_scores": {
+      "number_not_in_quote": {
+        "true_positives": 100,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "quote_missing": {
+        "true_positives": 100,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "number_not_in_source": {
+        "true_positives": 200,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      }
+    },
+    "pandas_agreement": true,
+    "network_required": false
+  },
+  "fresh_clone": {
+    "bootstrap": "passed",
+    "no_key_init": "passed",
+    "dated_plan": "passed",
+    "web_build": "passed",
+    "used_host_tools_and_caches": true,
+    "offline_check": {
+      "tests_passed": 452,
+      "seconds": 176.32,
+      "coverage_percent": 84.88,
+      "secrets_absent": true,
+      "network_refused": true,
+      "predates_final_provenance_and_duration_regressions": true
+    }
+  },
+  "limitations": [
+    "Other Python versions, architectures and Linux distributions not exercised",
+    "Human labels, five-record spot-check and NDA confirmation pending",
+    "RAPTOR, XBRL and Nowcast planned",
+    "Synthetic scores do not establish real-release accuracy",
+    "Primary extraction is running; final coverage and publication remain pending",
+    "Graph imports preserve layout and edges within a known command group; Run all retains canonical CLI order",
+    "Evidence UI shows bounded row excerpts; full source is available only through the private API",
+    "No off-machine firewall verification; no shared-hosting authentication"
+  ]
+}

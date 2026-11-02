@@ -1,0 +1,16 @@
+{
+  "HANDOVER.md": {
+    "sha256": "b420e6d0a8e8a5898a69ae34d79bb3d31071861669b804342c513ecac310b05b",
+    "source": "working tree before canvas documentation replacement",
+    "matches_commit": "12575e2"
+  },
+  "README.md": {
+    "sha256": "805584c2590b447d753bececb2aa60af7692f09fbc3ea3e5540ffa52cbec1bfd",
+    "source": "working tree before canvas documentation replacement",
+    "matches_commit": "12575e2"
+  },
+  "status.md": {
+    "sha256": "3ffa0577372cf4b4347f89273c83ed03ed06e0cdc22b5c58337eaa98f11ec12f",
+    "source": "working tree before canvas documentation replacement"
+  }
+}
