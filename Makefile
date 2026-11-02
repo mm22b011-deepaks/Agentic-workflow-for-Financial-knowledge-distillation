@@ -1,6 +1,8 @@
 PYTHON ?= .venv/bin/python
 RUFF = .venv/bin/ruff
-.PHONY: check lint format typecheck test demo website references web-build mutations audit-online
+.PHONY: bootstrap check lint format typecheck test demo website references web-build mutations audit-online
+bootstrap:
+	./setup.sh bootstrap
 check: lint format typecheck test
 lint:
 	$(RUFF) check src scripts tests

@@ -141,6 +141,7 @@ class ParsingConfig:
 class LLMConfig:
     """Model caller settings; only free OpenRouter models are permitted."""
 
+    offline: bool = False
     base_url: str = ''
     api_key_env: str = 'OPENROUTER_API_KEY'
     models: tuple[str, ...] = ()
@@ -415,7 +416,12 @@ def _coerce_override(raw_value: object, existing: Any) -> Any:
     return raw_value if isinstance(raw_value, str) else str(raw_value)
 
 
-def load_config(path: Path | str | None = None, overrides: dict[str, str] | None = None) -> Config:
+def load_config(
+    path: Path | str | None = None,
+    overrides: dict[str, str] | None = None,
+    *,
+    local: bool | None = None,
+) -> Config:
     """Load and validate the YAML config, optionally applying dotted-key overrides."""
     config_path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
     if not config_path.is_file():
@@ -427,6 +433,18 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
     raw: dict[str, Any] = raw_loaded or {}
     if not isinstance(raw, dict):
         raise ConfigError('config root must be a mapping')
+    local_path = config_path.parent / 'local.yaml'
+    if local is None:
+        local = os.environ.get('TRESATA_IGNORE_LOCAL_CONFIG') != '1'
+    if local and config_path.name == 'config.yaml' and local_path.is_file():
+        local_raw = yaml.safe_load(local_path.read_text()) or {}
+        if not isinstance(local_raw, dict):
+            raise ConfigError('local config root must be a mapping')
+        for name, section in local_raw.items():
+            if isinstance(section, dict) and isinstance(raw.get(name), dict):
+                raw[name] = {**raw[name], **section}
+            else:
+                raw[name] = section
     if overrides:
         raw = _apply_overrides(raw, overrides)
     _reject_unknown_sections(raw)
