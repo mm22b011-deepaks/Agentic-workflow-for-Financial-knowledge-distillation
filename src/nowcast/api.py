@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from nowcast.aggregation.aggregate import assert_index_level_only
 from nowcast.config import load_config
-from nowcast.contracts import IndexSnapshot, RunEvent, RunRequest, RunStatus
+from nowcast.contracts import IndexSnapshot, RunEvent, RunRequest, RunStatus, ScheduleSnapshot
 from nowcast.jobs import store_for
 from nowcast.paths import Paths
 from nowcast.registry import load_registry
@@ -216,6 +216,12 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
             'latency_p95_seconds': float(latency.quantile(0.95)) if not latency.empty else None,
             'xbrl_saved_calls': None,
         }
+
+    @app.get('/api/v1/schedule', response_model=ScheduleSnapshot)
+    def schedule() -> ScheduleSnapshot:
+        from nowcast.scheduler import Scheduler
+
+        return ScheduleSnapshot.model_validate(Scheduler(config, config_path).snapshot())
 
     @app.get('/api/v1/trace')
     def trace(request: Request) -> dict[str, Any]:

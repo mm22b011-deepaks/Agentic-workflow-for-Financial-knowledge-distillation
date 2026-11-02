@@ -9,14 +9,21 @@ from typer.testing import CliRunner
 
 from nowcast.app import app
 from nowcast.config import load_config
-from nowcast.contracts import IndexSnapshot, Registry, RunEvent, RunRequest, RunStatus
+from nowcast.contracts import (
+    IndexSnapshot,
+    Registry,
+    RunEvent,
+    RunRequest,
+    RunStatus,
+    ScheduleSnapshot,
+)
 from nowcast.registry import load_registry
 
 
 def main() -> None:
     config = load_config(ROOT / 'configs/config.yaml')
     registry = load_registry(config)
-    for model in (Registry, RunRequest, RunStatus, RunEvent, IndexSnapshot):
+    for model in (Registry, RunRequest, RunStatus, RunEvent, IndexSnapshot, ScheduleSnapshot):
         path = ROOT / 'schemas' / (model.__name__ + '.json')
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(model.model_json_schema(), indent=2) + '\n')

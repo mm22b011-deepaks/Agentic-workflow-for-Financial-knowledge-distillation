@@ -23,6 +23,18 @@ def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
         'extract': [paths.extractions(config) / 'extractions.parquet'],
         'aggregate': [paths.aggregates(config) / 'index_aggregates.parquet'],
         'demo': [paths.resolve('demo/verification.json')],
+        'freeze-panel': [paths.resolve('manifests/panel.json')],
+        'validate-index': [paths.resolve(config.data.document_index)],
+        'estimate-scope': [paths.resolve('manifests/estimate-scope.json')],
+        'doctor': [paths.resolve('manifests/doctor.json')],
+        'export': [paths.resolve('exports/index.json')],
+        'prepare-labels': [paths.resolve('inputs/label-sheet.json')],
+        'quality-summary': [paths.resolve('manifests/quality-summary.json')],
+        'report': [paths.resolve(config.reporting.report_path)],
+        'model-bakeoff': sorted(
+            paths.manifests(config).glob('bakeoff/*/scores.json'),
+            key=lambda path: path.stat().st_mtime,
+        )[-1:],
     }
     return choices.get(stage, [])
 
@@ -40,6 +52,18 @@ def record_artifacts(
     store: JobStore, job_id: str, stage: str, config: Config, config_path: Path
 ) -> None:
     payload = fingerprint_files(stage_files(config, config_path, stage))
+    from nowcast.storage import atomic_bytes
+
+    for index, item in enumerate(payload):
+        snapshot = (
+            store.path.parent
+            / 'runs'
+            / job_id
+            / stage
+            / (str(index) + '-' + Path(item['path']).name)
+        )
+        atomic_bytes(Path(item['path']).read_bytes(), snapshot)
+        item['snapshot'] = str(snapshot)
     with store.engine.begin() as connection:
         connection.execute(
             text(
@@ -82,5 +106,6 @@ def validate_upstream(
             if not row or row['config_fingerprint'] != config_fingerprint(config):
                 raise ValueError('upstream fingerprint is missing or stale')
             files = json.loads(row['files'])
-            if fingerprint_files([Path(item['path']) for item in files]) != files:
+            original = [{'path': item['path'], 'sha256': item['sha256']} for item in files]
+            if fingerprint_files([Path(item['path']) for item in files]) != original:
                 raise ValueError('upstream artifacts changed; run the workflow again')

@@ -10,9 +10,10 @@ from typing import Any, Protocol
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, ModelNotFound
+from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, ModelNotFound, RateLimited
 from nowcast.llm.caller import LLMResult
 from nowcast.llm.prompts import PromptBundle, render_template
+from nowcast.llm.receipts import RequestUncertain
 
 LOGGER = logging.getLogger(__name__)
 FENCE_RE = re.compile(r'^```[a-zA-Z]*\s*|\s*```$')
@@ -77,7 +78,7 @@ def extract_structured(
             # A spend cap is a deliberate stop, not a per-document failure: let it
             # reach the runner so the batch halts instead of being reported as llm_failed.
             raise
-        except (EmptyCompletion, AuthError, ModelNotFound):
+        except (EmptyCompletion, AuthError, ModelNotFound, RateLimited, RequestUncertain):
             # Not a parse failure and not repairable by prompting: the model had nothing
             # to say, or the credential/model is wrong. Propagate so the runner reports
             # `truncated` / aborts, instead of calling it llm_failed and repairing it.

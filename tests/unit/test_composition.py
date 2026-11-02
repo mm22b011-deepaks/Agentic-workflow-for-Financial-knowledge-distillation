@@ -223,6 +223,11 @@ def test_cli_extract_uses_retrying_caller(
         ]
     ).to_parquet(root / config.data.document_index, index=False)
 
+    import dataclasses
+
+    from nowcast.config import ScopeConfig
+
+    config = dataclasses.replace(config, scope=ScopeConfig())
     monkeypatch.setattr(cli, '_load', lambda _args: config)
     monkeypatch.setattr(cli, 'start_manifest', lambda *_a, **_k: _NullManifest())
     monkeypatch.setattr('nowcast.extraction.runner.run_extraction', fake_run)

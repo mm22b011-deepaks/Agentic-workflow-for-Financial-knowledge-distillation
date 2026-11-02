@@ -113,6 +113,8 @@ class RunRequest(Contract):
     submission_id: str = Field(pattern=r'^[a-zA-Z0-9-]{8,80}$')
     node_id: str | None = None
     upstream_run_id: str | None = None
+    command_id: str | None = None
+    parameters: dict[str, str | int | float | bool | list[str]] = Field(default_factory=dict)
 
 
 class RunStatus(Contract):
@@ -187,3 +189,41 @@ class IndexSnapshot(Contract):
                 elif isinstance(value, str):
                     raise ValueError('Index observations must be numeric')
         return rows
+
+
+class ScheduleDay(Contract):
+    utc_day: str
+    local_time: str
+    used: int
+    budget: int
+    configured_limit: int
+    today: bool
+    planned_requests: int
+    retry_reserve: int
+    planned_by_task: dict[str, int]
+
+
+class ScheduleTask(Contract):
+    id: str
+    status: Literal['pending', 'due', 'running', 'done', 'blocked', 'failed']
+    earliest_day: str
+    quota_cost: int
+    attempts: int
+    last_error: str | None
+    next_eligible: float | None
+    human: bool
+    capability: Literal['executable', 'planned', 'human'] = 'executable'
+
+
+class ScheduleSnapshot(Contract):
+    version: Literal['v1'] = 'v1'
+    utc_day: str
+    local_time: str
+    paused: bool
+    models_confirmed: bool
+    auth_blocked: bool
+    next_run_utc: str
+    next_run_local: str
+    forecast: dict[str, str | int | float | list[str] | None]
+    days: list[ScheduleDay]
+    tasks: list[ScheduleTask]

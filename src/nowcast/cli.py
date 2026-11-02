@@ -6,6 +6,7 @@ import argparse
 import dataclasses
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +112,9 @@ def _cmd_build_constituents(args: argparse.Namespace) -> int:
     from nowcast.ingestion.universe.builder import build_constituents
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     path = build_constituents(config)
     LOGGER.info('constituents written: %s', path)
     return 0
@@ -123,6 +126,9 @@ def _cmd_estimate_scope(args: argparse.Namespace) -> int:
 
     config = _load(args)
     estimate = estimate_scope(config)
+    from nowcast.storage import atomic_json
+
+    atomic_json(dataclasses.asdict(estimate), manifests_dir(config) / 'estimate-scope.json')
     for line in estimate.as_lines():
         LOGGER.info('%s', line)
     return 0
@@ -136,7 +142,9 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     from nowcast.ingestion.universe.builder import _resolve_input
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     manifest = start_manifest(config, stage='ingest')
     constituents = _resolve_input(config, config.data.constituents_csv)
     if constituents is None:
@@ -262,7 +270,9 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     from nowcast.llm.ledger import BudgetLedger
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     manifest = start_manifest(config, stage='extract')
     manifest.prompt_hashes = _prompt_fingerprints(config)
     source_index = index_path(config)
@@ -367,7 +377,9 @@ def _cmd_rebuild_index(args: argparse.Namespace) -> int:
     )
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     chosen = getattr(args, 'source', None)
     active = resolve_data_path(config, config.data.document_index)
     if not chosen and active.is_file() and not load_index(active).empty:
@@ -407,7 +419,9 @@ def _cmd_aggregate(args: argparse.Namespace) -> int:
     from nowcast.ingestion.constituents import load_constituents
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     manifest = start_manifest(config, stage='aggregate')
     source = consolidated_path(config)
     if not source.is_file():
@@ -415,6 +429,20 @@ def _cmd_aggregate(args: argparse.Namespace) -> int:
     frame = pd.read_parquet(source)
     constituents_path = resolve_data_path(config, config.data.constituents_csv)
     constituents = load_constituents(constituents_path)
+    from nowcast.scope import dimensions, freeze_scope, scoped_membership
+
+    if any(dimensions(config)):
+        panel = freeze_scope(config, constituents)
+        pairs = {(row['cik'], row['season']) for row in panel['pairs']}
+        from nowcast.extraction.selection import season_of_date
+
+        if not frame.empty:
+            selected = [
+                (str(row.cik).zfill(10), season_of_date(str(row.report_date))) in pairs
+                for row in frame.itertuples()
+            ]
+            frame = frame.loc[selected].copy()
+        config, _ = scoped_membership(config, constituents)
     aggregate = aggregate_index(config, frame, str(constituents_path))
     # The guardrail runs before the write, not after: a file that exists has been read.
     assert_index_level_only(aggregate, constituents)
@@ -435,11 +463,15 @@ def _cmd_model_bakeoff(args: argparse.Namespace) -> int:
     from nowcast.ingestion.rebuild import index_path
 
     config = _load(args)
-    validate_config(config, strict=True)
+    problems = validate_config(config)
+    if problems:
+        raise ConfigError('; '.join(problems))
     source = index_path(config)
     if not source.is_file():
         raise DataError(f'no document index at {source}; run rebuild-index first')
     models = args.model or list(config.llm.models)
+    if any(not model.endswith(':free') for model in models):
+        raise ConfigError('every model must end in :free')
     table = run_bakeoff(
         config,
         models,
@@ -467,6 +499,7 @@ def _cmd_run_all(args: argparse.Namespace) -> int:
     steps = (
         _cmd_validate_config,
         _cmd_build_constituents,
+        _cmd_estimate_scope,
         _cmd_ingest,
         _cmd_extract,
         _cmd_aggregate,
@@ -475,7 +508,22 @@ def _cmd_run_all(args: argparse.Namespace) -> int:
         code = step(args)
         if code != 0:
             return code
+    from nowcast.operations import export_index
+
+    export_index(_load(args))
     return 0
+
+
+def _cmd_utility(args: argparse.Namespace) -> int:
+    from nowcast.operations import execute
+
+    return execute(args.command, _load(args), args)
+
+
+def _cmd_schedule(args: argparse.Namespace) -> int:
+    from nowcast.scheduler import command
+
+    return command(_load(args), Path(args.config).resolve(), args)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -495,11 +543,25 @@ def build_parser() -> argparse.ArgumentParser:
         'aggregate': (_cmd_aggregate, 'aggregate extractions into index-level rows'),
         'model-bakeoff': (_cmd_model_bakeoff, 'measure every configured model on one sample'),
         'run-all': (_cmd_run_all, 'run every stage in order'),
+        'doctor': (_cmd_utility, 'check credentials, contact, models, disk and quota'),
+        'freeze-panel': (_cmd_utility, 'freeze the selected fixed panel'),
+        'validate-index': (_cmd_utility, 'validate an index in place'),
+        'supersede-stale': (_cmd_utility, 'explicitly archive stale extraction results'),
+        'demo': (_cmd_utility, 'run the 500-release offline verification'),
+        'serve': (_cmd_utility, 'serve the workstation website on all IPv4 interfaces'),
+        'export': (_cmd_utility, 'export identifier-free index artifacts'),
+        'prepare-labels': (_cmd_utility, 'prepare a private thirty-record label sheet'),
+        'quality-summary': (_cmd_utility, 'write the quality and human-gate summary'),
+        'report': (_cmd_utility, 'write the current quality report'),
     }
     for name, (handler, help_text) in common.items():
         sub = subparsers.add_parser(name, help=help_text)
         _add_common(sub)
-        if name == 'extract':
+        if name == 'serve':
+            sub.add_argument('--port', type=int, default=8767, help='website TCP port')
+        if name == 'validate-index':
+            sub.add_argument('--source', type=Path, default=None, help='index to validate in place')
+        if name in {'extract', 'run-all'}:
             sub.add_argument('--limit', type=int, default=0, help='only the first N documents')
             sub.add_argument(
                 '--sample',
@@ -530,6 +592,31 @@ def build_parser() -> argparse.ArgumentParser:
                 help='also require the secret environment variables to be set',
             )
         sub.set_defaults(handler=handler)
+    schedule = subparsers.add_parser('schedule', help='plan and run quota-aware tasks')
+    actions = schedule.add_subparsers(dest='schedule_action', required=True)
+    for name in ('plan', 'status', 'run', 'pause', 'resume', 'install', 'uninstall'):
+        sub = actions.add_parser(name, help='schedule ' + name)
+        _add_common(sub)
+        if name == 'run':
+            mode = sub.add_mutually_exclusive_group()
+            mode.add_argument(
+                '--once', action='store_true', help='perform due work and exit (default)'
+            )
+            mode.add_argument(
+                '--daemon', action='store_true', help='wait and perform due work continuously'
+            )
+            sub.add_argument(
+                '--automatic', action='store_true', help='respect the configured daily UTC run time'
+            )
+        if name == 'resume':
+            sub.add_argument(
+                '--confirm-models', action='store_true', help='human approval of model batches'
+            )
+        if name in {'install', 'uninstall'}:
+            sub.add_argument(
+                '--confirm', action='store_true', help='approve the displayed timer changes'
+            )
+        sub.set_defaults(handler=_cmd_schedule)
     return parser
 
 
@@ -538,6 +625,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        readers = {
+            'validate-config',
+            'validate-index',
+            'estimate-scope',
+            'doctor',
+            'serve',
+            'schedule',
+        }
+        if args.command not in readers and not os.environ.get('NOWCAST_JOB_ID'):
+            from nowcast.paths import Paths
+            from nowcast.storage import file_lock
+
+            try:
+                with file_lock(Paths.from_config(_load(args)).root / '.pipeline', blocking=False):
+                    return int(args.handler(args))
+            except BlockingIOError as exc:
+                raise DataError('another pipeline writer is active') from exc
         return int(args.handler(args))
     except (ConfigError, DataError, NowcastError) as exc:
         LOGGER.error('error: %s', exc)

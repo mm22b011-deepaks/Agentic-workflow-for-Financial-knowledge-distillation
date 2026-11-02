@@ -54,6 +54,7 @@ class RuntimeConfig:
     seed: int = 0
     log_level: str = 'INFO'
     data_dir_env: str = 'DATA_DIR'
+    durable_requests: bool = False
 
 
 @dataclass(frozen=True)

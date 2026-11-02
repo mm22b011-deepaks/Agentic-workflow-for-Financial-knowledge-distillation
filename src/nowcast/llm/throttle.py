@@ -105,7 +105,7 @@ class SharedRequestLimiter:
         self.clock = clock
         self.sleep = sleep
 
-    def acquire(self) -> None:
+    def acquire(self) -> int:
         from datetime import datetime, timezone
 
         from sqlalchemy import text
@@ -143,13 +143,13 @@ class SharedRequestLimiter:
                     0, resume - now, 60 - (now - recent[0]) if len(recent) >= self.per_minute else 0
                 )
                 if wait <= 0:
-                    connection.execute(
+                    result = connection.execute(
                         text(
                             'INSERT INTO reservations (scope,timestamp,utc_day) VALUES (:scope,:now,:day)'
                         ),
                         params,
                     )
-                    return
+                    return int(result.lastrowid)
             self.sleep(min(wait, 30))
 
     def cooldown(self, seconds: float) -> None:
@@ -161,4 +161,13 @@ class SharedRequestLimiter:
                     'INSERT INTO cooldowns(scope,resume_at) VALUES (:scope,:until) ON CONFLICT(scope) DO UPDATE SET resume_at=max(resume_at,:until)'
                 ),
                 {'scope': self.scope, 'until': self.clock() + max(0, seconds)},
+            )
+
+    def release(self, reservation_id: int) -> None:
+        from sqlalchemy import text
+
+        with self.store.transaction() as connection:
+            connection.execute(
+                text('DELETE FROM reservations WHERE id=:id AND scope=:scope'),
+                {'id': reservation_id, 'scope': self.scope},
             )

@@ -258,12 +258,14 @@ def initialize(
             contact = ask('SEC contact (Name email) [' + contact + ']: ').strip() or contact
         if args.sec_contact_from_env:
             contact = os.environ.get('SEC_USER_AGENT', '')
-        if contact and not re.fullmatch(r'.+\s+[^\s@]+@[^\s@]+\.[^\s@]+', contact):
+        from nowcast.operations import contact_ready
+
+        if contact and not contact_ready(contact):
             print('SEC contact invalid; SEC downloads disabled')
             contact = ''
-        if contact:
+        if contact or values.get('SEC_USER_AGENT'):
             updates['SEC_USER_AGENT'] = contact
-        else:
+        if not contact:
             print('SEC contact missing; SEC downloads disabled')
         daily = args.daily_limit if args.daily_limit is not None else config.llm.requests_per_day
         minute = (
