@@ -219,6 +219,7 @@ def pane(
     if node not in {n.id for n in definitions.nodes}:
         raise DataError('unknown node')
     incoming = [e.source for e in definitions.edges if e.target == node and not e.sub]
+    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))
     selected = node
     if side == 'input':
         selected = upstream or UPSTREAM.get(node) or (incoming[0] if incoming else node)

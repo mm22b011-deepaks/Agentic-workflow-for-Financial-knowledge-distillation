@@ -252,6 +252,7 @@ export function Panel({
               key={id}
               nodeId={id ?? copy.empty}
               side="input"
+              upstreamValue={upstream}
               data={input}
               other={output}
               loading={loading}

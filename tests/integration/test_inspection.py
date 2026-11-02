@@ -166,6 +166,13 @@ def test_label_sheet_uses_only_current_index_scope(corpus, monkeypatch):
     assert [row['document_id'] for row in sheet['records']] == ['private-record']
 
 
+def test_inspector_names_the_upstream_artifact_it_reads(corpus):
+    with client_for() as client:
+        response = client.get('/api/v1/nodes/extract/input')
+        assert response.status_code == 200
+        assert response.json()['upstream'][0] == 'parse'
+
+
 def test_evidence_rejects_number_in_another_row_and_labels_are_csrf_protected(corpus, monkeypatch):
     monkeypatch.setenv('NOWCAST_INTERNAL_TRACE', '1')
     with client_for() as client:

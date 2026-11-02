@@ -114,7 +114,21 @@ export function usePipeline() {
   useEffect(() => {
     if (session.mode === "replay") {
       setIndex(replay);
-      setStages(demoData);
+      setStages(
+        replay.source === "synthetic"
+          ? demoData
+          : {
+              source: "pipeline",
+              nodes: registry.nodes.map((node) => ({
+                id: node.id,
+                status: node.capability === "planned" ? "planned" : "idle",
+                out_count:
+                  node.id === "aggregate" && replay.status === "available"
+                    ? replay.snapshots.length
+                    : null,
+              })),
+            },
+      );
       setCoverage(empty);
       setCost(empty);
       setBakeoff(empty);

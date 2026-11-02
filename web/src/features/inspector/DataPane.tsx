@@ -32,6 +32,7 @@ export function DataPane({
   onRun,
   onUpstream,
   onQuery,
+  upstreamValue = "",
 }: {
   nodeId: string;
   side: "input" | "output";
@@ -41,6 +42,7 @@ export function DataPane({
   onRun: (run: string) => void;
   onUpstream: (node: string) => void;
   onQuery: (query: Record<string, string>) => void;
+  upstreamValue?: string;
 }) {
   const session = useSession();
   const data =
@@ -237,6 +239,7 @@ export function DataPane({
         {side === "input" && !!data?.upstream?.length && (
           <select
             aria-label={copy.upstream}
+            value={upstreamValue || data.upstream[0]}
             onChange={(e) => onUpstream(e.target.value)}
           >
             {data.upstream.map((n) => (
@@ -246,7 +249,11 @@ export function DataPane({
             ))}
           </select>
         )}
-        <select aria-label={copy.runs} onChange={(e) => onRun(e.target.value)}>
+        <select
+          aria-label={copy.runs}
+          value={data?.run ?? ""}
+          onChange={(e) => onRun(e.target.value)}
+        >
           <option value="">{copy.live}</option>
           {data?.runs?.map((run, i) => (
             <option key={run} value={run}>
