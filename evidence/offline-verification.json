@@ -1,0 +1,70 @@
+{
+  "version": "v1",
+  "documents": 500,
+  "companies": 125,
+  "seasons": 4,
+  "calls": 500,
+  "resumed": 0,
+  "validator_classes": {
+    "clean": {
+      "documents": 100,
+      "flagged": 0,
+      "precision": null,
+      "recall": null,
+      "false_positives": 0
+    },
+    "missing_quote": {
+      "documents": 100,
+      "flagged": 100,
+      "precision": 1.0,
+      "recall": 1.0,
+      "false_positives": 0
+    },
+    "wrong_number": {
+      "documents": 100,
+      "flagged": 100,
+      "precision": 1.0,
+      "recall": 1.0,
+      "false_positives": 0
+    },
+    "wrong_period": {
+      "documents": 100,
+      "flagged": 100,
+      "precision": 1.0,
+      "recall": 1.0,
+      "false_positives": 0
+    },
+    "wrong_sign": {
+      "documents": 100,
+      "flagged": 100,
+      "precision": 1.0,
+      "recall": 1.0,
+      "false_positives": 0
+    }
+  },
+  "validator_reason_scores": {
+    "number_not_in_quote": {
+      "true_positives": 100,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "quote_missing": {
+      "true_positives": 100,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "number_not_in_source": {
+      "true_positives": 200,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  },
+  "pandas_agreement": true,
+  "network_required": false
+}
