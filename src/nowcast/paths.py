@@ -27,7 +27,7 @@ class Paths:
     def from_config(cls, config: Config) -> Paths:
         """Build the path set for a loaded config, honouring the data-dir env var."""
         override = os.environ.get(config.runtime.data_dir_env)
-        base = Path(config.config_dir or config.paths.project_dir)
+        base = Path(config.config_dir) / config.paths.project_dir
         root = Path(override) if override else base / config.paths.data_dir
         prompts = base / config.paths.prompts_dir
         return cls(root=root.resolve(), prompts=prompts.resolve())

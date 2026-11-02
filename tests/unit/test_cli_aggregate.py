@@ -101,8 +101,10 @@ def test_run_all_stops_at_first_failure(
     monkeypatch.setenv('DATA_DIR', str(data))
     monkeypatch.setenv('OPENROUTER_API_KEY', 'test-key')
     monkeypatch.setenv('SEC_USER_AGENT', 'nowcast-tests tests@example.com')
-    # No constituents file: build-constituents would try the network, so point ingest at
-    # a missing file instead and check the run stops there with a non-zero code.
+    # Refuse the build stage locally and prove later stages never execute.
+    import nowcast.cli as cli
+
+    monkeypatch.setattr(cli, '_cmd_build_constituents', lambda args: 2)
     code = main(
         [
             'run-all',

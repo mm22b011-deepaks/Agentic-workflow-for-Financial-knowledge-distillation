@@ -36,6 +36,7 @@ def _config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **overrides: object
         # These tests are about the company guardrail, not the observation guardrail;
         # the observation minimum has its own tests.
         'aggregation.min_observations': 1,
+        'aggregation.dedupe_rule': 'max_confidence',
     }
     values.update(overrides)
     return load_config(REPO / 'configs' / 'config.yaml', overrides=values)
@@ -371,13 +372,16 @@ def test_collapse_keeps_the_most_confident_row() -> None:
     assert dropped == 1
 
 
-def test_share_reported_never_exceeds_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reports_outside_filing_date_membership_are_excluded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """More reporting companies than active members is a data error, not a share above 1."""
     config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
     constituents = _constituents(tmp_path, count=2)
     rows = [_compass(document_id=f'doc-{index}', cik=f'{index + 1:010d}') for index in range(3)]
-    with pytest.raises(DataError, match='share_reported would exceed 1'):
-        aggregate_index(config, _extractions(rows), str(constituents))
+    result = aggregate_index(config, _extractions(rows), str(constituents))
+    assert result.loc[0, 'n_reported'] == 2
+    assert result.loc[0, 'share_reported'] == 1
 
 
 def test_review_excluded_is_per_asof(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -521,6 +525,11 @@ def test_output_columns_exact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         'n_expected',
         'share_reported',
         'n_review_excluded',
+        'n_planned',
+        'n_attempted',
+        'execution_complete',
+        'n_eligible_releases',
+        'n_guidance_providers',
         'share_of_cohort',
         'share_of_index',
         'theme_demand_share',
@@ -1046,3 +1055,19 @@ def test_revenue_growth_metric_reported(tmp_path: Path, monkeypatch: pytest.Monk
     assert 'revenue_growth_agg' in result.columns
     assert result.loc[0, 'revenue_growth_agg'] == pytest.approx(5.0)
     assert result.loc[0, 'metric_status_revenue_growth_agg'] == 'ok'
+
+
+def test_reports_cannot_exceed_the_recorded_cohort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path, monkeypatch, **{'aggregation.min_constituents': 1})
+    constituents = _constituents(tmp_path)
+    cohort = tmp_path / 'data/manifests/cohort.csv'
+    cohort.parent.mkdir(parents=True)
+    pd.DataFrame([{'cik': '0000000001', 'season': '2025Q2'}]).to_csv(cohort, index=False)
+    rows = [
+        _compass(document_id='one', cik='0000000001'),
+        _compass(document_id='two', cik='0000000002'),
+    ]
+    with pytest.raises(DataError, match='share_reported would exceed 1'):
+        aggregate_index(config, _extractions(rows), str(constituents))

@@ -42,7 +42,15 @@ def load_overrides(config: Config, root: Path | None = None) -> pd.DataFrame:
     if candidate.is_absolute():
         path = candidate
     else:
-        bases = [base for base in (root, data_root(config), Path.cwd()) if base is not None]
+        bases = [
+            base
+            for base in (
+                root,
+                data_root(config),
+                Path(config.config_dir) / config.paths.project_dir,
+            )
+            if base is not None
+        ]
         found = next((base / candidate for base in bases if (base / candidate).is_file()), None)
         if found is None:
             # The overrides file is optional: its absence means "no overrides", not an error.

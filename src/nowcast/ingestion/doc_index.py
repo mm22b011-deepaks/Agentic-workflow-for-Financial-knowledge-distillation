@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from nowcast.errors import DataError
+from nowcast.storage import atomic_parquet
 
 # `items` is the 8-K item list from the submissions feed ("2.02,9.01"). It is not part
 # of the pre-v2 index, so it is the one column `load_index` backfills rather than
@@ -86,7 +87,7 @@ def write_index(frame: pd.DataFrame, path: Path | str) -> Path:
     """Write the document index to parquet."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    frame[list(INDEX_COLUMNS)].to_parquet(target, index=False)
+    atomic_parquet(frame[list(INDEX_COLUMNS)], target)
     return target
 
 
@@ -96,3 +97,48 @@ def upsert_index(path: Path | str, rows: list[dict[str, object]]) -> pd.DataFram
     merged = upsert_rows(existing, rows)
     write_index(merged, path)
     return merged
+
+
+class IndexCheckpoint:
+    """Recover downloaded rows from fsynced receipts and batch expensive parquet writes."""
+
+    def __init__(self, path: Path, batch_size: int = 25) -> None:
+        import json
+
+        self.path = path
+        self.receipts = path.with_suffix('.receipts.jsonl')
+        self.frame = load_index(path)
+        self.pending: list[dict[str, object]] = []
+        self.batch_size = batch_size
+        if self.receipts.exists():
+            for line in self.receipts.read_text().splitlines():
+                try:
+                    self.pending.append(json.loads(line))
+                except ValueError:
+                    # A killed append may leave the final line incomplete; earlier receipts survive.
+                    break
+            self.flush()
+
+    def add(self, row: dict[str, object]) -> None:
+        """Durably acknowledge a completed download before returning to ingestion."""
+        import json
+        import os
+
+        self.receipts.parent.mkdir(parents=True, exist_ok=True)
+        with self.receipts.open('a') as handle:
+            handle.write(json.dumps(row) + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        self.pending.append(row)
+        if len(self.pending) >= self.batch_size:
+            self.flush()
+
+    def flush(self) -> None:
+        """Checkpoint receipts before removing them; replay after a crash is idempotent."""
+        if not self.pending:
+            self.receipts.unlink(missing_ok=True)
+            return
+        self.frame = upsert_rows(self.frame, self.pending)
+        write_index(self.frame, self.path)
+        self.receipts.unlink(missing_ok=True)
+        self.pending.clear()

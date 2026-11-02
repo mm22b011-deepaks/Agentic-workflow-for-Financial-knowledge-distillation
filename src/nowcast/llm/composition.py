@@ -13,6 +13,8 @@ import threading
 import time
 from typing import Any
 
+from pydantic import ValidationError
+
 from nowcast.config import Config, cache_dir
 from nowcast.errors import (
     AuthError,
@@ -22,9 +24,9 @@ from nowcast.errors import (
     RateLimited,
     TruncatedCompletion,
 )
+from nowcast.extraction.schema import ExtractionRecord
 from nowcast.llm.cache import ResponseCache, cache_key
 from nowcast.llm.caller import LLMResult
-from nowcast.llm.throttle import RequestLimiter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +49,13 @@ def cacheable_reply(text: str) -> bool:
         loaded = json.loads(candidate[start : end + 1])
     except json.JSONDecodeError:
         return False
-    return isinstance(loaded, dict)
+    if not isinstance(loaded, dict):
+        return False
+    try:
+        ExtractionRecord.model_validate(loaded)
+    except ValidationError:
+        return False
+    return True
 
 
 def retry_delay(exc: Exception, attempt: int, backoff: float, max_wait: float) -> float:
@@ -114,10 +122,14 @@ class RetryingCaller:
     ) -> LLMResult:
         """Return a cached or fresh completion, retrying transient failures only."""
         key = self._key(model, messages)
+        cache_started = time.perf_counter()
         cached = self._cache.get(key)
         if cached is not None and cacheable_reply(cached):
             with self._lock:
                 self.cache_hits += 1
+            note = getattr(self._caller, 'note_cache_hit', None)
+            if note is not None:
+                note(model, time.perf_counter() - cache_started)
             return LLMResult(text=cached, model=model, cached=True)
         attempts = max(1, int(self._config.llm.retry_attempts))
         backoff = float(self._config.llm.retry_backoff_seconds)
@@ -211,9 +223,13 @@ def make_caller(
         inner if inner is not None else LLMCaller(config.llm, ledger=ledger, transport=transport)
     )
     active_cache = cache if cache is not None else ResponseCache(config.cache, cache_dir(config))
-    limiter = RequestLimiter(
+    from nowcast.jobs import store_for
+    from nowcast.llm.throttle import SharedRequestLimiter
+
+    limiter = SharedRequestLimiter(
+        store_for(config),
+        config.llm.base_url,
         per_minute=int(config.llm.requests_per_minute),
         per_day=int(config.llm.requests_per_day),
-        cooldown_seconds=float(config.llm.cooldown_seconds),
     )
     return RetryingCaller(caller, active_cache, config, sleep=sleep, limiter=limiter)

@@ -61,6 +61,7 @@ class PathsConfig:
     """Directory layout settings, relative to the project or data directory."""
 
     project_dir: str = '.'
+    registry_file: str = 'configs/registry.yaml'
     data_dir: str = 'data'
     raw_dir: str = 'raw'
     cache_dir: str = '.cache/llm'
@@ -198,18 +199,22 @@ class ExtractionConfig:
     # list: a prompt offering a value the code rejects teaches the model to fail.
     eps_basis_vocab: tuple[str, ...] = ()
     guidance_direction_vocab: tuple[str, ...] = ()
+    guidance_presence_vocab: tuple[str, ...] = ('provided', 'not_provided')
     tone_vocab: tuple[str, ...] = ()
     tone_scores: dict[str, float] = field(default_factory=dict)
     review_reason_codes: tuple[str, ...] = ()
     # Interim packer (before R2): the head of the release plus windows around these
     # phrases, in document order.
     pack_phrases: tuple[str, ...] = ()
+    theme_direction_vocab: tuple[str, ...] = ('up', 'down', 'flat', 'mixed')
 
     def vocab(self, name: str) -> tuple[str, ...]:
         """Return one configured vocabulary by field name; () for a free-text field."""
         return {
             'eps_basis': self.eps_basis_vocab,
+            'prior_year_basis': self.eps_basis_vocab,
             'guidance_direction': self.guidance_direction_vocab,
+            'guidance_presence': self.guidance_presence_vocab,
             'tone': self.tone_vocab,
         }.get(name, ())
 
@@ -224,7 +229,8 @@ class AggregationConfig:
     winsorize_pct: float = 0.05
     # How a (company, season) reported more than once is reduced to one observation:
     # the row with the highest stored confidence, or the earliest document id.
-    dedupe_rule: str = 'max_confidence'
+    dedupe_rule: str = 'model_priority'
+    model_priority: tuple[str, ...] = ()
     # A metric observed by fewer companies than this is reported as NaN with a status,
     # not computed: one company's figure is that company's result.
     min_observations: int = 10
@@ -258,7 +264,7 @@ class UniverseConfig:
     subset_n: int = 0
     subset_seed: int = 42
     avg_tokens_per_doc_in: int = 6000
-    avg_tokens_per_doc_out: int = 800
+    avg_tokens_per_doc_out: int = 32768
     licence_note: str = ''
     refresh: bool = False
 
@@ -419,7 +425,7 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
         raise ConfigError("config key 'parsing.section_patterns' must be a mapping")
 
     return Config(
-        config_dir=str(config_path.resolve().parent.parent),
+        config_dir=str(config_path.resolve().parent),
         runtime=RuntimeConfig(**runtime),
         paths=PathsConfig(**paths),
         data=DataConfig(
@@ -526,7 +532,7 @@ def validate_config(config: Config, strict: bool = False) -> list[str]:
         problems.append('aggregation.winsorize_pct must be in [0, 0.5)')
     if config.aggregation.min_constituents < 1:
         problems.append('aggregation.min_constituents must be >= 1')
-    if config.aggregation.dedupe_rule not in {'max_confidence', 'first_document'}:
+    if config.aggregation.dedupe_rule not in {'max_confidence', 'first_document', 'model_priority'}:
         problems.append("aggregation.dedupe_rule must be 'max_confidence' or 'first_document'")
     if config.llm.max_tokens_ceiling < config.llm.max_tokens:
         problems.append('llm.max_tokens_ceiling must be >= llm.max_tokens')

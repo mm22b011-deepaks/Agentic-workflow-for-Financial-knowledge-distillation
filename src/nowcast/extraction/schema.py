@@ -17,7 +17,7 @@ class NullReason(str, Enum):
 class NumField(BaseModel):
     """A number the document states explicitly."""
 
-    value: float | None = None
+    value: float | None = Field(default=None, allow_inf_nan=False)
     null_reason: NullReason | None = None
     evidence_quote: str | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -54,8 +54,10 @@ class ExtractionRecord(BaseModel):
     prior_year_eps: NumField = NumField()
     consensus_eps: NumField = NumField()
     eps_basis: TextField = TextField()
+    prior_year_basis: TextField = TextField()
     revenue: NumField = NumField()
     revenue_yoy_growth: NumField = NumField()
+    guidance_presence: TextField = TextField()
     guidance_direction: TextField = TextField()
     guidance_metric: TextField = TextField()
     tone: TextField = TextField()

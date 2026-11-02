@@ -114,7 +114,10 @@ def test_prepare_text_records_how_much_was_sent(config: Config, tmp_path: Path) 
         sha256='h0',
     )
     short = dataclasses.replace(
-        config, extraction=dataclasses.replace(config.extraction, max_doc_chars=100)
+        config,
+        extraction=dataclasses.replace(
+            config.extraction, max_doc_chars=100, pack_phrases=('guidance',)
+        ),
     )
     prepared = runner.prepare_text(short, document)
     assert prepared.chars_total >= 500
@@ -198,7 +201,10 @@ def test_runner_stores_diagnostics_and_corrected_values(config: Config, tmp_path
         sha256='h0',
     )
     cut = dataclasses.replace(
-        config, extraction=dataclasses.replace(config.extraction, max_doc_chars=120)
+        config,
+        extraction=dataclasses.replace(
+            config.extraction, max_doc_chars=120, pack_phrases=('guidance',)
+        ),
     )
     caller = FakeCaller()
     outcomes = asyncio.run(
@@ -268,5 +274,7 @@ def test_pack_phrases_change_the_fingerprint(config: Config, tmp_path: Path) -> 
         sha256='h0',
     )
     packed = runner.fingerprint(config, document, 'model:free', 'digest')
-    unpacked_config = dc.replace(config, extraction=dc.replace(config.extraction, pack_phrases=()))
+    unpacked_config = dc.replace(
+        config, extraction=dc.replace(config.extraction, pack_phrases=('guidance',))
+    )
     assert runner.fingerprint(unpacked_config, document, 'model:free', 'digest') != packed

@@ -558,4 +558,5 @@ def test_stale_fingerprint_not_consolidated(config: Config, tmp_path: Path) -> N
 
     frame = runner.consolidate(config, [config.llm.models[0]])
     assert frame['document_id'].tolist() == ['doc0']
-    assert (extractions_dir(config) / 'superseded').is_dir()
+    assert path.is_file()
+    assert not (extractions_dir(config) / 'superseded').exists()

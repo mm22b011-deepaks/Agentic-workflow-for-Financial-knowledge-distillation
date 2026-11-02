@@ -22,6 +22,7 @@ from nowcast.errors import DataError
 from nowcast.extraction.review_queue import load_queue
 from nowcast.ingestion.doc_index import (
     INDEX_COLUMNS,
+    file_sha256,
     has_earnings_item,
     load_index,
     write_index,
@@ -125,6 +126,26 @@ def validate_index_rows(frame: pd.DataFrame, config: Config) -> list[IndexProble
     return problems
 
 
+def validate_index_contents(frame: pd.DataFrame, config: Config) -> list[IndexProblem]:
+    """Verify raw-file existence, hash and parseability before publishing a replacement."""
+    from nowcast.parsing.html import html_to_text
+
+    problems = []
+    for row in frame.to_dict('records'):
+        document_id = str(row.get('document_id', ''))
+        path = resolve_data_path(config, str(row.get('raw_path', '')))
+        try:
+            if not path.is_file():
+                problems.append(IndexProblem(document_id, 'raw_missing', str(path)))
+            elif file_sha256(path) != row.get('sha256'):
+                problems.append(IndexProblem(document_id, 'hash_mismatch', str(path)))
+            elif not html_to_text(path.read_text(encoding='utf-8', errors='replace')).strip():
+                problems.append(IndexProblem(document_id, 'parse_empty', str(path)))
+        except (OSError, ValueError) as exc:
+            problems.append(IndexProblem(document_id, 'raw_unreadable', type(exc).__name__))
+    return problems
+
+
 def index_path(config: Config) -> Path:
     """Return the configured document index path, resolved against the data root."""
     return resolve_data_path(config, config.data.document_index)
@@ -169,7 +190,7 @@ def _supersede_queue_rows(config: Config, document_ids: set[str]) -> int:
     if doomed.empty:
         return 0
     kept = queue.drop(doomed.index)
-    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     archive = queue_path.parent / SUPERSEDED_DIR / f'review_queue.{stamp}.parquet'
     archive.parent.mkdir(parents=True, exist_ok=True)
     doomed.to_parquet(archive, index=False)
@@ -215,6 +236,8 @@ def rebuild_index(
                 f'{target} already holds rows; rebuilding would replace it. '
                 'Pass --force to back it up and rebuild anyway.'
             )
+        if source_path is None:
+            raise DataError('replacing a populated index requires an explicit source')
         report.backup_path = _backup_target(target)
 
     problems = validate_index_rows(frame, config)
@@ -229,6 +252,10 @@ def rebuild_index(
         dropped |= set(old['document_id'].astype(str)) - set(kept['document_id'].astype(str))
     report.dropped_documents = sorted(dropped)
 
+    if report.backup_path is not None:
+        content_problems = validate_index_contents(kept, config)
+        if kept.empty or content_problems:
+            raise DataError('candidate failed raw-content validation; populated target preserved')
     write_index(kept, target)
     if supersede:
         report.superseded_extractions = _move_extractions(config, dropped)
@@ -245,7 +272,7 @@ def rebuild_index(
 
 def _backup_target(target: Path) -> Path:
     """Copy the existing target next to itself with a timestamp; never delete it."""
-    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     backup = target.with_name(f'{target.stem}.{stamp}{target.suffix}')
     shutil.copy2(target, backup)
     LOGGER.info('backed up existing index target=%s backup=%s', target, backup)

@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,14 @@ from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, Truncated
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.units import normalise_record
-from nowcast.extraction.validators import is_empty_extraction, needs_review, validate_record
+from nowcast.extraction.validators import (
+    NUMERIC_FIELDS,
+    evidence_span,
+    is_empty_extraction,
+    needs_review,
+    validate_record,
+)
+from nowcast.jobs import JobCancelled
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
 from nowcast.llm.structured import extract_structured
@@ -203,6 +210,8 @@ def validation_settings(config: Config) -> dict[str, object]:
         'max_tokens': int(config.llm.max_tokens),
         'reasoning': config.llm.reasoning_params(),
         'units_rule': UNITS_RULE_VERSION,
+        'validator_version': 'row-period-v5',
+        'theme_direction_vocab': list(extraction.theme_direction_vocab),
         # Packing decides which sentences exist in the prompt, so a different phrase set
         # is a different question. Without this, turning packing off would resume the
         # old packed records as if they answered it.
@@ -325,6 +334,26 @@ def compose_caller(
     return RetryingCaller(inner, active_cache, config, limiter=limiter)
 
 
+def static_prompt_variables(config: Config) -> dict[str, object]:
+    from nowcast.registry import load_registry
+
+    registry = load_registry(config)
+    return {
+        'max_evidence_words': config.extraction.max_evidence_words,
+        'themes': ', '.join(config.extraction.themes),
+        'schema_version': config.extraction.schema_version,
+        'eps_basis_vocab': ', '.join(config.extraction.eps_basis_vocab),
+        'guidance_direction_vocab': ', '.join(config.extraction.guidance_direction_vocab),
+        'tone_vocab': ', '.join(config.extraction.tone_vocab),
+        'kpi_definitions': '\n'.join(f'{k.id}: {k.definition}' for k in registry.kpis),
+    }
+
+
+def current_prompt_digest(config: Config) -> str:
+    bundle = load_prompt(PROMPT_NAME, config.extraction.schema_version, prompts_dir(config))
+    return prompt_hash(bundle, static_prompt_variables(config))
+
+
 async def run_extraction(
     config: Config,
     documents: list[Document],
@@ -345,32 +374,12 @@ async def run_extraction(
     outcomes: list[ExtractionOutcome] = []
     lock = asyncio.Lock()
 
+    static = static_prompt_variables(config)
+
     def prompt_variables(document: Document, text: str) -> dict[str, object]:
-        """Return the template variables, including the vocabularies from config.
+        return {**static, 'document_id': document.document_id, 'document_text': text}
 
-        The prompt is not allowed to carry its own copies of these lists: a value the
-        prompt offers and the validator rejects teaches the model to fail.
-        """
-        return {
-            'document_id': document.document_id,
-            'document_text': text,
-            'max_evidence_words': config.extraction.max_evidence_words,
-            'themes': ', '.join(config.extraction.themes),
-            'schema_version': config.extraction.schema_version,
-            'eps_basis_vocab': ', '.join(config.extraction.eps_basis_vocab),
-            'guidance_direction_vocab': ', '.join(config.extraction.guidance_direction_vocab),
-            'tone_vocab': ', '.join(config.extraction.tone_vocab),
-        }
-
-    def _prompt_digest() -> str:
-        static = {
-            key: value
-            for key, value in prompt_variables(Document('', '', '', '', Path(), ''), '').items()
-            if key not in {'document_id', 'document_text'}
-        }
-        return prompt_hash(bundle, static)
-
-    digest = _prompt_digest()
+    digest = prompt_hash(bundle, static)
 
     async def _process(model: str, document: Document) -> ExtractionOutcome:
         """Extract one (model, document), converting any failure into an outcome.
@@ -385,7 +394,7 @@ async def run_extraction(
             # A spend cap is a run-level stop, not a document failure; handled inside.
             stop['budget'] = True
             return ExtractionOutcome(document.document_id, model, 'budget_stopped')
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, JobCancelled):
             raise
         except Exception as exc:
             LOGGER.exception('document failed model=%s document=%s', model, document.document_id)
@@ -408,6 +417,9 @@ async def run_extraction(
         if _already_done(target, expected):
             return ExtractionOutcome(document.document_id, model, 'skipped', skipped=True)
         async with semaphore:
+            from nowcast.jobs import check_cancelled
+
+            check_cancelled()
             if stop['budget']:
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')
             if stop['auth']:
@@ -469,14 +481,22 @@ async def run_extraction(
             # simply read correctly.
             record = normalise_record(record)
             source = str(variables['document_text'])
-            issues, record = validate_record(record, source, config)
+            issues, record = validate_record(
+                record, source, config, report_date=document.report_date
+            )
             reasons = needs_review(record, issues, config, truncated=prepared.truncated)
-            diagnostics = {
+            diagnostics: dict[str, Any] = {
                 'chars_total': prepared.chars_total,
                 'chars_sent': prepared.chars_sent,
                 'truncated': prepared.truncated,
                 'windows_used': prepared.windows_used,
             }
+            diagnostics['evidence_spans'] = {}
+            for field_name in NUMERIC_FIELDS:
+                quote = getattr(record, field_name).evidence_quote
+                span = evidence_span(quote or '', source, record.fiscal_year, record.fiscal_quarter)
+                if span is not None:
+                    diagnostics['evidence_spans'][field_name] = asdict(span)
             # Replace, never append: a document that passed on this run must not keep a
             # row from a run where it did not.
             review_queue.replace_rows(
@@ -566,7 +586,7 @@ async def run_extraction(
             on_outcome(outcome)
 
     _flag_disagreements(config, outcomes, active_models, queue_target)
-    consolidate(config, active_models)
+    write_consolidated(config, consolidate(config, active_models))
     if stop['auth']:
         raise AuthError(
             f'every call was rejected ({stop["auth"]}); the run stopped after '
@@ -644,10 +664,12 @@ def _flag_disagreements(
         review_queue.append_rows(queue_path, rows)
 
 
-def _settings_digest(config: Config, payload: dict[str, Any], model: str) -> str:
+def _settings_digest(
+    config: Config, payload: dict[str, Any], model: str, prompt_digest: str
+) -> str:
     """Recompute a stored result's fingerprint from what it recorded about itself."""
     sha = str(payload.get('sha256') or '')
-    if not sha:
+    if not sha or not payload.get('prompt_digest'):
         # Results written before the sha was stored cannot be re-checked against the
         # current settings; they are kept rather than discarded on a guess.
         return str(payload.get('fingerprint') or '')
@@ -660,7 +682,7 @@ def _settings_digest(config: Config, payload: dict[str, Any], model: str) -> str
         sha256=sha,
         season=str(payload.get('season_sampled') or ''),
     )
-    return fingerprint(config, proxy, model, str(payload.get('prompt_digest') or ''))
+    return fingerprint(config, proxy, model, prompt_digest)
 
 
 def supersede_result(config: Config, path: Path) -> Path:
@@ -685,6 +707,7 @@ def consolidate(
     first. Missing values are None ("not measured"), never False.
     """
     frames: list[pd.DataFrame] = []
+    prompt_digest = current_prompt_digest(config)
     for model in models:
         directory = extractions_dir(config) / model_slug(model)
         rows: list[dict[str, Any]] = []
@@ -698,11 +721,12 @@ def consolidate(
                 continue
             # Only the document hash and the settings need re-checking here; the prompt
             # digest is stored with the result, so a prompt change still shows up.
-            current = _settings_digest(config, payload, model)
+            current = _settings_digest(config, payload, model, prompt_digest)
             if str(payload.get('fingerprint') or '') != current:
                 # Written under other settings: it answers a different question, so it
                 # is set aside rather than mixed into this run's numbers.
-                supersede_result(config, path)
+                if skipped is not None:
+                    skipped.append(str(path))
                 continue
             record = payload.get('record')
             if not isinstance(record, dict):
@@ -735,7 +759,14 @@ def consolidate(
             # Percent as printed (H5): 4.0 means 4%, so the column carries the unit in
             # its name instead of leaving every reader to assume one.
             row['revenue_yoy_growth_pct'] = (record.get('revenue_yoy_growth') or {}).get('value')
-            for name in ('eps_basis', 'guidance_direction', 'guidance_metric', 'tone'):
+            for name in (
+                'eps_basis',
+                'prior_year_basis',
+                'guidance_presence',
+                'guidance_direction',
+                'guidance_metric',
+                'tone',
+            ):
                 row[name] = (record.get(name) or {}).get('value')
             for theme in config.extraction.themes:
                 mention = (record.get('theme_mentions') or {}).get(theme) or {}
@@ -748,20 +779,44 @@ def consolidate(
             row['record_confidence'] = record_confidence(record)
             # Surviving a consolidate means the fingerprint matched: this row is current.
             row['stale'] = False
+            row['verification_status'] = (
+                'verified'
+                if payload.get('sha256') and payload.get('prompt_digest')
+                else 'unverified'
+            )
             rows.append(row)
         if rows:
-            frame = pd.DataFrame(rows)
-            target = extractions_dir(config) / f'{model_slug(model)}.parquet'
-            frame.sort_values('document_id').to_parquet(target, index=False)
-            LOGGER.info('consolidated model=%s rows=%d path=%s', model, len(frame), target)
-            frames.append(frame)
-    if not frames:
-        return pd.DataFrame()
-    combined = pd.concat(frames, ignore_index=True)
+            frames.append(pd.DataFrame(rows))
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def write_consolidated(config: Config, frame: pd.DataFrame) -> Path:
+    """Explicitly write derived artifacts, including an empty result to clear old output."""
     target = consolidated_path(config)
-    combined.sort_values(['model', 'document_id']).to_parquet(target, index=False)
-    LOGGER.info('consolidated all models rows=%d path=%s', len(combined), target)
-    return combined
+    target.parent.mkdir(parents=True, exist_ok=True)
+    for model, group in frame.groupby('model') if not frame.empty else []:
+        group.sort_values('document_id').to_parquet(
+            extractions_dir(config) / f'{model_slug(str(model))}.parquet', index=False
+        )
+    frame.to_parquet(target, index=False)
+    return target
+
+
+def supersede_stale(config: Config, models: list[str]) -> list[Path]:
+    """Move stale results only when explicitly requested by the operator."""
+    moved = []
+    prompt_digest = current_prompt_digest(config)
+    for model in models:
+        for path in sorted((extractions_dir(config) / model_slug(model)).glob('*.json')):
+            try:
+                payload = json.loads(path.read_text())
+            except (OSError, ValueError):
+                continue
+            if payload.get('sha256') and payload.get('fingerprint') != _settings_digest(
+                config, payload, model, prompt_digest
+            ):
+                moved.append(supersede_result(config, path))
+    return moved
 
 
 CONFIDENCE_FIELDS = ('reported_eps', 'revenue', 'guidance_direction', 'tone')

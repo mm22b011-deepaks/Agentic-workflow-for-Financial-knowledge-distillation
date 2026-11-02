@@ -13,6 +13,10 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from nowcast.jobs import JobStore
 
 
 class RequestLimiter:
@@ -80,3 +84,81 @@ class RequestLimiter:
                     self._day_count += 1
                     return
             self._sleep(wait)
+
+
+class SharedRequestLimiter:
+    """Reserve requests transactionally across processes, using UTC calendar days."""
+
+    def __init__(
+        self,
+        store: JobStore,
+        scope: str,
+        per_minute: int,
+        per_day: int,
+        clock: Callable[[], float] = time.time,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.store = store
+        self.scope = scope
+        self.per_minute = per_minute
+        self.per_day = per_day
+        self.clock = clock
+        self.sleep = sleep
+
+    def acquire(self) -> None:
+        from datetime import datetime, timezone
+
+        from sqlalchemy import text
+
+        from nowcast.errors import BudgetExceeded
+
+        while True:
+            now = self.clock()
+            day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
+            with self.store.transaction() as connection:
+                params = {'scope': self.scope, 'now': now, 'day': day, 'minute': now - 60}
+                daily = connection.execute(
+                    text('SELECT count(*) FROM reservations WHERE scope=:scope AND utc_day=:day'),
+                    params,
+                ).scalar_one()
+                if daily >= self.per_day:
+                    raise BudgetExceeded(
+                        f'UTC daily request budget exhausted: {daily}/{self.per_day}'
+                    )
+                recent = list(
+                    connection.execute(
+                        text(
+                            'SELECT timestamp FROM reservations WHERE scope=:scope AND timestamp>:minute ORDER BY timestamp'
+                        ),
+                        params,
+                    ).scalars()
+                )
+                resume = (
+                    connection.execute(
+                        text('SELECT resume_at FROM cooldowns WHERE scope=:scope'), params
+                    ).scalar_one_or_none()
+                    or 0
+                )
+                wait = max(
+                    0, resume - now, 60 - (now - recent[0]) if len(recent) >= self.per_minute else 0
+                )
+                if wait <= 0:
+                    connection.execute(
+                        text(
+                            'INSERT INTO reservations (scope,timestamp,utc_day) VALUES (:scope,:now,:day)'
+                        ),
+                        params,
+                    )
+                    return
+            self.sleep(min(wait, 30))
+
+    def cooldown(self, seconds: float) -> None:
+        from sqlalchemy import text
+
+        with self.store.transaction() as connection:
+            connection.execute(
+                text(
+                    'INSERT INTO cooldowns(scope,resume_at) VALUES (:scope,:until) ON CONFLICT(scope) DO UPDATE SET resume_at=max(resume_at,:until)'
+                ),
+                {'scope': self.scope, 'until': self.clock() + max(0, seconds)},
+            )

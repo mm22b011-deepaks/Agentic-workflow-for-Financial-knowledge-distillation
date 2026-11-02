@@ -99,34 +99,20 @@ def test_estimate_scope_cli_is_offline(
     assert '$0.00' in out
 
 
-def test_dotenv_never_overrides_real_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A real environment variable wins over .env, so deployed secrets are not clobbered."""
-    from nowcast.cli import _bootstrap_dotenv
-
-    dotenv = tmp_path / '.env'
-    dotenv.write_text(
-        'SEC_USER_AGENT=from-file\nDOTENV_ONLY_VALUE=only-in-file\n', encoding='utf-8'
-    )
-    monkeypatch.setenv('SEC_USER_AGENT', 'from-real-env')
-    monkeypatch.delenv('DOTENV_ONLY_VALUE', raising=False)
-
-    _bootstrap_dotenv((dotenv,))
+def test_normal_cli_does_not_load_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
-    assert os.environ['SEC_USER_AGENT'] == 'from-real-env'
-    assert os.environ['DOTENV_ONLY_VALUE'] == 'only-in-file'
+    (tmp_path / '.env').write_text('DOTENV_ONLY_VALUE=from-file\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv('DOTENV_ONLY_VALUE', raising=False)
+    assert main(['validate-config', '--config', str(CONFIG_PATH)]) == 0
+    assert 'DOTENV_ONLY_VALUE' not in os.environ
 
 
 def test_validate_config_strict_reports_missing_env(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """--strict exits 1 and names the missing variable without ever printing a value."""
-    import nowcast.cli as cli
-
-    # The repository .env supplies the key, so disable that source to model a bare CI box.
-    monkeypatch.setattr(cli, '_bootstrap_dotenv', lambda *args, **kwargs: None)
     monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
     code = main(['validate-config', '--config', str(CONFIG_PATH), '--strict'])
     out = capsys.readouterr().out
@@ -240,18 +226,13 @@ def test_ingest_report_written_even_when_aborted(
     assert not (data / 'document_index.parquet').exists()
 
 
-def test_scripts_and_cli_share_one_dotenv_rule(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Both entry points call the one implementation, so they cannot drift apart."""
-    from nowcast import cli, envfile
+def test_operator_setup_never_loads_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+    import runpy
 
-    calls: list[tuple[Path, ...]] = []
-    monkeypatch.setattr(
-        envfile, 'load_dotenv_without_overriding', lambda paths: calls.append(tuple(paths))
-    )
-    monkeypatch.setattr(
-        cli, 'load_dotenv_without_overriding', envfile.load_dotenv_without_overriding
-    )
-    cli._bootstrap_dotenv((tmp_path / '.env',))
-    assert calls == [(tmp_path / '.env',)]
+    (tmp_path / '.env').write_text('DOTENV_ONLY_VALUE=from-file\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv('DOTENV_ONLY_VALUE', raising=False)
+    setup = runpy.run_path(str(REPO / 'scripts/_bootstrap.py'))['setup']
+    setup()
+    assert 'DOTENV_ONLY_VALUE' not in os.environ

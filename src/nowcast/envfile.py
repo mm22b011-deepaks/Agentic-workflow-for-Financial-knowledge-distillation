@@ -1,10 +1,4 @@
-"""Loading `.env` files without ever overriding the real environment.
-
-The rule is the same for the CLI and the operator scripts: a variable already set in the
-environment (a Colab secret, a shell export, a CI secret) always wins, and the checked-out
-`.env` only fills what is missing. Implemented once here so the two entry points cannot
-drift apart.
-"""
+"""Restricted smoke-process helpers for dotenv loading and redacted key provenance."""
 
 from __future__ import annotations
 

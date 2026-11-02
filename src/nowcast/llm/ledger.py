@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -27,6 +28,12 @@ LEDGER_COLUMNS = [
     'finish_reason',
     'outcome',
     'cached',
+    'reasoning_tokens',
+    'content_tokens',
+    'latency_seconds',
+    'status_code',
+    'attempt_id',
+    'request_kind',
 ]
 
 
@@ -38,6 +45,7 @@ class BudgetLedger:
         self._path = Path(path)
         self._max_usd = float(max_usd)
         self._rows: list[dict[str, Any]] = []
+        self._pending: list[dict[str, Any]] = []
         self._total = 0.0
         # Extraction runs many calls from a thread pool; every read-modify-write of
         # the running total must hold this lock or spend can be lost or double-counted.
@@ -81,6 +89,7 @@ class BudgetLedger:
         max_tokens: int = 0,
         finish_reason: str = '',
         outcome: str = 'ok',
+        request_kind: str = 'completion',
     ) -> None:
         """Append one call to the in-memory ledger.
 
@@ -100,17 +109,41 @@ class BudgetLedger:
             'finish_reason': finish_reason,
             'outcome': outcome,
             'cached': bool(getattr(usage, 'cached', False)),
+            'reasoning_tokens': usage.reasoning_tokens,
+            'content_tokens': usage.content_tokens,
+            'latency_seconds': usage.latency_seconds,
+            'status_code': usage.status_code,
+            'attempt_id': uuid.uuid4().hex,
+            'request_kind': request_kind,
         }
         with self._lock:
             self._rows.append(row)
+            self._pending.append(row)
             self._total += float(usage.cost_usd)
 
     def flush(self) -> None:
         """Write the ledger to parquet, preserving the schema even when empty."""
-        with self._lock:
-            rows = list(self._rows)
-            total = self._total
+        import fcntl
+
+        from nowcast.storage import atomic_parquet
+
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        frame = pd.DataFrame(rows, columns=LEDGER_COLUMNS)
-        frame.to_parquet(self._path, index=False)
-        LOGGER.info('ledger flushed rows=%d total_usd=%.6f path=%s', len(frame), total, self._path)
+        with self._lock, self._path.with_suffix('.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            existing = (
+                pd.read_parquet(self._path)
+                if self._path.exists()
+                else pd.DataFrame(columns=LEDGER_COLUMNS)
+            )
+            pending = pd.DataFrame(self._pending, columns=LEDGER_COLUMNS)
+            frame = (
+                pd.concat([existing, pending], ignore_index=True) if not existing.empty else pending
+            )
+            frame = frame.reindex(columns=LEDGER_COLUMNS)
+            atomic_parquet(frame, self._path)
+            self._pending.clear()
+            self._rows = [{str(k): v for k, v in row.items()} for row in frame.to_dict('records')]
+            self._total = float(frame.cost_usd.sum())
+        LOGGER.info(
+            'ledger flushed rows=%d total_usd=%.6f path=%s', len(frame), self._total, self._path
+        )

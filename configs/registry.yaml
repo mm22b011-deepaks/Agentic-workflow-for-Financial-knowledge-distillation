@@ -1,0 +1,93 @@
+version: v1
+kpis:
+  - id: eps_growth
+    label: EPS growth proxy
+    field: reported_eps
+    output: eps_growth_agg
+    definition: Equal-weight mean of comparable company EPS growth, using absolute prior EPS as denominator; zero bases excluded.
+    unit: fraction
+  - id: revenue_growth
+    label: Revenue growth proxy
+    field: revenue_yoy_growth
+    output: revenue_growth_agg
+    definition: Equal-weight mean of company revenue growth percentages stated in releases.
+    unit: percent
+  - id: guidance
+    label: Guidance direction
+    field: guidance_direction
+    output: guidance_raise_share
+    definition: Share of usable guidance observations reporting a raise. Provider counts are shown separately.
+    unit: fraction
+  - id: tone
+    label: Tone score
+    field: tone
+    output: tone_score_mean
+    definition: Mean configured tone score among usable observations.
+    unit: score
+nodes:
+  - id: validate-config
+    label: Validate configuration
+    inputs: []
+    output: configuration
+    capability: executable
+    help: Checks configuration before work starts. Credentials come from the server environment.
+  - id: build-constituents
+    label: Build membership
+    inputs: [configuration]
+    output: membership
+    capability: executable
+    help: Reconstructs membership intervals. Missing mappings remain visible in private audit artifacts.
+  - id: ingest
+    label: Ingest releases
+    parameters:
+      - {label: Window start, config_path: data.start_date}
+      - {label: Window end, config_path: data.end_date}
+    inputs: [membership]
+    output: documents
+    capability: executable
+    help: Visits eligible company-season pairs and preserves recoverable download receipts.
+  - id: extract
+    label: Extract and validate
+    parameters:
+      - {label: Model priority, config_path: llm.models}
+      - {label: Reply token ceiling, config_path: llm.max_tokens}
+    inputs: [documents]
+    output: extractions
+    capability: executable
+    help: Runs configured free models. Evidence problems withdraw affected fields; blocking failures withdraw the record.
+  - id: aggregate
+    label: Aggregate index proxies
+    parameters:
+      - {label: Minimum companies, config_path: aggregation.min_constituents}
+      - {label: Minimum usable observations, config_path: aggregation.min_observations}
+    inputs: [extractions]
+    output: aggregates
+    capability: executable
+    help: Computes company-growth proxies with coverage and observation gates. Suppressed snapshots remain explicit.
+  - id: demo
+    label: Offline verification
+    inputs: []
+    output: verification
+    capability: executable
+    help: Generates 500 releases, exercises the pipeline without network access, and compares aggregation to independent pandas calculations.
+  - id: nowcast
+    label: Nowcast
+    inputs: [aggregates]
+    output: forecast
+    capability: planned
+    help: Planned. No forecast is produced by the current application.
+workflows:
+  - id: production
+    label: Production pipeline
+    nodes: [validate-config, build-constituents, ingest, extract, aggregate]
+    edges: [[validate-config, build-constituents], [build-constituents, ingest], [ingest, extract], [extract, aggregate]]
+  - id: demo
+    label: Offline verification
+    nodes: [demo]
+    edges: []
+concepts:
+  revenue: [RevenueFromContractWithCustomerExcludingAssessedTax, Revenues, SalesRevenueNet]
+  reported_eps: [EarningsPerShareDiluted, EarningsPerShareBasic]
+limits:
+  maximum_planned_pairs: 10000
+  maximum_requests: 50000
