@@ -21,3 +21,13 @@ manifests/
 # Archives and partial downloads: a stray zip ships caches and raw filings
 *.zip
 *.part
+node_modules/
+web/dist/
+playwright-report/
+test-results/
+*.sqlite*
+.coverage*
+htmlcov/
+.tools/
+.hypothesis/
+configs/local.yaml

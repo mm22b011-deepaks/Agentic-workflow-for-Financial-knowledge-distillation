@@ -6,7 +6,9 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^docs/history/original-ef4e696/
       - id: end-of-file-fixer
+        exclude: ^docs/history/original-ef4e696/
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
@@ -15,15 +17,24 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.17.3
     hooks:
       - id: ruff
         args: ['--fix']
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+  - repo: local
     hooks:
-      - id: mypy
+      - id: redacted-secrets
+        name: Redacted credential scan
+        entry: .venv/bin/python scripts/scan_secrets.py
+        pass_filenames: false
+        language: system
+        always_run: true
+
+      - id: project-types
+        name: Project type check
+        entry: .venv/bin/mypy src
+        language: system
+        pass_filenames: false
         files: ^src/
-        additional_dependencies: ['types-PyYAML', 'pandas-stubs']
