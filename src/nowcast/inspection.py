@@ -414,7 +414,7 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
                 'running': 'running',
             }[job.status]
             events = store.events(job.id)
-            if len(events) > 1:
+            if len(events) > 1 and job.status not in {'queued', 'running'}:
                 duration = max(
                     0,
                     (

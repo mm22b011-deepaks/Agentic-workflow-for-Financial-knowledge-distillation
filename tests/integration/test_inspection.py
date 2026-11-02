@@ -173,6 +173,33 @@ def test_inspector_names_the_upstream_artifact_it_reads(corpus):
         assert response.json()['upstream'][0] == 'parse'
 
 
+def test_running_stage_does_not_report_startup_time_as_completed_duration(corpus):
+    import os
+
+    from nowcast.contracts import RunRequest
+    from nowcast.jobs import process_identity, store_for
+
+    with client_for() as client:
+        store = store_for(corpus)
+        row, _ = store.create(
+            RunRequest(
+                workflow_id='command', command_id='extract', submission_id='duration-regression'
+            ),
+            corpus,
+            CONFIG,
+        )
+        assert store.claim(row['id'])
+        store.update(
+            row['id'], stage='extract', pid=os.getpid(), identity=process_identity(os.getpid())
+        )
+        store.event(row['id'], 'extract', 'started')
+        state = next(
+            node for node in client.get('/api/v1/stages').json()['nodes'] if node['id'] == 'extract'
+        )
+        assert state['status'] == 'running'
+        assert state['duration'] is None
+
+
 def test_evidence_rejects_number_in_another_row_and_labels_are_csrf_protected(corpus, monkeypatch):
     monkeypatch.setenv('NOWCAST_INTERNAL_TRACE', '1')
     with client_for() as client:
