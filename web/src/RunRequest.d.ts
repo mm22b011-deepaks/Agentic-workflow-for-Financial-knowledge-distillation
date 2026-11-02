@@ -10,6 +10,7 @@ export type WorkflowId = string;
 export type SubmissionId = string;
 export type NodeId = string | null;
 export type UpstreamRunId = string | null;
+export type CommandId = string | null;
 
 export interface RunRequest {
   version?: Version;
@@ -17,4 +18,9 @@ export interface RunRequest {
   submission_id: SubmissionId;
   node_id?: NodeId;
   upstream_run_id?: UpstreamRunId;
+  command_id?: CommandId;
+  parameters?: Parameters;
+}
+export interface Parameters {
+  [k: string]: string | number | boolean | string[];
 }

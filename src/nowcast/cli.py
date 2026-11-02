@@ -217,6 +217,11 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         )
     finally:
         checkpoint.flush()
+        from nowcast.phase_services import phase_path
+        from nowcast.storage import atomic_parquet
+
+        atomic_parquet(pd.DataFrame(report.filings), phase_path(config, 'discover'))
+        atomic_parquet(pd.DataFrame(report.downloaded_rows), phase_path(config, 'download'))
         # Every one of these is written even on the abort path: how far a run got and why
         # it stopped are the most useful things these files can say.
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -496,21 +501,21 @@ def _not_implemented(name: str) -> int:
 
 def _cmd_run_all(args: argparse.Namespace) -> int:
     """Run validate-config, build-constituents, ingest, extract and aggregate in order."""
-    steps = (
-        _cmd_validate_config,
-        _cmd_build_constituents,
-        _cmd_estimate_scope,
-        _cmd_ingest,
-        _cmd_extract,
-        _cmd_aggregate,
-    )
-    for step in steps:
-        code = step(args)
-        if code != 0:
-            return code
-    from nowcast.operations import export_index
+    from nowcast.phase_services import RUN_ALL_STAGES
 
-    export_index(_load(args))
+    for stage in RUN_ALL_STAGES:
+        child = argparse.Namespace(**{**vars(args), 'command': stage})
+        handler = build_parser().parse_args([stage]).handler
+        code = int(handler(child))
+        if code:
+            return code
+    return 0
+
+
+def _cmd_phase(args: argparse.Namespace) -> int:
+    from nowcast.phase_services import execute
+
+    execute(args.command, _load(args))
     return 0
 
 
@@ -554,9 +559,18 @@ def build_parser() -> argparse.ArgumentParser:
         'quality-summary': (_cmd_utility, 'write the quality and human-gate summary'),
         'report': (_cmd_utility, 'write the current quality report'),
     }
+    from nowcast.phase_services import PHASES
+
+    common.update({name: (_cmd_phase, 'execute ' + name + ' phase') for name in PHASES})
     for name, (handler, help_text) in common.items():
         sub = subparsers.add_parser(name, help=help_text)
         _add_common(sub)
+        if name == 'doctor':
+            sub.add_argument(
+                '--verify-provider',
+                action='store_true',
+                help='verify authenticated quota and zero model pricing',
+            )
         if name == 'serve':
             sub.add_argument('--port', type=int, default=8767, help='website TCP port')
         if name == 'validate-index':
@@ -598,6 +612,11 @@ def build_parser() -> argparse.ArgumentParser:
         sub = actions.add_parser(name, help='schedule ' + name)
         _add_common(sub)
         if name == 'run':
+            sub.add_argument(
+                '--start-models',
+                action='store_true',
+                help='start the approved model day now after Day 0',
+            )
             mode = sub.add_mutually_exclusive_group()
             mode.add_argument(
                 '--once', action='store_true', help='perform due work and exit (default)'

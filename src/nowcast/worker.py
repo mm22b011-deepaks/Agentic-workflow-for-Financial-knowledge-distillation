@@ -44,14 +44,28 @@ def _run(store: JobStore, job_id: str) -> None:
             store.update(job_id, stage=stage)
             store.event(job_id, stage, 'started')
             request = json.loads(row.get('request_json') or '{}')
+            if request.get('command_id') and request.get('node_id'):
+                from nowcast.artifacts import validate_command_upstream
+                from nowcast.contracts import RunRequest
+
+                validate_command_upstream(store, RunRequest.model_validate(request), config)
             parameters = request.get('parameters', {})
+            if request.get('command_id') == 'run-all':
+                from nowcast.cli_registry import catalogue
+
+                allowed = next(c['controls'] for c in catalogue() if c['id'] == stage)
+                parameters = {
+                    key: value
+                    for key, value in parameters.items()
+                    if key in {c['name'] for c in allowed}
+                }
             if parameters:
                 execute_stage(path, stage, parameters)
             else:
                 execute_stage(path, stage)
             from nowcast.artifacts import record_artifacts
 
-            record_artifacts(store, job_id, stage, config, path)
+            record_artifacts(store, job_id, stage, config, path, parameters)
             store.update(job_id, completed=index + 1)
             store.event(job_id, stage, 'completed')
         check_cancelled()

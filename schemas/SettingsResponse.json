@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ConfigControl": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "boolean",
+            "integer",
+            "number",
+            "string"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Value"
+        },
+        "multiple": {
+          "default": false,
+          "title": "Multiple",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "value"
+      ],
+      "title": "ConfigControl",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "nodes": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/ConfigControl"
+        },
+        "type": "array"
+      },
+      "title": "Nodes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "title": "SettingsResponse",
+  "type": "object"
+}

@@ -378,3 +378,58 @@ def test_actual_worker_executes_canonical_doctor_and_records_artifacts(config, m
             == 1
         )
     assert not __import__('os').environ.get('NOWCAST_JOB_ID')
+
+
+def test_start_models_waits_for_day_zero_approval_and_acceptance(config, monkeypatch):
+    from nowcast.errors import DataError
+
+    scheduler, _clock, provider, _order = scheduler_fixture(config, monkeypatch)
+    with pytest.raises(DataError):
+        scheduler.start_models()
+    scheduler.run_once()
+    scheduler.set_state('models_confirmed', True)
+    scheduler.set_state('models_hold', 'acceptance checks')
+    with pytest.raises(DataError):
+        scheduler.start_models()
+    scheduler.set_state('models_hold', None)
+    scheduler.start_models()
+    plan = scheduler.snapshot()
+    assert plan['days'][0]['planned_requests'] == 4
+    assert len(plan['days']) == 2
+    scheduler.run_once()
+    assert provider.calls == 4
+    assert scheduler.used() == 4
+
+
+def test_changed_cap_updates_calendar_without_redrawing_scope(config, monkeypatch):
+    scheduler, _clock, _provider, _order = scheduler_fixture(config, monkeypatch)
+    before = scheduler.snapshot()
+    scheduler.config = dataclasses.replace(
+        scheduler.config, llm=dataclasses.replace(scheduler.config.llm, requests_per_day=1000)
+    )
+    after = scheduler.snapshot()
+    assert before['forecast']['releases'] == after['forecast']['releases']
+    assert after['forecast']['daily_limit'] == 1000
+    assert after['forecast']['model_days'] == 1
+    assert after['days'][1]['planned_requests'] == 6
+
+
+def test_acceptance_hold_blocks_an_approved_due_model_day(config, monkeypatch):
+    scheduler, clock, provider, _order = scheduler_fixture(config, monkeypatch)
+    scheduler.run_once()
+    scheduler.set_state('models_confirmed', True)
+    scheduler.set_state('models_hold', 'website checks')
+    clock.sleep(86400)
+    scheduler.run_once()
+    assert not provider.calls
+    assert (
+        next(t for t in scheduler.tasks() if t['task_key'] == 'bakeoff')['last_error']
+        == 'website checks'
+    )
+
+
+def test_systemd_working_directory_is_an_absolute_value_without_quotes(config, tmp_path):
+    root = tmp_path / 'checkout with spaces'
+    proposal = installation_preview(config, root, tmp_path / 'config')
+    service = next(value for key, value in proposal.items() if key.endswith('.service'))
+    assert 'WorkingDirectory=' + str(root.resolve()) + '\n' in service

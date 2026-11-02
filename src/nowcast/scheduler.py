@@ -192,8 +192,27 @@ class Scheduler:
         self.ensure_plan()
         now = self.now()
         forecast = self.state('forecast', {})
-        count = min(self.config.scheduler.max_days, int(forecast.get('model_days') or 1) + 1)
+        if forecast.get('daily_limit') != self.config.llm.requests_per_day or forecast.get(
+            'daily_capacity'
+        ) != daily_capacity(self.config):
+            forecast = scope_summary(
+                self.config,
+                now=datetime.fromisoformat(self.state('start_day')).replace(tzinfo=timezone.utc),
+            )
+            self.set_state('forecast', forecast)
         start = date.fromisoformat(self.state('start_day'))
+        model_offset = max(
+            0,
+            (
+                date.fromisoformat(
+                    self.state('model_start_day', (start + timedelta(days=1)).isoformat())
+                )
+                - start
+            ).days,
+        )
+        count = min(
+            self.config.scheduler.max_days, int(forecast.get('model_days') or 1) + model_offset
+        )
         days = []
         remaining = int(forecast.get('releases') or 0)
         bakeoff = self.config.scheduler.bakeoff_requests
@@ -203,10 +222,12 @@ class Scheduler:
             instant = datetime.combine(day, datetime.min.time(), timezone.utc).replace(
                 hour=hour, minute=minute
             )
-            planned_bakeoff = min(bakeoff, daily_capacity(self.config)) if offset > 0 else 0
+            planned_bakeoff = (
+                min(bakeoff, daily_capacity(self.config)) if offset >= model_offset else 0
+            )
             planned_extract = (
                 min(remaining, max(0, daily_capacity(self.config) - planned_bakeoff))
-                if offset > 0
+                if offset >= model_offset
                 else 0
             )
             bakeoff -= planned_bakeoff
@@ -220,7 +241,9 @@ class Scheduler:
                     'configured_limit': self.config.llm.requests_per_day,
                     'today': day == now.date(),
                     'planned_requests': planned_bakeoff + planned_extract,
-                    'retry_reserve': self.config.scheduler.retry_reserve if offset > 0 else 0,
+                    'retry_reserve': self.config.scheduler.retry_reserve
+                    if offset >= model_offset
+                    else 0,
                     'planned_by_task': {'bakeoff': planned_bakeoff, 'extract': planned_extract},
                 }
             )
@@ -339,6 +362,23 @@ class Scheduler:
             self.store.reconcile()
             time.sleep(0.25)
 
+    def start_models(self) -> None:
+        self.ensure_plan()
+        if not self.state('models_confirmed', False) or self.state('models_hold'):
+            raise DataError('model approval and acceptance checks required')
+        day_zero = {key for key, command, _ in DAY_ZERO if command}
+        if any(t['status'] != 'done' for t in self.tasks() if t['task_key'] in day_zero):
+            raise DataError('Day 0 must finish before model work')
+        today = self.now().date().isoformat()
+        with self.store.transaction() as connection:
+            connection.execute(
+                text(
+                    "UPDATE schedule_tasks SET earliest_day=:day WHERE task_key IN ('bakeoff','extract','aggregate','export','labels','quality','report') AND earliest_day>:day"
+                ),
+                {'day': today},
+            )
+        self.set_state('model_start_day', today)
+
     def run_once(self, automatic: bool = False) -> dict[str, Any]:
         self.ensure_plan()
         if self.state('paused', False):
@@ -387,6 +427,11 @@ class Scheduler:
                         self.update(row['task_key'], status='blocked', last_error='planned')
                         continue
                     model = row['quota_cost'] > 0
+                    if model and self.state('models_hold'):
+                        self.update(
+                            row['task_key'], status='blocked', last_error=self.state('models_hold')
+                        )
+                        continue
                     if model and (
                         not self.state('models_confirmed', False)
                         or self.state('auth_blocked', False)
@@ -407,6 +452,11 @@ class Scheduler:
                     ):
                         self.update(
                             row['task_key'], status='blocked', last_error='SEC contact required'
+                        )
+                        continue
+                    if row['task_key'] == 'extract' and self.state('bakeoff_unusable', False):
+                        self.update(
+                            row['task_key'], status='blocked', last_error='no usable measured model'
                         )
                         continue
                     if model and self.config.llm.offline:
@@ -552,14 +602,25 @@ class Scheduler:
             and row.get('nonempty_extractions', row.get('ok', 0))
         ]
         if not eligible:
+            self.set_state('bakeoff_unusable', True)
             return
+        self.set_state('bakeoff_unusable', False)
         selected = sorted(
             eligible,
             key=lambda row: (
                 -float(row.get('parse_success_rate', 0)),
                 float(row.get('empty_completion_rate', 0)),
-                'reasoning' in row['model'].lower(),
-                float(row.get('tokens', float('inf'))),
+                -sum(float(v) for v in row.get('coverage', {}).values()),
+                (
+                    0
+                    if row.get('reasoning_tokens') == 0
+                    else 1
+                    if row.get('reasoning_tokens') is None
+                    else 2
+                ),
+                float(row['completion_tokens'])
+                if row.get('completion_tokens') is not None
+                else float(row.get('tokens', float('inf'))),
                 float(row.get('latency_p95_seconds') or float('inf')),
             ),
         )[0]['model']
@@ -579,7 +640,7 @@ def installation_preview(
         return '"' + value.replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%') + '"'
 
     marker = '# Managed by Tresata ' + identity
-    service = f'{marker}\n[Unit]\nDescription=Tresata quota-aware tasks\n[Service]\nType=oneshot\nWorkingDirectory={quote(str(root.resolve()))}\nExecStart={quote(str(root.resolve() / "setup.sh"))} cli schedule run --once\n'
+    service = f'{marker}\n[Unit]\nDescription=Tresata quota-aware tasks\n[Service]\nType=oneshot\nWorkingDirectory={str(root.resolve()).replace(chr(37), chr(37) * 2)}\nExecStart={quote(str(root.resolve() / "setup.sh"))} cli schedule run --once\n'
     timer = f'{marker}\n[Unit]\nDescription=Tresata UTC schedule\n[Timer]\nOnCalendar=*-*-* {config.schedule.run_at_utc}:00 UTC\nPersistent=true\nUnit={name}.service\n[Install]\nWantedBy=timers.target\n'
     return {
         str(directory / (name + '.service')): service,
@@ -694,6 +755,8 @@ def command(config: Config, config_path: Path, args: argparse.Namespace) -> int:
             scheduler.set_state('models_confirmed', True)
             scheduler.set_state('auth_blocked', False)
     if action == 'run':
+        if getattr(args, 'start_models', False):
+            scheduler.start_models()
         while True:
             result = scheduler.run_once(args.automatic)
             if not args.daemon:

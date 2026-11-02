@@ -12,14 +12,10 @@ def catalogue() -> list[dict[str, Any]]:
 
     result = []
 
-    def visit(parser: argparse.ArgumentParser, prefix: list[str]) -> None:
+    def visit(parser: argparse.ArgumentParser, prefix: list[str], help_text: str = '') -> None:
         groups = [
             action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
         ]
-        if groups:
-            for name, child in groups[0].choices.items():
-                visit(child, [*prefix, name])
-            return
         controls = []
         for action in parser._actions:
             if not action.option_strings:
@@ -51,12 +47,17 @@ def catalogue() -> list[dict[str, Any]]:
             )
         result.append(
             {
-                'id': '-'.join(prefix),
+                'id': '-'.join(prefix) or 'cli',
                 'command': prefix,
                 'controls': controls,
-                'help': parser.description or ' '.join(prefix),
+                'help': parser.description or help_text or ' '.join(prefix),
             }
         )
+
+        if groups:
+            descriptions = {action.dest: action.help for action in groups[0]._choices_actions}
+            for name, child in groups[0].choices.items():
+                visit(child, [*prefix, name], descriptions.get(name) or '')
 
     visit(build_parser(), [])
     return result

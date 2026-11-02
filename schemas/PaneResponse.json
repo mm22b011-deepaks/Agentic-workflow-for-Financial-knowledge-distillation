@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "FieldProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "inferred_type": {
+          "enum": [
+            "number",
+            "boolean",
+            "string",
+            "null",
+            "mixed"
+          ],
+          "title": "Inferred Type",
+          "type": "string"
+        },
+        "null_rate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Null Rate"
+        },
+        "example": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Example"
+        }
+      },
+      "required": [
+        "field",
+        "inferred_type",
+        "null_rate",
+        "example"
+      ],
+      "title": "FieldProfile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/FieldProfile"
+      },
+      "title": "Profiles",
+      "type": "array"
+    },
+    "view": {
+      "default": "index",
+      "enum": [
+        "index",
+        "trace"
+      ],
+      "title": "View",
+      "type": "string"
+    },
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "node": {
+      "title": "Node",
+      "type": "string"
+    },
+    "side": {
+      "enum": [
+        "input",
+        "output"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "status": {
+      "default": "available",
+      "enum": [
+        "available",
+        "unavailable",
+        "private"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
+    },
+    "offset": {
+      "title": "Offset",
+      "type": "integer"
+    },
+    "columns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Columns",
+      "type": "array"
+    },
+    "rows": {
+      "items": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Rows",
+      "type": "array"
+    },
+    "runs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Runs",
+      "type": "array"
+    },
+    "upstream": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Upstream",
+      "type": "array"
+    },
+    "duration": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run"
+    }
+  },
+  "required": [
+    "node",
+    "side",
+    "total",
+    "offset",
+    "columns",
+    "rows",
+    "config_hash"
+  ],
+  "title": "PaneResponse",
+  "type": "object"
+}

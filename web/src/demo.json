@@ -1,0 +1,41 @@
+{
+  "version": "v1",
+  "source": "synthetic",
+  "nodes": [
+    {
+      "id": "run-all",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "build-constituents",
+      "status": "done",
+      "out_count": 125
+    },
+    {
+      "id": "cohort",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "ingest",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "extract",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "validate",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "review",
+      "status": "done",
+      "out_count": 400
+    }
+  ]
+}

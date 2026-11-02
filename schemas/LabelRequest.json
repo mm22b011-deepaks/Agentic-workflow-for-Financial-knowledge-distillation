@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "record_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Record Id",
+      "type": "string"
+    },
+    "field": {
+      "pattern": "^[a-z_]{1,40}$",
+      "title": "Field",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    },
+    "verdict": {
+      "enum": [
+        "correct",
+        "wrong",
+        "unsure"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "record_id",
+    "field",
+    "verdict"
+  ],
+  "title": "LabelRequest",
+  "type": "object"
+}

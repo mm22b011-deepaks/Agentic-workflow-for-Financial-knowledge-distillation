@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "StageState": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "idle",
+            "running",
+            "done",
+            "attention",
+            "error",
+            "planned"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "in_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "In Count"
+        },
+        "out_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Count"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "skipped_by_reason": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Skipped By Reason",
+          "type": "object"
+        },
+        "last_run": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Run"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "title": "StageState",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "source": {
+      "default": "pipeline",
+      "enum": [
+        "pipeline",
+        "synthetic"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/StageState"
+      },
+      "title": "Nodes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "title": "StageSnapshot",
+  "type": "object"
+}

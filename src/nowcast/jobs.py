@@ -109,13 +109,26 @@ class JobStore:
             from nowcast.cli_registry import command_argv
 
             command_argv(request.command_id, request.parameters, config_path)
+            from nowcast.workflow_registry import canvas_registry
+
+            node = next((n for n in canvas_registry().nodes if n.id == request.command_id), None)
+            if node is None or node.capability != 'executable':
+                raise ValueError('command requires a terminal')
             order = [request.command_id]
+            if request.command_id == 'run-all':
+                from nowcast.phase_services import RUN_ALL_STAGES
+
+                order = list(RUN_ALL_STAGES)
         elif workflow is None:
             raise ValueError('unknown workflow')
         else:
             order = registry.execution_order(workflow)
         from nowcast.artifacts import validate_upstream
 
+        if request.command_id:
+            from nowcast.artifacts import validate_command_upstream
+
+            validate_command_upstream(self, request, config)
         if not request.command_id:
             validate_upstream(self, request, config, workflow, registry)
         if request.command_id and request.node_id and request.command_id != request.node_id:

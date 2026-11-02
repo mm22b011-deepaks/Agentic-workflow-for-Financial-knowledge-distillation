@@ -1,0 +1,327 @@
+{
+  "$defs": {
+    "CLIControl": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flags",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "help",
+            "boolean",
+            "integer",
+            "number",
+            "string"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Default"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Choices"
+        },
+        "multiple": {
+          "title": "Multiple",
+          "type": "boolean"
+        },
+        "help": {
+          "title": "Help",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "flags",
+        "kind",
+        "default",
+        "choices",
+        "multiple",
+        "help"
+      ],
+      "title": "CLIControl",
+      "type": "object"
+    },
+    "CanvasEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "target_port": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Port"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "sub": {
+          "default": false,
+          "title": "Sub",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "title": "CanvasEdge",
+      "type": "object"
+    },
+    "CanvasNode": {
+      "additionalProperties": false,
+      "properties": {
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/FlowPort"
+          },
+          "title": "Ports",
+          "type": "array"
+        },
+        "help_question": {
+          "default": 0,
+          "maximum": 13,
+          "minimum": 0,
+          "title": "Help Question",
+          "type": "integer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Command",
+          "type": "array"
+        },
+        "controls": {
+          "items": {
+            "$ref": "#/$defs/CLIControl"
+          },
+          "title": "Controls",
+          "type": "array"
+        },
+        "help": {
+          "default": "",
+          "title": "Help",
+          "type": "string"
+        },
+        "label_key": {
+          "title": "Label Key",
+          "type": "string"
+        },
+        "icon": {
+          "title": "Icon",
+          "type": "string"
+        },
+        "variant": {
+          "default": "square",
+          "enum": [
+            "square",
+            "trigger",
+            "wide",
+            "branch",
+            "sub"
+          ],
+          "title": "Variant",
+          "type": "string"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        },
+        "capability": {
+          "default": "executable",
+          "enum": [
+            "executable",
+            "planned",
+            "inspect",
+            "terminal"
+          ],
+          "title": "Capability",
+          "type": "string"
+        },
+        "subnodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Subnodes",
+          "type": "array"
+        },
+        "open_output": {
+          "default": false,
+          "title": "Open Output",
+          "type": "boolean"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "required": [
+        "id",
+        "label_key",
+        "icon",
+        "group"
+      ],
+      "title": "CanvasNode",
+      "type": "object"
+    },
+    "FlowPort": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "direction",
+        "kind"
+      ],
+      "title": "FlowPort",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/CanvasNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/CanvasEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "graph_schema": {
+      "additionalProperties": true,
+      "title": "Graph Schema",
+      "type": "object"
+    }
+  },
+  "required": [
+    "nodes",
+    "edges",
+    "graph_schema"
+  ],
+  "title": "CanvasRegistry",
+  "type": "object"
+}

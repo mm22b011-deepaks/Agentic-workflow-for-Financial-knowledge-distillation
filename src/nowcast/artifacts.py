@@ -27,7 +27,11 @@ def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
         'validate-index': [paths.resolve(config.data.document_index)],
         'estimate-scope': [paths.resolve('manifests/estimate-scope.json')],
         'doctor': [paths.resolve('manifests/doctor.json')],
-        'export': [paths.resolve('exports/index.json')],
+        'export': [paths.resolve('exports/index.json'), paths.resolve('exports/kpis.json')],
+        'run-all': [
+            paths.aggregates(config) / 'index_aggregates.parquet',
+            paths.resolve('exports/kpis.json'),
+        ],
         'prepare-labels': [paths.resolve('inputs/label-sheet.json')],
         'quality-summary': [paths.resolve('manifests/quality-summary.json')],
         'report': [paths.resolve(config.reporting.report_path)],
@@ -36,6 +40,10 @@ def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
             key=lambda path: path.stat().st_mtime,
         )[-1:],
     }
+    from nowcast.phase_services import PHASES, phase_path
+
+    if stage in PHASES:
+        return [phase_path(config, stage)]
     return choices.get(stage, [])
 
 
@@ -49,7 +57,12 @@ def fingerprint_files(files: list[Path]) -> list[dict[str, str]]:
 
 
 def record_artifacts(
-    store: JobStore, job_id: str, stage: str, config: Config, config_path: Path
+    store: JobStore,
+    job_id: str,
+    stage: str,
+    config: Config,
+    config_path: Path,
+    parameters: dict[str, Any] | None = None,
 ) -> None:
     payload = fingerprint_files(stage_files(config, config_path, stage))
     from nowcast.storage import atomic_bytes
@@ -64,6 +77,27 @@ def record_artifacts(
         )
         atomic_bytes(Path(item['path']).read_bytes(), snapshot)
         item['snapshot'] = str(snapshot)
+    if stage in {'extract', 'validate'}:
+        from nowcast.inspection import capture_evidence
+        from nowcast.storage import atomic_json
+
+        snapshot = store.path.parent / 'runs' / job_id / stage / 'evidence.json'
+        context = config
+        if parameters and parameters.get('set'):
+            from nowcast.config import load_config
+
+            context = load_config(
+                config_path, overrides=dict(part.split('=', 1) for part in parameters['set'])
+            )
+        atomic_json(capture_evidence(context), snapshot)
+        payload.append(
+            {
+                'path': str(snapshot),
+                'sha256': hashlib.sha256(snapshot.read_bytes()).hexdigest(),
+                'snapshot': str(snapshot),
+                'kind': 'evidence',
+            }
+        )
     with store.engine.begin() as connection:
         connection.execute(
             text(
@@ -109,3 +143,34 @@ def validate_upstream(
             original = [{'path': item['path'], 'sha256': item['sha256']} for item in files]
             if fingerprint_files([Path(item['path']) for item in files]) != original:
                 raise ValueError('upstream artifacts changed; run the workflow again')
+
+
+def validate_command_upstream(store: JobStore, request: Any, config: Config) -> None:
+    """An inspector step consumes one known, unchanged server-owned artifact version."""
+    if not request.node_id:
+        return
+    from nowcast.inspection import UPSTREAM
+
+    stage = UPSTREAM.get(request.command_id)
+    if not stage:
+        return
+    if not request.upstream_run_id:
+        raise ValueError('inspector requires a validated upstream run')
+    with store.engine.connect() as connection:
+        row = (
+            connection.execute(
+                text(
+                    'SELECT config_fingerprint,files FROM artifacts WHERE job_id=:run AND stage=:stage'
+                ),
+                {'run': request.upstream_run_id, 'stage': stage},
+            )
+            .mappings()
+            .first()
+        )
+    if row is None or row['config_fingerprint'] != config_fingerprint(config):
+        raise ValueError('upstream fingerprint is missing or stale')
+    files = json.loads(row['files'])
+    if fingerprint_files([Path(item['path']) for item in files]) != [
+        {'path': item['path'], 'sha256': item['sha256']} for item in files
+    ]:
+        raise ValueError('upstream artifacts changed')

@@ -1,62 +1,58 @@
-# Pipeline help
+# Help
 
-All metrics are index-level proxies. Replay never starts a job.
+## What is a node?
 
-## Validate configuration
+One CLI stage. Double-click to inspect input and output. ○ → ○
 
-Checks configuration before work starts. Credentials come from the server environment.
+## What do the colours mean?
 
-Capability: executable.
+Teal tools, coral selection; green done, amber attention, red error. ○ ✓ △ ×
 
-## Build membership
+## What is a company-season?
 
-Reconstructs membership intervals. Missing mappings remain visible in private audit artifacts.
+One company × one filing quarter. Frozen panels reuse companies. 40 × 4
 
-Capability: executable.
+## Why is a value blank?
 
-## Ingest releases
+○ means unavailable or unmeasured. It never means zero. ○ ≠ 0
 
-Visits eligible company-season pairs and preserves recoverable download receipts.
+## What is the coverage gate?
 
-Capability: executable.
+Observations must meet configured publish thresholds. Coverage is not accuracy. n ÷ N → ◆
 
-## Extract and validate
+## What is the review queue?
 
-Runs configured free models. Evidence problems withdraw affected fields; blocking failures withdraw the record.
+Inspect flagged fields here. Four blocking reasons exclude the record. △ → ✓ / ×
 
-Capability: executable.
+## Why are some nodes dashed?
 
-## Aggregate index proxies
+RAPTOR, XBRL and Nowcast are planned and cannot execute. ◌ ⇢ ◇
 
-Computes company-growth proxies with coverage and observation gates. Suppressed snapshots remain explicit.
+## What does replay do?
 
-Capability: executable.
+Validated Index fixtures only. Replay executes nothing and excludes private evidence. ▶ → ◇
 
-## Offline verification
+## How do I resume a run?
 
-Generates 500 releases, exercises the pipeline without network access, and compares aggregation to independent pandas calculations.
+Resume requires unchanged configuration and upstream hashes; quotas still apply. Ⅱ → ▶
 
-Capability: executable.
+## What is Index view?
 
-## Nowcast
+Identifier-free proxies and anonymous rows. Internal trace lasts this session only. ◇ → ○
 
-Planned. No forecast is produced by the current application.
+## Which models run?
 
-Capability: planned.
+Only configured :free models. Bakeoff selects measured results within quota. ○ → 1
 
-## EPS growth proxy
+## How many requests are left?
 
-Equal-weight mean of comparable company EPS growth, using absolute prior EPS as denominator; zero bases excluded.
+Persisted UTC reservations count against your cap, minus schedule reserves. n / N
 
-## Revenue growth proxy
+## How do I verify a record?
 
-Equal-weight mean of company revenue growth percentages stated in releases.
+Internal trace → Evidence. J/K navigate; 1/2/3 mark verdicts; E opens evidence. ✓ × ?
 
-## Guidance direction
+## How do I add a node?
 
-Share of usable guidance observations reporting a raise. Provider counts are shown separately.
-
-## Tone score
-
-Mean configured tone score among usable observations.
+Use the palette or validated graph import. Commands come from argparse. + → ○
 

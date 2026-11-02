@@ -18,16 +18,21 @@ from sqlalchemy import text
 
 from nowcast.aggregation.aggregate import assert_index_level_only
 from nowcast.config import load_config
-from nowcast.contracts import IndexSnapshot, RunEvent, RunRequest, RunStatus, ScheduleSnapshot
+from nowcast.contracts import (
+    IndexSnapshot,
+    RunEvent,
+    RunRequest,
+    RunStatus,
+    ScheduleSnapshot,
+    SessionResponse,
+)
 from nowcast.jobs import store_for
 from nowcast.paths import Paths
-from nowcast.registry import load_registry
 
 
 def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
-    config_path = config_path.resolve()
+    config_path = Path(config_path).resolve()
     config = load_config(config_path)
-    registry = load_registry(config)
     store = store_for(config)
     store.reconcile()
     nonce = secrets.token_urlsafe(32)
@@ -56,6 +61,13 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
                 header, nonce
             ):
                 return JSONResponse({'detail': 'session protection required'}, status_code=403)
+        if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+            import re
+
+            body = await request.body()
+            key = os.environ.get(config.llm.api_key_env, '')
+            if (key and key.encode() in body) or re.search(rb'sk-or-v1-[a-fA-F0-9]{32,}', body):
+                return JSONResponse({'detail': 'credential input rejected'}, status_code=422)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store, private'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -71,7 +83,7 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
             raise HTTPException(404, 'run not found')
         return row
 
-    @app.get('/api/v1/session')
+    @app.get('/api/v1/session', response_model=SessionResponse)
     def session(response: Response) -> dict[str, Any]:
         response.set_cookie('tresata_session', nonce, httponly=True, samesite='strict')
         return {
@@ -82,7 +94,9 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
 
     @app.get('/api/v1/registry')
     def definitions() -> dict[str, Any]:
-        return registry.model_dump(mode='json')
+        from nowcast.workflow_registry import canvas_registry
+
+        return canvas_registry().model_dump(mode='json')
 
     @app.get('/api/v1/runs', response_model=list[RunStatus])
     def runs() -> list[RunStatus]:
@@ -132,10 +146,12 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
     def index() -> IndexSnapshot:
         path = Paths.from_config(config).aggregates(config) / 'index_aggregates.parquet'
         demo = Paths.from_config(config).resolve('demo/index.json')
-        latest = store.list_runs()
-        show_demo = not path.is_file() or bool(
-            latest and latest[0].workflow_id == 'demo' and latest[0].status == 'succeeded'
+        document_index = Paths.from_config(config).resolve(config.data.document_index)
+        releases = pd.read_parquet(document_index) if document_index.is_file() else pd.DataFrame()
+        real_releases = not releases.empty and (
+            'source' not in releases or releases.source.ne('synthetic').any()
         )
+        show_demo = not path.is_file() and not real_releases
         if show_demo and demo.is_file():
             from pydantic import ValidationError
 
@@ -150,7 +166,9 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
         frame = pd.read_parquet(path)
         assert_index_level_only(frame)
         records = json.loads(frame.to_json(orient='records', date_format='iso'))
-        return IndexSnapshot(snapshots=records)
+        source = Paths.from_config(config).resolve('manifests/source.json')
+        synthetic = source.is_file() and json.loads(source.read_text()).get('source') == 'synthetic'
+        return IndexSnapshot(source='synthetic' if synthetic else 'pipeline', snapshots=records)
 
     @app.get('/api/v1/quality')
     def quality() -> dict[str, Any]:
@@ -235,6 +253,9 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
         frame = load_queue(Paths.from_config(config).resolve(config.extraction.review_queue_path))
         return {'version': 'v1', 'rows': json.loads(frame.to_json(orient='records'))}
 
+    from nowcast.inspection_api import register
+
+    register(app, config, config_path, store)
     web = Path(config.config_dir) / config.paths.project_dir / 'web' / 'dist'
     if web.is_dir():
         app.mount('/', StaticFiles(directory=web, html=True), name='website')

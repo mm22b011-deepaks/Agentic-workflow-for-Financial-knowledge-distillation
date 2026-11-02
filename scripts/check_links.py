@@ -12,7 +12,11 @@ import httpx
 def main() -> int:
     paths = [Path('README.md'), *Path('docs').glob('*.md'), *Path('docs/adr').glob('*.md')]
     links = sorted(
-        {url for path in paths for url in re.findall(r'https://[^\s)>`]+', path.read_text())}
+        {
+            url.rstrip('.,;')
+            for path in paths
+            for url in re.findall(r'https://[^\s)>`]+', path.read_text())
+        }
     )
 
     def check(url: str) -> tuple[str, int]:
