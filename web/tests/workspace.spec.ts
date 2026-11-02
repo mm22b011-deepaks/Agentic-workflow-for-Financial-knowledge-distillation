@@ -157,6 +157,22 @@ test("live releases remain Production before KPI publication", async ({
   await expect(
     page.locator('[data-node="ingest"] .flow-label small'),
   ).toHaveText("156");
+  await page.getByRole("button", { name: "Replay", exact: true }).click();
+  await page.getByLabel("Load replay", { exact: true }).setInputFiles({
+    name: "real-index.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: "v1",
+        source: "pipeline",
+        status: "available",
+        snapshots: [],
+      }),
+    ),
+  });
+  await expect(
+    page.locator('[data-node="extract"] .flow-label small'),
+  ).toHaveText("○");
 });
 
 test("every node opens within text budget", async ({ page }) => {
@@ -170,6 +186,55 @@ test("every node opens within text budget", async ({ page }) => {
     expect(await wordCount(page, ".node-panel"), node.id).toBeLessThanOrEqual(
       40,
     );
+    await page.keyboard.press("Escape");
+  }
+});
+
+test("inspector keeps the selected run on reopening", async ({ page }) => {
+  await page.route(/\/api\/v1\/nodes\/extract\/output/, (route) =>
+    route.fulfill({
+      json: {
+        node: "extract",
+        side: "output",
+        view: "index",
+        status: "available",
+        total: 1,
+        offset: 0,
+        columns: ["row"],
+        rows: [{ row: 1 }],
+        config_hash: "12345678",
+        runs: ["run-a", "run-b"],
+        run: new URL(route.request().url()).searchParams.get("run"),
+      },
+    }),
+  );
+  await open(page);
+  await panel(page, "extract");
+  const input = page.getByRole("region", { name: "INPUT", exact: true });
+  await expect(
+    input.getByRole("combobox", { name: "Upstream", exact: true }),
+  ).toHaveValue("parse");
+  await input
+    .getByRole("combobox", { name: "Upstream", exact: true })
+    .selectOption("ingest");
+  const output = page.getByRole("region", { name: "OUTPUT", exact: true });
+  await output
+    .getByRole("combobox", { name: "Runs", exact: true })
+    .selectOption("run-b");
+  await expect(page.locator(".node-panel .loading")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await panel(page, "extract");
+  await expect(
+    output.getByRole("combobox", { name: "Runs", exact: true }),
+  ).toHaveValue("run-b");
+  await expect(
+    input.getByRole("combobox", { name: "Upstream", exact: true }),
+  ).toHaveValue("ingest");
+  expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(40);
+  await page.keyboard.press("Escape");
+  for (const id of ["model-bakeoff", "cohort"]) {
+    await panel(page, id);
+    expect(await wordCount(page, ".node-panel"), id).toBeLessThanOrEqual(40);
     await page.keyboard.press("Escape");
   }
 });
