@@ -453,18 +453,24 @@ async def run_extraction(
                     100.0 * prepared.chars_sent / max(prepared.chars_total, 1),
                 )
             try:
-                parsed, raw_text, error = await asyncio.to_thread(
-                    extract_structured,
-                    caller,
-                    model,
-                    bundle,
-                    variables,
-                    ExtractionRecord,
-                    int(config.extraction.max_repairs),
-                )
-                record: ExtractionRecord | None = (
-                    parsed if isinstance(parsed, ExtractionRecord) else None
-                )
+                from nowcast.llm.ledger import DOCUMENT_CONTEXT
+
+                context_token = DOCUMENT_CONTEXT.set(document.document_id)
+                try:
+                    parsed, raw_text, error = await asyncio.to_thread(
+                        extract_structured,
+                        caller,
+                        model,
+                        bundle,
+                        variables,
+                        ExtractionRecord,
+                        int(config.extraction.max_repairs),
+                    )
+                    record: ExtractionRecord | None = (
+                        parsed if isinstance(parsed, ExtractionRecord) else None
+                    )
+                finally:
+                    DOCUMENT_CONTEXT.reset(context_token)
             except BudgetExceeded:
                 stop['budget'] = True
                 return ExtractionOutcome(document.document_id, model, 'budget_stopped')

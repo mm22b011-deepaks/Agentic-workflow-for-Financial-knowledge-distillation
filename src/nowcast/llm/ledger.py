@@ -5,6 +5,9 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -17,6 +20,19 @@ if TYPE_CHECKING:
     from nowcast.llm.caller import LLMResult
 
 LOGGER = logging.getLogger(__name__)
+DOCUMENT_CONTEXT: ContextVar[str | None] = ContextVar('nowcast_document', default=None)
+ATTEMPT_CONTEXT: ContextVar[tuple[str, int] | None] = ContextVar('nowcast_attempt', default=None)
+
+
+@contextmanager
+def measure_attempt(request_id: str, retry_number: int) -> Iterator[None]:
+    token = ATTEMPT_CONTEXT.set((request_id, retry_number))
+    try:
+        yield
+    finally:
+        ATTEMPT_CONTEXT.reset(token)
+
+
 LEDGER_COLUMNS = [
     'timestamp',
     'model',
@@ -34,6 +50,9 @@ LEDGER_COLUMNS = [
     'status_code',
     'attempt_id',
     'request_kind',
+    'request_id',
+    'retry_number',
+    'document_id',
 ]
 
 
@@ -98,6 +117,7 @@ class BudgetLedger:
         is visible in the data, and a call that raised is still counted: the calls that
         fail are exactly the ones a cost or truncation analysis needs.
         """
+        attempt = ATTEMPT_CONTEXT.get()
         row = {
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'model': model,
@@ -115,6 +135,9 @@ class BudgetLedger:
             'status_code': usage.status_code,
             'attempt_id': uuid.uuid4().hex,
             'request_kind': request_kind,
+            'request_id': attempt[0] if attempt else None,
+            'retry_number': attempt[1] if attempt else None,
+            'document_id': DOCUMENT_CONTEXT.get(),
         }
         with self._lock:
             self._rows.append(row)
