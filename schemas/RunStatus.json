@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "workflow_id": {
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stage"
+    },
+    "completed": {
+      "title": "Completed",
+      "type": "integer"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
+    },
+    "cancel_requested": {
+      "title": "Cancel Requested",
+      "type": "boolean"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "workflow_id",
+    "status",
+    "stage",
+    "completed",
+    "total",
+    "cancel_requested",
+    "created_at"
+  ],
+  "title": "RunStatus",
+  "type": "object"
+}

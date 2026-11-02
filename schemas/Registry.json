@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "KPI": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "enum": [
+            "eps_growth",
+            "revenue_growth",
+            "guidance",
+            "tone"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "definition": {
+          "title": "Definition",
+          "type": "string"
+        },
+        "unit": {
+          "enum": [
+            "fraction",
+            "percent",
+            "score"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "field",
+        "output",
+        "definition",
+        "unit"
+      ],
+      "title": "KPI",
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "inputs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "capability": {
+          "enum": [
+            "executable",
+            "planned"
+          ],
+          "title": "Capability",
+          "type": "string"
+        },
+        "help": {
+          "title": "Help",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/ParameterBinding"
+          },
+          "title": "Parameters",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "inputs",
+        "output",
+        "capability",
+        "help"
+      ],
+      "title": "Node",
+      "type": "object"
+    },
+    "ParameterBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "config_path": {
+          "enum": [
+            "data.start_date",
+            "data.end_date",
+            "llm.models",
+            "llm.max_tokens",
+            "aggregation.min_constituents",
+            "aggregation.min_observations"
+          ],
+          "title": "Config Path",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "label",
+        "config_path"
+      ],
+      "title": "ParameterBinding",
+      "type": "object"
+    },
+    "PlanLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_planned_pairs": {
+          "exclusiveMinimum": 0,
+          "title": "Maximum Planned Pairs",
+          "type": "integer"
+        },
+        "maximum_requests": {
+          "exclusiveMinimum": 0,
+          "title": "Maximum Requests",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maximum_planned_pairs",
+        "maximum_requests"
+      ],
+      "title": "PlanLimits",
+      "type": "object"
+    },
+    "Workflow": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Edges",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "nodes",
+        "edges"
+      ],
+      "title": "Workflow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "kpis": {
+      "items": {
+        "$ref": "#/$defs/KPI"
+      },
+      "title": "Kpis",
+      "type": "array"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "workflows": {
+      "items": {
+        "$ref": "#/$defs/Workflow"
+      },
+      "title": "Workflows",
+      "type": "array"
+    },
+    "concepts": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "propertyNames": {
+        "enum": [
+          "revenue",
+          "reported_eps"
+        ]
+      },
+      "title": "Concepts",
+      "type": "object"
+    },
+    "limits": {
+      "$ref": "#/$defs/PlanLimits"
+    }
+  },
+  "required": [
+    "version",
+    "kpis",
+    "nodes",
+    "workflows",
+    "concepts",
+    "limits"
+  ],
+  "title": "Registry",
+  "type": "object"
+}

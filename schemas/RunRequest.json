@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "workflow_id": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "submission_id": {
+      "pattern": "^[a-zA-Z0-9-]{8,80}$",
+      "title": "Submission Id",
+      "type": "string"
+    },
+    "node_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Node Id"
+    },
+    "upstream_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Upstream Run Id"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "submission_id"
+  ],
+  "title": "RunRequest",
+  "type": "object"
+}
