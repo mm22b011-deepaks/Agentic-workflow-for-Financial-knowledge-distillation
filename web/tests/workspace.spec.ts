@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import registry from "../src/registry.json" with { type: "json" };
 import { readFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import type { GraphDocument } from "../src/GraphDocument";
 const names: Record<string, string> = {
   cli: "CLI",
   "run-all": "Run",
@@ -481,6 +482,70 @@ test("Index and KPI exports are public and replay imports only Index", async ({
     page.getByRole("button", { name: "Export KPIs", exact: true }),
   ).toBeDisabled();
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("graph imports keep edited edges and restore deleted nodes", async ({
+  page,
+}) => {
+  await open(page);
+  async function exported(): Promise<GraphDocument> {
+    const pending = page.waitForEvent("download");
+    await page
+      .getByRole("button", { name: "Export graph", exact: true })
+      .click();
+    return JSON.parse(await readFile((await (await pending).path())!, "utf8"));
+  }
+  async function imported(graph: GraphDocument) {
+    await page
+      .getByLabel("Import graph", { exact: true })
+      .setInputFiles({
+        name: "graph.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(graph)),
+      });
+  }
+  const original = await exported();
+  const edited = { ...original, edges: original.edges.slice(0, -1) };
+  await imported(edited);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(
+    edited.edges.length,
+  );
+  expect((await exported()).edges).toEqual(edited.edges);
+  const navigation = page.locator(".canvas-switch");
+  await navigation
+    .getByRole("button", { name: "Maintenance", exact: true })
+    .click();
+  const maintenance = await exported();
+  await navigation
+    .getByRole("button", { name: "Production", exact: true })
+    .click();
+  expect((await exported()).edges).toEqual(edited.edges);
+  await page.locator('[data-node="run-all"]').click();
+  await page.keyboard.press("Backspace");
+  await expect(page.locator('[data-node="run-all"]')).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Run selected", exact: true }),
+  ).toBeDisabled();
+  await imported(original);
+  await expect(page.locator('[data-node="run-all"]')).toBeVisible();
+  expect((await exported()).edges).toEqual(original.edges);
+  await imported(maintenance);
+  await expect(
+    navigation.getByRole("button", { name: "Maintenance", exact: true }),
+  ).toHaveClass(/active/);
+  expect((await exported()).nodes.map((node) => node.id)).toEqual(
+    maintenance.nodes.map((node) => node.id),
+  );
+  for (const name of [
+    "Production",
+    "Ingest",
+    "Extract",
+    "Maintenance",
+    "DEMO",
+  ]) {
+    await navigation.getByRole("button", { name, exact: true }).click();
+    expect(await wordCount(page, ".workstation"), name).toBeLessThanOrEqual(60);
+  }
 });
 
 test("schema rejection and planned stages cannot execute", async ({ page }) => {

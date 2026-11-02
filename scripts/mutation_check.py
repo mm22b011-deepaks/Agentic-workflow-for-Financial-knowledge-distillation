@@ -64,9 +64,11 @@ MUTANTS = (
     Mutant(
         'provenance: canonical input omitted',
         'src/nowcast/inspection.py',
-        "    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))\n",
+        '    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))\n',
         '',
-        ('tests/integration/test_inspection.py::test_inspector_names_the_upstream_artifact_it_reads',),
+        (
+            'tests/integration/test_inspection.py::test_inspector_names_the_upstream_artifact_it_reads',
+        ),
     ),
     Mutant(
         'delivery: label sheet includes stale scope',
