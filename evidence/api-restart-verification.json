@@ -1,0 +1,8 @@
+{
+  "api_restart": "passed",
+  "same_worker_survived": true,
+  "cancellation_after_restart": "passed",
+  "events_recovered": true,
+  "provider_calls": 0,
+  "credentials_present": false
+}
