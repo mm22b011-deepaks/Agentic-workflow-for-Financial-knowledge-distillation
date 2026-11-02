@@ -21,3 +21,9 @@ Private preparation: frozen panel = 150 valid companies, 1,153 planned pairs; se
 Open: live S2 minimum 500 verified releases/100 companies/four seasons; S3 verified company-facts response and XBRL-assisted extraction; real S4 batches/accuracy/quota verification; S5 supplied labels and five-record human spot-check; missing K2/K4/K5/K9/K11/K12/K13 text, tier gates, original viewport widths and needle margin; other platforms. Broader historical fact/hierarchy migration, nowcasting and evaluation remain planned. SEC_USER_AGENT is absent. Key rotation, SEC contact, membership mapping/interval audit, NDA confirmation and human labels remain human actions. See the final HANDOVER.md for operation and evidence locations.
 
 Network-fix verification: 18 focused tests passed, both new mutants were caught, Ruff/format/mypy/secret scanning passed, and an actual launch was verified on 0.0.0.0:8767 via localhost/LAN/Tailscale addresses. taskd remains on 8765. No server was left running on 8767; remote-device/firewall access was not checked. See evidence/network-binding-verification.json.
+
+## 2026-11-02 — scheduler and Day 0
+
+Migration 0003 reuses jobs, events and reservations for quota-aware dependencies. Durable receipts recover completed responses; ambiguous requests block. Canonical argparse definitions drive Typer and worker dispatch. Model batches remain behind human confirmation; timer proposal prepared without installation.
+
+Day 0 live: 40 companies, 160 planned pairs, 156 downloaded, four no release; 361 SEC attempts, all 200; 211 retained index rows validated in place. No model requests. Existing backups and raw files preserved. Ruff/format: 129 files; mypy: 66 source files; pytest: 431 passed, four fork deprecation warnings, 146.83s; coverage 85.12%. Focused wizard/scope/receipt/concurrency/recovery checks: 31 passed. Exact-value tree/history scan clean. See evidence/scheduler-day0.json.

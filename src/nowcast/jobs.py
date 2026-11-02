@@ -97,16 +97,29 @@ class JobStore:
         )
 
     def create(
-        self, request: RunRequest, config: Config, config_path: Path
+        self,
+        request: RunRequest,
+        config: Config,
+        config_path: Path,
+        schedule_task: str | None = None,
     ) -> tuple[dict[str, Any], bool]:
         registry = load_registry(config)
         workflow = next((w for w in registry.workflows if w.id == request.workflow_id), None)
-        if workflow is None:
+        if request.command_id:
+            from nowcast.cli_registry import command_argv
+
+            command_argv(request.command_id, request.parameters, config_path)
+            order = [request.command_id]
+        elif workflow is None:
             raise ValueError('unknown workflow')
-        order = registry.execution_order(workflow)
+        else:
+            order = registry.execution_order(workflow)
         from nowcast.artifacts import validate_upstream
 
-        validate_upstream(self, request, config, workflow, registry)
+        if not request.command_id:
+            validate_upstream(self, request, config, workflow, registry)
+        if request.command_id and request.node_id and request.command_id != request.node_id:
+            raise ValueError('CLI node and command must match')
         if request.node_id:
             order = [request.node_id]
         with self.transaction() as connection:
@@ -121,7 +134,8 @@ class JobStore:
             if existing:
                 if existing['workflow_id'] != request.workflow_id or (
                     existing['request_json']
-                    and existing['request_json'] != request.model_dump_json()
+                    and RunRequest.model_validate_json(existing['request_json']).model_dump()
+                    != request.model_dump()
                 ):
                     raise ValueError('submission identifier already names a different workflow')
                 return dict(existing), False
@@ -160,6 +174,13 @@ class JobStore:
                 ),
                 values,
             )
+            if schedule_task:
+                connection.execute(
+                    text(
+                        "UPDATE schedule_tasks SET last_job=:job,status='running',attempts=attempts+1 WHERE task_key=:task"
+                    ),
+                    {'job': job_id, 'task': schedule_task},
+                )
         self.event(job_id, None, 'queued')
         return values, True
 

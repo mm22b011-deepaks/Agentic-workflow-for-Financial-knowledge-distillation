@@ -5,31 +5,27 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from contextlib import suppress
 from pathlib import Path
 
 from nowcast.config import load_config
-from nowcast.errors import AuthError, BudgetExceeded, ConfigError
+from nowcast.errors import AuthError, BudgetExceeded, ConfigError, RateLimited
 from nowcast.jobs import JobCancelled, JobStore, check_cancelled, config_fingerprint
+from nowcast.llm.receipts import RequestUncertain
 
 
-def execute_stage(config_path: Path, stage: str) -> None:
+def execute_stage(config_path: Path, stage: str, parameters: dict | None = None) -> None:
     """CLI and website share the same existing pipeline services."""
-    if stage == 'demo':
-        from nowcast.paths import Paths
-        from nowcast.verification import synthetic_demo
-
-        config = load_config(config_path)
-        synthetic_demo(config, Paths.from_config(config).resolve('demo'))
-        return
     from nowcast.cli import build_parser
+    from nowcast.cli_registry import command_argv
 
-    args = build_parser().parse_args([stage, '--config', str(config_path)])
+    args = build_parser().parse_args(command_argv(stage, parameters or {}, config_path))
     code = int(args.handler(args))
     if code:
         raise RuntimeError(f'stage exited {code}')
 
 
-def run(store: JobStore, job_id: str) -> None:
+def _run(store: JobStore, job_id: str) -> None:
     if not store.claim(job_id):
         return
     os.environ['NOWCAST_JOB_DATABASE'] = str(store.path)
@@ -47,7 +43,12 @@ def run(store: JobStore, job_id: str) -> None:
             check_cancelled()
             store.update(job_id, stage=stage)
             store.event(job_id, stage, 'started')
-            execute_stage(path, stage)
+            request = json.loads(row.get('request_json') or '{}')
+            parameters = request.get('parameters', {})
+            if parameters:
+                execute_stage(path, stage, parameters)
+            else:
+                execute_stage(path, stage)
             from nowcast.artifacts import record_artifacts
 
             record_artifacts(store, job_id, stage, config, path)
@@ -62,6 +63,12 @@ def run(store: JobStore, job_id: str) -> None:
     except BudgetExceeded:
         store.update(job_id, status='interrupted')
         store.event(job_id, None, 'quota_exhausted')
+    except RateLimited:
+        store.update(job_id, status='interrupted')
+        store.event(job_id, None, 'rate_limited')
+    except RequestUncertain:
+        store.update(job_id, status='failed')
+        store.event(job_id, None, 'needs_attention')
     except (AuthError, ConfigError) as exc:
         store.update(job_id, status='failed')
         store.event(
@@ -73,6 +80,29 @@ def run(store: JobStore, job_id: str) -> None:
         # Private data and provider response bodies never enter public job events.
         store.update(job_id, status='failed')
         store.event(job_id, None, 'failed')
+
+
+def run(store: JobStore, job_id: str) -> None:
+    from nowcast.storage import file_lock
+
+    keys = {'NOWCAST_JOB_DATABASE', 'NOWCAST_JOB_ID', 'DATA_DIR'}
+    row = store.get(job_id)
+    if row:
+        with suppress(ConfigError):
+            keys.add(load_config(Path(row['config_path'])).runtime.data_dir_env)
+    previous = {key: os.environ.get(key) for key in keys}
+    try:
+        with file_lock(store.path.parent / '.pipeline', blocking=False):
+            _run(store, job_id)
+    except BlockingIOError:
+        store.update(job_id, status='failed')
+        store.event(job_id, None, 'writer_busy')
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def main() -> None:

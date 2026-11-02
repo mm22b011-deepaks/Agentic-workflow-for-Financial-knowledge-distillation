@@ -15,7 +15,13 @@ from typing import Any
 import pandas as pd
 
 from nowcast.config import Config, cache_dir, extractions_dir, prompts_dir, resolve_data_path
-from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion, TruncatedCompletion
+from nowcast.errors import (
+    AuthError,
+    BudgetExceeded,
+    EmptyCompletion,
+    RateLimited,
+    TruncatedCompletion,
+)
 from nowcast.extraction import review_queue
 from nowcast.extraction.schema import ExtractionRecord
 from nowcast.extraction.units import normalise_record
@@ -29,6 +35,7 @@ from nowcast.extraction.validators import (
 from nowcast.jobs import JobCancelled
 from nowcast.llm.cache import ResponseCache
 from nowcast.llm.prompts import PromptBundle, load_prompt, prompt_hash
+from nowcast.llm.receipts import RequestUncertain
 from nowcast.llm.structured import extract_structured
 from nowcast.parsing.html import html_to_text, strip_sgml_wrapper
 from nowcast.parsing.packing import pack
@@ -394,8 +401,12 @@ async def run_extraction(
             # A spend cap is a run-level stop, not a document failure; handled inside.
             stop['budget'] = True
             return ExtractionOutcome(document.document_id, model, 'budget_stopped')
-        except (asyncio.CancelledError, JobCancelled):
+        except (asyncio.CancelledError, JobCancelled, RequestUncertain):
             raise
+        except RateLimited:
+            if config.runtime.durable_requests:
+                raise
+            return _safe_failure(queue_target, document, model, 'llm_failed', 'rate limited')
         except Exception as exc:
             LOGGER.exception('document failed model=%s document=%s', model, document.document_id)
             return _safe_failure(queue_target, document, model, 'document_error', str(exc))

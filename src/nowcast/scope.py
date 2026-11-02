@@ -9,7 +9,10 @@ import logging
 import math
 import random
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from nowcast.extraction.runner import Document
 
 import pandas as pd
 
@@ -179,3 +182,19 @@ def freeze_scope(
                 config.aggregation.min_observations,
             )
     return panel
+
+
+def select_documents(config: Config, documents: list[Document]) -> list[Document]:
+    if not any(dimensions(config)):
+        return documents
+    from nowcast.extraction.selection import season_of_date
+    from nowcast.ingestion.constituents import load_constituents
+
+    members = load_constituents(Paths.from_config(config).resolve(config.data.constituents_csv))
+    panel = freeze_scope(config, members)
+    pairs = {(row['cik'], row['season']) for row in panel['pairs']}
+    return [
+        doc
+        for doc in documents
+        if (str(doc.cik).zfill(10), season_of_date(doc.report_date)) in pairs
+    ]

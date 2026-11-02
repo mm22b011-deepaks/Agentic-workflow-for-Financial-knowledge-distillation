@@ -50,6 +50,7 @@ class ModelScore:
     tokens: int = 0
     accuracy: dict[str, float] | None = None
     coverage: dict[str, int] = field(default_factory=dict)
+    unvisited: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         """Return the score as a flat record for the report."""
@@ -58,6 +59,8 @@ class ModelScore:
         return {
             'model': self.model,
             'documents': self.documents,
+            'unvisited': self.unvisited,
+            'execution_complete': self.unvisited == 0,
             'ok': self.ok,
             'empty_completion_rate': round(self.empty / total, 4),
             'failed_rate': round(self.failed / total, 4),
@@ -79,10 +82,18 @@ class ModelScore:
         }
 
 
+def _scope_documents(config: Config, documents: list[Document]) -> list[Document]:
+    from nowcast.scope import select_documents
+
+    return select_documents(config, documents)
+
+
 def documents_for(config: Config, index: Path, count: int) -> list[Document]:
     """Return the same stratified sample every candidate model is measured on."""
     sample = stratified_sample(
-        load_documents(config, index), count, int(config.aggregation.sample_seed)
+        _scope_documents(config, load_documents(config, index)),
+        count,
+        int(config.aggregation.sample_seed),
     )
     return sample
 
@@ -107,7 +118,9 @@ def score_model(
         )
     )
     for outcome in outcomes:
-        if outcome.status == 'ok':
+        if outcome.status == 'budget_stopped':
+            score.unvisited += 1
+        elif outcome.status == 'ok':
             score.ok += 1
         elif outcome.status == 'skipped':
             score.cached_or_skipped += 1
@@ -181,6 +194,8 @@ def run_bakeoff(
                 score_model(isolated, model, documents, factory, ledger=ledger, labels=labels)
             )
         except (AuthError, EmptyCompletion, BudgetExceeded) as exc:
+            if config.runtime.durable_requests and isinstance(exc, (AuthError, BudgetExceeded)):
+                raise
             # A model that cannot answer at all is a result, not a reason to lose the run.
             score = ModelScore(model=model, documents=len(documents), failed=len(documents))
             score.model = f'{model} ({type(exc).__name__}: {str(exc)[:80]})'

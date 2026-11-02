@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import httpx
+import pytest
 
 from nowcast.config import Config
 from nowcast.extraction.bakeoff import FIELDS, run_bakeoff
 from nowcast.llm.caller import LLMCaller
 from nowcast.llm.composition import RetryingCaller
+
+
+@pytest.fixture
+def config(config):
+    from nowcast.config import ScopeConfig
+
+    return dataclasses.replace(config, scope=ScopeConfig())
+
 
 REPLY = json.dumps(
     {

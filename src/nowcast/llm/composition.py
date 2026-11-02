@@ -13,6 +13,7 @@ import threading
 import time
 from typing import Any
 
+import httpx
 from pydantic import ValidationError
 
 from nowcast.config import Config, cache_dir
@@ -79,9 +80,11 @@ class RetryingCaller:
         config: Config,
         sleep: Any = None,
         limiter: Any = None,
+        receipts: Any = None,
     ) -> None:
         """Store the inner caller, the cache, the retry settings and the shared limiter."""
         self._caller = caller
+        self._receipts = receipts
         self._limiter = limiter
         self._cache = cache
         self._config = config
@@ -140,11 +143,20 @@ class RetryingCaller:
         truncated_retry_used = False
         empty_retry_used = False
         for attempt in range(attempts):
+            reservation = None
+            if self._receipts is not None:
+                recovered = self._receipts.begin(key)
+                if recovered is not None:
+                    self.cache_hits += 1
+                    note = getattr(self._caller, 'note_cache_hit', None)
+                    if note is not None:
+                        note(model, time.perf_counter() - cache_started)
+                    return recovered
             try:
                 with self._lock:
                     self.calls += 1
                 if self._limiter is not None:
-                    self._limiter.acquire()
+                    reservation = self._limiter.acquire()
                 try:
                     result = self._caller.complete(model, messages, max_tokens=budget)
                 except RateLimited as exc:
@@ -153,12 +165,22 @@ class RetryingCaller:
                     if self._limiter is not None and exc.retry_after_seconds:
                         self._limiter.cooldown(float(exc.retry_after_seconds))
                     raise
-            except (BudgetExceeded, AuthError, ModelNotFound):
+            except (BudgetExceeded, AuthError, ModelNotFound) as fatal:
+                if (
+                    isinstance(fatal, AuthError)
+                    and reservation is not None
+                    and hasattr(self._limiter, 'release')
+                ):
+                    self._limiter.release(reservation)
+                if self._receipts is not None:
+                    self._receipts.failed(key, 'retryable')
                 # A spend cap, a rejected credential and a missing model are facts about
                 # the run, not transient states: retrying them spends the budget on the
                 # same answer and buries the cause under N identical failures.
                 raise
             except EmptyCompletion as exc:
+                if self._receipts is not None:
+                    self._receipts.failed(key, 'retryable')
                 last_error = exc
                 if not isinstance(exc, TruncatedCompletion):
                     # A provider that returns finish_reason=stop with no content is
@@ -180,6 +202,14 @@ class RetryingCaller:
                 )
                 continue
             except Exception as exc:
+                if self._receipts is not None:
+                    self._receipts.failed(
+                        key,
+                        'retryable'
+                        if isinstance(exc, (RateLimited, httpx.HTTPStatusError))
+                        else 'uncertain',
+                    )
+                    raise
                 last_error = exc
                 LOGGER.warning('call failed attempt=%d model=%s error=%s', attempt, model, exc)
                 if attempt < attempts - 1:
@@ -188,6 +218,11 @@ class RetryingCaller:
                         LOGGER.info('retrying in %.1fs attempt=%d model=%s', delay, attempt, model)
                         self._sleep(delay)
                 continue
+            if self._receipts is not None:
+                if cacheable_reply(result.text):
+                    self._receipts.finish(key, result)
+                else:
+                    self._receipts.failed(key)
             if cacheable_reply(result.text):
                 self._cache.set(key, result.text, model)
             else:
@@ -211,6 +246,7 @@ def make_caller(
     inner: Any = None,
     transport: Any = None,
     sleep: Any = None,
+    clock: Any = None,
 ) -> RetryingCaller:
     """Return the composed caller every entry point must use.
 
@@ -231,5 +267,12 @@ def make_caller(
         config.llm.base_url,
         per_minute=int(config.llm.requests_per_minute),
         per_day=int(config.llm.requests_per_day),
+        clock=clock or time.time,
+        sleep=sleep or time.sleep,
     )
-    return RetryingCaller(caller, active_cache, config, sleep=sleep, limiter=limiter)
+    from nowcast.llm.receipts import RequestReceipts
+
+    receipts = RequestReceipts(store_for(config)) if config.runtime.durable_requests else None
+    return RetryingCaller(
+        caller, active_cache, config, sleep=sleep, limiter=limiter, receipts=receipts
+    )

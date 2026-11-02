@@ -70,6 +70,12 @@ def _run_ingest(
         return main(
             [
                 'ingest',
+                '--set',
+                'scope.profile=custom',
+                '--set',
+                'scope.companies=0',
+                '--set',
+                'scope.seasons=0',
                 '--config',
                 str(CONFIG_PATH),
                 '--set',
@@ -200,6 +206,12 @@ def test_abort_keeps_rows_downloaded_so_far(
     code = main(
         [
             'ingest',
+            '--set',
+            'scope.profile=custom',
+            '--set',
+            'scope.companies=0',
+            '--set',
+            'scope.seasons=0',
             '--config',
             str(CONFIG_PATH),
             '--set',

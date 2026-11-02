@@ -7,7 +7,22 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from nowcast.cli import main
+from nowcast.cli import main as pipeline_main
+
+
+def main(argv):
+    return pipeline_main(
+        [
+            *argv,
+            '--set',
+            'scope.profile=custom',
+            '--set',
+            'scope.companies=0',
+            '--set',
+            'scope.seasons=0',
+        ]
+    )
+
 
 REPO = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = REPO / 'configs' / 'config.yaml'
