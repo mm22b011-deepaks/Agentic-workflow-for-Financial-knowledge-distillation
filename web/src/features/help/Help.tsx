@@ -25,6 +25,18 @@ export function Help() {
   const questions = copy.questions
     .map((question, i) => ({ question, i }))
     .filter((v) => v.question.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    if (
+      session.help !== null &&
+      session.help >= 0 &&
+      !questions
+        .slice(page * 4, page * 4 + 4)
+        .some((item) => item.i === session.help)
+    ) {
+      setSearch("");
+      setPage(Math.floor(session.help / 4));
+    }
+  }, [session.help]);
   return (
     <AnimatePresence>
       {session.help !== null && (
