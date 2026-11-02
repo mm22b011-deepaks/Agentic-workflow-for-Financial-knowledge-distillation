@@ -279,8 +279,21 @@ test("evidence highlights wrong row, verdict writes labels.csv", async ({
 
 test("help accordion, tour and text budget", async ({ page }) => {
   await open(page);
+  const model = page.locator('[data-node="model"]');
+  await model.hover();
+  await model.getByRole("button", { name: "Info", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: /Which models run\?/ }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await page
+    .getByRole("dialog", { name: "Help", exact: true })
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await page.getByRole("button", { name: "Help", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Help", exact: true });
+  await drawer
+    .getByRole("textbox", { name: "Search", exact: true })
+    .fill("node");
   await drawer.getByRole("button", { name: "What is a node?" }).click();
   await expect(drawer.locator(".help-answer")).toBeVisible();
   expect(await wordCount(page, ".help-drawer")).toBeLessThanOrEqual(40);
@@ -496,13 +509,11 @@ test("graph imports keep edited edges and restore deleted nodes", async ({
     return JSON.parse(await readFile((await (await pending).path())!, "utf8"));
   }
   async function imported(graph: GraphDocument) {
-    await page
-      .getByLabel("Import graph", { exact: true })
-      .setInputFiles({
-        name: "graph.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(JSON.stringify(graph)),
-      });
+    await page.getByLabel("Import graph", { exact: true }).setInputFiles({
+      name: "graph.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(graph)),
+    });
   }
   const original = await exported();
   const edited = { ...original, edges: original.edges.slice(0, -1) };
