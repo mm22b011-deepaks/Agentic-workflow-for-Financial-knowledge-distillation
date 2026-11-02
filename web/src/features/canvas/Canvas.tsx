@@ -280,6 +280,23 @@ function Surface({
   const [group, setGroup] = useState("main");
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [editedEdges, setEditedEdges] = useState<
+    Record<string, CanvasRegistry["edges"]>
+  >({});
+  function rememberEdges(next: Edge[]) {
+    setEditedEdges((old) => ({
+      ...old,
+      [group]: next.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        port: edge.sourceHandle ?? "out",
+        target_port: edge.targetHandle ?? "in",
+        sub:
+          registry.nodes.find((node) => node.id === edge.target)?.variant ===
+          "sub",
+      })),
+    }));
+  }
   function measurement(id: string) {
     if (preferences.lens === "quality") {
       const category = [
@@ -331,7 +348,7 @@ function Surface({
           height: 120,
         }),
       );
-    registry.edges
+    (editedEdges[group] ?? registry.edges)
       .filter(
         (e) =>
           visible.some((n) => n.id === e.source) &&
@@ -366,7 +383,7 @@ function Surface({
       }),
     );
     setEdges(
-      registry.edges
+      (editedEdges[group] ?? registry.edges)
         .filter(
           (e) =>
             visible.some((n) => n.id === e.source) &&
@@ -397,7 +414,7 @@ function Surface({
           },
         })),
     );
-  }, [registry, visible, setNodes, setEdges]);
+  }, [registry, visible, group, editedEdges, setNodes, setEdges]);
   useEffect(() => {
     setNodes((old) =>
       old.map((n) => ({
@@ -477,10 +494,10 @@ function Surface({
             n.data.definition.capability === "planned",
         )
       )
-        setEdges(next);
+        rememberEdges(next);
       else session.set({ error: copy.rejected });
     },
-    [nodes, edges, setEdges, session],
+    [nodes, edges, group, registry, session],
   );
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -556,34 +573,43 @@ function Surface({
         )
       )
         throw Error();
+      const groupOf = (id: string) => {
+        const value = registry.nodes.find((node) => node.id === id)?.group;
+        return value === "sub" ? "main" : value;
+      };
+      const groups = [...new Set(g.nodes.map((node) => groupOf(node.id)))];
+      if (groups.length !== 1 || !groups[0]) throw Error();
+      const destination = groups[0];
+      const scope = registry.nodes.filter(
+        (node) => groupOf(node.id) === destination,
+      );
+      setGroup(destination);
+      setEditedEdges((old) => ({
+        ...old,
+        [destination]: g.edges.map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+          port: edge.source_port ?? "out",
+          target_port: edge.target_port ?? "in",
+          sub:
+            registry.nodes.find((node) => node.id === edge.target)?.variant ===
+            "sub",
+        })),
+      }));
       preferences.set({
-        positions: Object.fromEntries(
-          g.nodes.map((n) => [n.id, { x: n.x, y: n.y }]),
-        ),
+        positions: {
+          ...preferences.positions,
+          ...Object.fromEntries(g.nodes.map((n) => [n.id, { x: n.x, y: n.y }])),
+        },
         hidden: [
           ...(preferences.hidden ?? []).filter(
-            (id) => !g.nodes.some((n) => n.id === id),
+            (id) => !scope.some((node) => node.id === id),
           ),
-          ...visible
+          ...scope
             .filter((n) => !g.nodes.some((v) => v.id === n.id))
             .map((n) => n.id),
         ],
       });
-      setNodes((old) =>
-        old.map((n) => ({
-          ...n,
-          position: g.nodes.find((v) => v.id === n.id) ?? n.position,
-        })),
-      );
-      setEdges(
-        g.edges.map((e, i) => ({
-          ...e,
-          sourceHandle: e.source_port ?? "out",
-          targetHandle: e.target_port ?? "in",
-          id: `import-${i}`,
-          type: "volume",
-        })),
-      );
     } catch {
       session.set({ error: copy.rejected });
     }
@@ -621,15 +647,24 @@ function Surface({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
-        onNodesDelete={(deleted) =>
+        onNodesDelete={(deleted) => {
           preferences.set({
             hidden: [
               ...(preferences.hidden ?? []),
               ...deleted.map((n) => n.id),
             ],
-          })
-        }
+          });
+          if (deleted.some((node) => node.id === session.selected))
+            session.set({ selected: null });
+        }}
         onEdgesChange={onEdgesChange}
+        onEdgesDelete={(deleted) =>
+          rememberEdges(
+            edges.filter(
+              (edge) => !deleted.some((item) => item.id === edge.id),
+            ),
+          )
+        }
         onConnect={connect}
         onNodeClick={(_, n) => session.set({ selected: n.id })}
         onNodeDoubleClick={(_, n) =>

@@ -122,6 +122,7 @@ export const copy = {
   reorder: "Reorder",
   remove: "Remove",
   labels: {
+    maintenance: "Maintenance",
     cli: "CLI",
     schedule: "Schedule",
     "run-all": "Run",
@@ -264,4 +265,16 @@ export const glyphs = {
 export function tooltip(value: unknown): string {
   return String(value).split(/\s+/).slice(0, 6).join(" ");
 }
-export function typeLabel(value:string):string{return ({number:'Number',boolean:'Boolean',string:'String',null:copy.unknown,mixed:'Mixed'} as Record<string,string>)[value]??copy.unknown;}
+export function typeLabel(value: string): string {
+  return (
+    (
+      {
+        number: "Number",
+        boolean: "Boolean",
+        string: "String",
+        null: copy.unknown,
+        mixed: "Mixed",
+      } as Record<string, string>
+    )[value] ?? copy.unknown
+  );
+}
