@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -104,6 +105,10 @@ class LLMResult:
     total_tokens: int = 0
     cost_usd: float = 0.0
     cached: bool = False
+    reasoning_tokens: int | None = None
+    content_tokens: int | None = None
+    latency_seconds: float | None = None
+    status_code: int | None = None
 
 
 class LLMCaller:
@@ -196,6 +201,9 @@ class LLMCaller:
             return self._reasoning_support[model]
         supported = True
         if self._config.models_url:
+            started = time.perf_counter()
+            response = None
+            completed = False
             try:
                 response = self._client.get(self._config.models_url, timeout=30.0)
                 response.raise_for_status()
@@ -206,8 +214,23 @@ class LLMCaller:
                     if isinstance(params, list):
                         supported = 'reasoning' in params
                     break
+                completed = True
             except (httpx.HTTPError, ValueError) as exc:
                 LOGGER.warning('could not read model capabilities model=%s error=%s', model, exc)
+            finally:
+                if self._ledger is not None:
+                    self._ledger.record(
+                        model,
+                        LLMResult(
+                            text='',
+                            model=model,
+                            latency_seconds=time.perf_counter() - started,
+                            status_code=response.status_code if response is not None else None,
+                        ),
+                        request_kind='capabilities',
+                        outcome='capabilities_ok' if completed else 'capabilities_error',
+                    )
+                    self._ledger.flush()
         self._reasoning_support[model] = supported
         if not supported:
             LOGGER.info('model does not support reasoning parameters model=%s', model)
@@ -248,6 +271,17 @@ class LLMCaller:
             )
         response.raise_for_status()
 
+    def note_cache_hit(self, model: str, latency: float) -> None:
+        """Measure cache outcomes without counting them as HTTP attempts or reservations."""
+        if self._ledger is not None:
+            self._ledger.record(
+                model,
+                LLMResult(text='', model=model, cached=True, latency_seconds=latency),
+                request_kind='cache',
+                outcome='cache_hit',
+            )
+            self._ledger.flush()
+
     def complete(
         self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None
     ) -> LLMResult:
@@ -256,25 +290,64 @@ class LLMCaller:
         budget = int(max_tokens or self._config.max_tokens)
         if self._ledger is not None:
             self._ledger.check_budget()
-        response = self._client.post(
-            '/chat/completions', json=self._payload(model, messages, budget)
-        )
-        self._raise_for_status(response)
-        body = response.json()
-        choices = body.get('choices') or []
-        message = (choices[0].get('message') or {}) if choices else {}
-        text = str(message.get('content') or '')
-        usage: dict[str, Any] = body.get('usage') or {}
-        cost = self._cost_from_headers(response, usage)
-        finish = str(choices[0].get('finish_reason') or '') if choices else ''
-        result = LLMResult(
-            text=text,
-            model=str(body.get('model') or model),
-            prompt_tokens=int(usage.get('prompt_tokens') or 0),
-            completion_tokens=int(usage.get('completion_tokens') or 0),
-            total_tokens=int(usage.get('total_tokens') or 0),
-            cost_usd=cost,
-        )
+        payload = self._payload(model, messages, budget)
+        started = time.perf_counter()
+        response = None
+        try:
+            response = self._client.post('/chat/completions', json=payload)
+            self._raise_for_status(response)
+            body = response.json()
+        except Exception:
+            if self._ledger is not None:
+                self._ledger.record(
+                    model,
+                    LLMResult(
+                        text='',
+                        model=model,
+                        latency_seconds=time.perf_counter() - started,
+                        status_code=response.status_code if response is not None else None,
+                    ),
+                    max_tokens=budget,
+                    outcome='http_error' if response is not None else 'transport_error',
+                )
+                self._ledger.flush()
+            raise
+        try:
+            choices = body.get('choices') or []
+            message = (choices[0].get('message') or {}) if choices else {}
+            text = str(message.get('content') or '')
+            usage: dict[str, Any] = body.get('usage') or {}
+            cost = self._cost_from_headers(response, usage)
+            finish = str(choices[0].get('finish_reason') or '') if choices else ''
+            result = LLMResult(
+                text=text,
+                model=str(body.get('model') or model),
+                prompt_tokens=int(usage.get('prompt_tokens') or 0),
+                completion_tokens=int(usage.get('completion_tokens') or 0),
+                total_tokens=int(usage.get('total_tokens') or 0),
+                cost_usd=cost,
+                reasoning_tokens=(usage.get('completion_tokens_details') or {}).get(
+                    'reasoning_tokens'
+                ),
+                content_tokens=(usage.get('completion_tokens_details') or {}).get('content_tokens'),
+                latency_seconds=time.perf_counter() - started,
+                status_code=response.status_code,
+            )
+        except (AttributeError, KeyError, IndexError, TypeError, ValueError):
+            if self._ledger is not None:
+                self._ledger.record(
+                    model,
+                    LLMResult(
+                        text='',
+                        model=model,
+                        latency_seconds=time.perf_counter() - started,
+                        status_code=response.status_code,
+                    ),
+                    max_tokens=budget,
+                    outcome='invalid_response',
+                )
+                self._ledger.flush()
+            raise
         empty = not text.strip()
         outcome = 'ok'
         if empty or finish == 'length':
@@ -292,6 +365,7 @@ class LLMCaller:
                 finish_reason=finish,
                 outcome=outcome,
             )
+            self._ledger.flush()
         if outcome != 'ok':
             reasoning = message.get('reasoning') or message.get('reasoning_content') or ''
             LOGGER.warning(

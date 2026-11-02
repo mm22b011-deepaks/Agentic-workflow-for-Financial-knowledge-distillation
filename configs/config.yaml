@@ -5,7 +5,7 @@ runtime:
   data_dir_env: DATA_DIR
 
 paths:
-  project_dir: '.'
+  project_dir: '..'
   data_dir: data
   raw_dir: raw
   cache_dir: .cache/llm
@@ -55,8 +55,8 @@ data:
     - .txt
   edgar_earnings_items:
     - '2.02'
-  edgar_max_documents: 100
-  edgar_docs_per_cik: 3
+  edgar_max_documents: 0
+  edgar_docs_per_cik: 0
 
 parsing:
   min_section_chars: 200
@@ -70,7 +70,7 @@ llm:
     - 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
   timeout_seconds: 120.0
   temperature: 0.0
-  max_tokens: 8192
+  max_tokens: 32768
   # A truncated (empty) completion is retried once at double this, never above the ceiling.
   max_tokens_ceiling: 32768
   # Exactly one reasoning control: 'effort' or 'max_tokens'. Both at once made one dead.
@@ -87,7 +87,7 @@ llm:
   referer_url: ''
   # Free models are limited by requests, not dollars. This is the real budget.
   requests_per_minute: 20
-  requests_per_day: 1000
+  requests_per_day: 50
   # A provider "retry after" pauses every caller, not just the refused one.
   cooldown_seconds: 30.0
   # Cascade: move to the next configured model only on failure or below this confidence.
@@ -139,7 +139,7 @@ extraction:
      validation_issues, llm_failed, truncated, doc_truncated, document_error,
      model_disagreement]
   # Interim packer: head of the release plus windows around these phrases.
-  pack_phrases: ["per share", revenue, outlook, guidance]
+  pack_phrases: []
 
 aggregation:
   weighting: equal
@@ -148,7 +148,7 @@ aggregation:
   winsorize_pct: 0.05
   # One company's quarter may arrive as two rows (two models, or two exhibits in one
   # filing). Reduced by this rule before any count or metric sees it.
-  dedupe_rule: max_confidence
+  dedupe_rule: model_priority
   # A metric seen by fewer companies than this is NaN with a status, never computed.
   min_observations: 10
   # Seeded sample order for extract --sample.
@@ -180,6 +180,6 @@ universe:
   subset_n: 0
   subset_seed: 42
   avg_tokens_per_doc_in: 6000
-  avg_tokens_per_doc_out: 800
+  avg_tokens_per_doc_out: 32768
   licence_note: ''
   refresh: false

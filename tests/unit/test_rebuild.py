@@ -165,7 +165,15 @@ def test_rebuild_backs_up_target(config: Config, tmp_path: Path) -> None:
     target = index_path(config)
     target.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([_row('existing')]).to_parquet(target, index=False)
-    report = rebuild_index(config, pd.DataFrame([_row('new')]), source_path=None, force=True)
+    from nowcast.ingestion.doc_index import file_sha256
+
+    row = _row('new')
+    raw = resolve_data_path(config, str(row['raw_path']))
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text('<p>Revenue was $100 million.</p>')
+    row['sha256'] = file_sha256(raw)
+    source = _legacy(tmp_path, [row])
+    report = rebuild_index(config, pd.DataFrame([row]), source_path=source, force=True)
     assert report.backup_path is not None and report.backup_path.is_file()
     backups = pd.read_parquet(report.backup_path)
     assert backups['document_id'].tolist() == ['existing']

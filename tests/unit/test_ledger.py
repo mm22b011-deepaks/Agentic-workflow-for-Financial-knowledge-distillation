@@ -36,6 +36,12 @@ def test_ledger_total_and_parquet(tmp_path: Path) -> None:
         'finish_reason',
         'outcome',
         'cached',
+        'reasoning_tokens',
+        'content_tokens',
+        'latency_seconds',
+        'status_code',
+        'attempt_id',
+        'request_kind',
     ]
     assert len(frame) == 2
     # The budget each call ran under is recorded, so a truncated reply is visible.
@@ -84,3 +90,17 @@ def test_ledger_records_are_thread_safe(tmp_path: Path) -> None:
     assert len(frame) == 800
     assert ledger.total_usd == pytest.approx(800 * per_call)
     assert frame['cost_usd'].sum() == pytest.approx(800 * per_call)
+
+
+def test_two_process_views_do_not_overwrite_attempts(tmp_path: Path) -> None:
+    path = tmp_path / 'ledger.parquet'
+    first = BudgetLedger(path, 1)
+    second = BudgetLedger(path, 1)
+    first.record('a:free', _usage(0.01))
+    second.record('b:free', _usage(0.02))
+    first.flush()
+    second.flush()
+    first.flush()
+    frame = pd.read_parquet(path)
+    assert len(frame) == 2
+    assert set(frame.model) == {'a:free', 'b:free'}

@@ -107,3 +107,33 @@ def test_bakeoff_writes_a_table_without_network(
     # Coverage is a share of documents, and a missing field is zero, not absent.
     assert set(row['coverage']) == set(FIELDS)
     assert row['coverage']['reported_eps'] > 0.0
+
+
+def test_bakeoff_isolated_and_requests_ledgered(
+    config: Config, tmp_path: Path, monkeypatch: object
+) -> None:
+    index = _index(tmp_path, documents=1)
+    import nowcast.llm.composition as composition
+
+    original = composition.make_caller
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith('/models'):
+            return httpx.Response(200, json={'data': []})
+        return httpx.Response(
+            200,
+            json={
+                'model': 'fake/model:free',
+                'choices': [{'message': {'content': REPLY}, 'finish_reason': 'stop'}],
+                'usage': {'prompt_tokens': 10, 'completion_tokens': 5},
+            },
+        )
+
+    def factory(c: Config, **kwargs: object) -> RetryingCaller:
+        return original(c, transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(composition, 'make_caller', factory)  # type: ignore[attr-defined]
+    table = run_bakeoff(config, ['fake/model:free'], index, 1)
+    assert table['models'][0]['requests'] == 1
+    assert table['models'][0]['latency_p95_seconds'] is not None
+    assert not (tmp_path / 'data/extractions').exists()

@@ -21,8 +21,7 @@ from nowcast.config import (
     resolve_data_path,
     validate_config,
 )
-from nowcast.envfile import load_dotenv_without_overriding
-from nowcast.errors import ConfigError, DataError, NowcastError
+from nowcast.errors import BudgetExceeded, ConfigError, DataError, NowcastError
 from nowcast.logging_setup import setup_logging
 from nowcast.manifest import (
     Manifest,
@@ -36,16 +35,6 @@ from nowcast.manifest import (
 # should not change name depending on how the CLI was started.
 LOGGER = logging.getLogger('nowcast.cli')
 DEFAULT_CONFIG = Path('configs') / 'config.yaml'
-
-
-def _bootstrap_dotenv(candidates: tuple[Path, ...] = (Path('.env'),)) -> None:
-    """Fill unset variables from a local .env, never overriding the real environment.
-
-    A deployed environment (or a Colab secret) always wins; the .env file only
-    supplies what is missing, which is what makes a local CLI run convenient
-    without letting a checked-out file clobber real credentials.
-    """
-    load_dotenv_without_overriding(candidates)
 
 
 def _configure_logging(config: Config) -> None:
@@ -83,7 +72,6 @@ def _load(args: argparse.Namespace) -> Config:
     path = Path(args.config) if args.config else DEFAULT_CONFIG
     if not path.is_file():
         raise ConfigError(f'config file not found: {path}')
-    _bootstrap_dotenv((path.resolve().parent.parent / '.env', Path('.env')))
     config = load_config(path, overrides=overrides or None)
     _configure_logging(config)
     return config
@@ -142,7 +130,7 @@ def _cmd_estimate_scope(args: argparse.Namespace) -> int:
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
     """Download earnings documents for the constituents CIKs and index them."""
-    from nowcast.ingestion.doc_index import load_index, upsert_rows, write_index
+    from nowcast.ingestion.doc_index import IndexCheckpoint, load_index
     from nowcast.ingestion.edgar import IngestReport, ingest_edgar
     from nowcast.ingestion.rebuild import index_path
     from nowcast.ingestion.universe.builder import _resolve_input
@@ -166,6 +154,11 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     # at the document cap, so CIK order would fill it with the alphabetically first
     # companies — a sample of the alphabet, not of the index.
     sample = season_sample(config, frame)
+    from nowcast.registry import load_registry
+
+    registry = load_registry(config)
+    if len(sample.pairs) > registry.limits.maximum_planned_pairs:
+        raise DataError('planned company-season pairs exceed configured maximum')
     ciks = list(sample.ciks)
     # Say what the cap will actually cover: a cap of 100 documents at 3 per company
     # visits at most 34 companies, whichever 519 were sampled.
@@ -192,27 +185,38 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     cohort_path.parent.mkdir(parents=True, exist_ok=True)
     cohort.to_csv(cohort_path, index=False)
 
-    def persist(row: dict[str, object]) -> None:
-        """Merge one downloaded row into the index as soon as it exists."""
-        merged_now = upsert_rows(load_index(target_index), [row])
-        write_index(merged_now, target_index)
+    checkpoint = IndexCheckpoint(target_index)
 
     rows: list[dict[str, object]] = []
     try:
+        if any(
+            not cik.isascii() or not cik.isdecimal() or len(cik) != 10 or int(cik) == 0
+            for cik in ciks
+        ):
+            raise DataError('membership contains unmapped CIKs; resolve them before SEC ingestion')
         rows = ingest_edgar(
             config,
             ciks,
             max_documents=limit,
             per_cik_limit=per_cik,
             report=report,
-            on_row=persist,
+            on_row=checkpoint.add,
             target_seasons=sample.season_targets(),
+            membership=frame,
         )
     finally:
+        checkpoint.flush()
         # Every one of these is written even on the abort path: how far a run got and why
         # it stopped are the most useful things these files can say.
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report.as_dict(), indent=2), encoding='utf-8')
+        planned = cohort.copy()
+        planned['outcome'] = [
+            report.pair_outcomes.get(str(row.cik) + ':' + str(row.season), 'unvisited')
+            for row in planned.itertuples()
+        ]
+        planned.to_csv(manifests_dir(config) / 'pair_outcomes.csv', index=False)
+        cohort = planned[planned['outcome'] != 'unvisited'][['cik', 'season']]
         cohort.to_csv(cohort_path, index=False)
     merged = load_index(target_index)
     summary = {
@@ -262,6 +266,12 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     if not source_index.is_file():
         raise DataError(f'no document index at {source_index}; run ingest or rebuild-index first')
     documents = load_documents(config, source_index)
+    from nowcast.registry import load_registry
+
+    registry = load_registry(config)
+    maximum_requests = len(documents) * len(config.llm.models) * int(config.llm.retry_attempts)
+    if maximum_requests > registry.limits.maximum_requests:
+        raise DataError('maximum extraction request plan exceeds configured maximum')
     # `--limit` is the index head — the oldest filings of a few companies. `--sample`
     # takes one document per company first, spread across seasons, so a capped run
     # describes the index rather than the alphabet.
@@ -315,13 +325,18 @@ def _cmd_extract(args: argparse.Namespace) -> int:
         review,
         empty,
     )
+    from nowcast.extraction.runner import write_consolidated
+
     combined = consolidate(config, models)
+    write_consolidated(config, combined)
     manifest.notes = (
         f'{ok} ok, {failed} failed, {review} flagged ({empty} empty); {len(combined)} rows'
     )
     _record_run(config, 'extract', [str(source_index)], manifest)
     LOGGER.info('consolidated %d rows', len(combined))
-    return 0
+    if any(item.status == 'budget_stopped' for item in outcomes):
+        raise BudgetExceeded('request budget exhausted; partial extraction results preserved')
+    return 1 if any(item.status == 'failed' for item in outcomes) else 0
 
 
 def _cmd_rebuild_index(args: argparse.Namespace) -> int:
@@ -336,6 +351,9 @@ def _cmd_rebuild_index(args: argparse.Namespace) -> int:
     config = _load(args)
     validate_config(config, strict=True)
     chosen = getattr(args, 'source', None)
+    active = resolve_data_path(config, config.data.document_index)
+    if not chosen and active.is_file() and not load_index(active).empty:
+        raise DataError('replacing a populated index requires an explicit --source')
     source = Path(chosen) if chosen else default_source(config)
     if not source.is_file():
         raise DataError(f'no index to rebuild at {source}')
@@ -404,7 +422,13 @@ def _cmd_model_bakeoff(args: argparse.Namespace) -> int:
     if not source.is_file():
         raise DataError(f'no document index at {source}; run rebuild-index first')
     models = args.model or list(config.llm.models)
-    table = run_bakeoff(config, models, source, int(args.sample))
+    table = run_bakeoff(
+        config,
+        models,
+        source,
+        int(args.sample),
+        labels=Path(args.labels) if getattr(args, 'labels', None) else None,
+    )
     target = manifests_dir(config) / 'bakeoff.json'
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(table, indent=2), encoding='utf-8')
@@ -480,6 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
                 '--sample', type=int, default=10, help='documents each model is measured on'
             )
             sub.add_argument('--model', action='append', default=[], help='model (repeatable)')
+            sub.add_argument('--labels', type=Path, default=None, help='supplied human labels')
         if name == 'validate-config':
             sub.add_argument(
                 '--strict',

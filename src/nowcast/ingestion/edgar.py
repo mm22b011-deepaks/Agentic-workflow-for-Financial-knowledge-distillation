@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pandas as pd
 
 from nowcast.config import Config, data_root, raw_dir
 from nowcast.errors import ConfigError, DataError
@@ -38,6 +39,7 @@ class IngestReport:
     skip_reasons: dict[str, int] = field(default_factory=dict)
     zero_disclosure_ciks: list[str] = field(default_factory=list)
     aborted: str | None = None
+    pair_outcomes: dict[str, str] = field(default_factory=dict)
     # Not serialised: the run fails on it rather than reporting it afterwards.
     consecutive_blocked: int = field(default=0, repr=False)
 
@@ -65,6 +67,7 @@ class IngestReport:
             'skip_reasons': dict(sorted(self.skip_reasons.items())),
             'zero_disclosure_ciks': list(self.zero_disclosure_ciks),
             'aborted': self.aborted,
+            'pair_outcomes': self.pair_outcomes,
         }
 
 
@@ -243,10 +246,6 @@ def fetch_disclosures(
     response.raise_for_status()
     payload = response.json()
     recent = (payload.get('filings') or {}).get('recent') or {}
-    accessions = recent.get('accessionNumber') or []
-    forms = recent.get('form') or []
-    dates = recent.get('filingDate') or []
-    items = recent.get('items') or []
     # The window comes from the caller or from the configured data dates, never from
     # the wall clock: a run must be reproducible on any day it is repeated.
     lower = start_date or _configured_date(config, config.data.start_date)
@@ -259,6 +258,37 @@ def fetch_disclosures(
     if upper is None:
         # `date.today()` made every run's window different on a different day.
         raise ConfigError('data.end_date must be set; an implicit "today" is not reproducible')
+    dates_seen = [str(value)[:10] for value in recent.get('filingDate') or []]
+    covered = bool(dates_seen and min(dates_seen) <= lower.isoformat())
+    if not covered:
+        for page in (payload.get('filings') or {}).get('files') or []:
+            if str(page.get('filingTo') or '') < lower.isoformat():
+                continue
+            if str(page.get('filingFrom') or '') > upper.isoformat():
+                continue
+            template = config.data.edgar_filing_files_url_template
+            if not template:
+                break
+            limiter.wait()
+            older_response = client.get(template.format(name=page['name']))
+            if report is not None:
+                report.attempts += 1
+                report.record_status(older_response.status_code)
+            older_response.raise_for_status()
+            older = older_response.json()
+            for key, values in older.items():
+                if isinstance(values, list):
+                    recent[key] = list(recent.get(key) or []) + values
+            dates_seen.extend(str(value)[:10] for value in older.get('filingDate') or [])
+            covered = bool(dates_seen and min(dates_seen) <= lower.isoformat())
+            if covered:
+                break
+        if not covered and report is not None:
+            report.record_skip(f'window_not_covered:{cik.zfill(10)}')
+    accessions = recent.get('accessionNumber') or []
+    forms = recent.get('form') or []
+    dates = recent.get('filingDate') or []
+    items = recent.get('items') or []
     wanted = set(config.data.edgar_forms)
     wanted_items = list(config.data.edgar_earnings_items)
     found: list[Disclosure] = []
@@ -384,6 +414,7 @@ def ingest_edgar(
     report: IngestReport | None = None,
     on_row: Callable[[dict[str, object]], None] | None = None,
     target_seasons: Iterable[str] | None = None,
+    membership: pd.DataFrame | None = None,
 ) -> list[dict[str, object]]:
     """Download earnings exhibits for the given CIKs and return document index rows.
 
@@ -406,9 +437,14 @@ def ingest_edgar(
     rows: list[dict[str, object]] = []
     try:
         for cik in ciks:
-            if len(rows) >= limit:
+            from nowcast.jobs import check_cancelled
+
+            check_cancelled()
+            if limit and len(rows) >= limit:
                 break
             active_report.companies += 1
+            for season in targets_by_cik.get(cik.zfill(10), targets):
+                active_report.pair_outcomes[cik.zfill(10) + ':' + season] = 'no_release'
             taken = 0
             try:
                 disclosures = fetch_disclosures(
@@ -420,6 +456,17 @@ def ingest_edgar(
                     window_end,
                     active_report,
                 )
+                if membership is not None:
+                    from nowcast.ingestion.constituents import active_on
+
+                    eligible = []
+                    for disclosure in disclosures:
+                        members = active_on(membership, disclosure.filing_date.isoformat())
+                        if disclosure.cik.zfill(10) in set(members.cik.astype(str).str.zfill(10)):
+                            eligible.append(disclosure)
+                        else:
+                            active_report.record_skip('outside_membership_at_filing')
+                    disclosures = eligible
                 # One exhibit per filing and one filing per season, newest season first:
                 # sorting newest-first alone spends the per-company cap on the same
                 # quarter's release and supplement, leaving the other seasons unseen.
@@ -433,7 +480,8 @@ def ingest_edgar(
                 if not disclosures:
                     active_report.zero_disclosure_ciks.append(cik.zfill(10))
                 for disclosure in disclosures:
-                    if len(rows) >= limit or (per_cik and taken >= per_cik):
+                    check_cancelled()
+                    if (limit and len(rows) >= limit) or (per_cik and taken >= per_cik):
                         break
                     try:
                         path = download_document(
@@ -448,6 +496,8 @@ def ingest_edgar(
                         )
                         active_report.record_skip(f'download_failed:{_status_of(exc)}')
                         continue
+                    season = f'{disclosure.filing_date.year}Q{(disclosure.filing_date.month - 1) // 3 + 1}'
+                    active_report.pair_outcomes[cik.zfill(10) + ':' + season] = 'downloaded'
                     taken += 1
                     active_report.documents += 1
                     text = _document_text(path)
@@ -478,6 +528,8 @@ def ingest_edgar(
                 # and leave a run that looks like an honest zero.
                 if isinstance(exc, DataError) and 'window' in str(exc).lower():
                     raise
+                for season in targets_by_cik.get(cik.zfill(10), targets):
+                    active_report.pair_outcomes[cik.zfill(10) + ':' + season] = 'failed'
                 LOGGER.warning('cik failed cik=%s error=%s', cik, exc)
                 active_report.record_skip(f'cik_failed:{_status_of(exc)}')
             # Checked outside the per-CIK handler: a 403 on the submissions request

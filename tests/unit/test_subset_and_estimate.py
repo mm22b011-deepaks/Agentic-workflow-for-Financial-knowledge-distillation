@@ -172,3 +172,23 @@ def test_estimate_scope_missing_constituents_names_the_file(tmp_path: Path) -> N
     with pytest.raises(DataError) as excinfo:
         estimate_scope(config)
     assert 'nope.csv' in str(excinfo.value)
+
+
+def test_scope_reports_request_budget_and_configured_reply_ceiling(tmp_path: Path) -> None:
+    path = _write_constituents(tmp_path / 'constituents.csv', count=2)
+    config = load_config(
+        REPO / 'configs/config.yaml',
+        overrides={
+            'data.start_date': '2025-01-01',
+            'data.end_date': '2025-12-31',
+            'llm.requests_per_day': '3',
+        },
+    )
+    estimate = estimate_scope(config, constituents_path=path)
+    lines = '\n'.join(estimate.as_lines())
+    # Eight releases x two models; three attempts per request is the upper plan.
+    assert 'base model requests       16' in lines
+    assert 'maximum model requests    48' in lines
+    assert 'UTC days at configured cap 6..16' in lines
+    assert estimate.output_tokens >= estimate.documents * config.llm.max_tokens
+    assert 'per model' in lines

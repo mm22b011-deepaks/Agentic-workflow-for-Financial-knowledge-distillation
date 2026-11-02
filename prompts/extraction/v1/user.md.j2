@@ -1,10 +1,10 @@
 Extract the earnings record from the document below.
 
 RULES FOR THIS REPLY
-- Return one JSON object with all sixteen keys and nothing else.
+- Return one JSON object with all requested keys and nothing else.
 - Keys: schema_version, document_id, fiscal_year, fiscal_quarter, currency, units,
-  reported_eps, prior_year_eps, consensus_eps, eps_basis, revenue, revenue_yoy_growth,
-  guidance_direction, guidance_metric, tone, theme_mentions.
+  reported_eps, prior_year_eps, consensus_eps, eps_basis, prior_year_basis, revenue, revenue_yoy_growth,
+  guidance_presence, guidance_direction, guidance_metric, tone, theme_mentions.
 - Use null with null_reason "not_stated" or "ambiguous" for anything the document does
   not state. Never guess.
 - Copy every evidence_quote verbatim. For a number, the quote must contain its digits
@@ -14,3 +14,7 @@ RULES FOR THIS REPLY
 <document id="{{ document_id }}">
 {{ document_text }}
 </document>
+
+- prior_year_basis records GAAP or adjusted for prior_year_eps; leave null if unstated.
+
+- guidance_presence: "provided" when a forward numeric outlook is explicitly given, "not_provided" when explicitly absent; otherwise null. This is separate from a revision direction.

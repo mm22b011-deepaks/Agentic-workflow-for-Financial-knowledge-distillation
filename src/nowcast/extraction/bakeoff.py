@@ -8,11 +8,15 @@ of a weak free model are visible before a 500-document run pays for them.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
+import json
 import statistics
-import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from nowcast.config import Config, extractions_dir, prompts_dir, resolve_data_path
 from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion
@@ -39,6 +43,12 @@ class ModelScore:
     cached_or_skipped: int = 0
     latencies: list[float] = field(default_factory=list)
     requests: int = 0
+    http_attempts: int = 0
+    cache_hits: int = 0
+    nonempty: int = 0
+    throttled: int = 0
+    tokens: int = 0
+    accuracy: dict[str, float] | None = None
     coverage: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -54,6 +64,15 @@ class ModelScore:
             'parse_success_rate': round(self.ok / total, 4),
             'coverage': coverage,
             'requests': self.requests,
+            'http_attempts': self.http_attempts,
+            'cache_hits': self.cache_hits,
+            'nonempty_extractions': self.nonempty,
+            'throttled': self.throttled,
+            'tokens': self.tokens,
+            'accuracy': self.accuracy,
+            'latency_p95_seconds': float(np.percentile(self.latencies, 95))
+            if self.latencies
+            else None,
             'latency_p50_seconds': round(statistics.median(self.latencies), 2)
             if self.latencies
             else None,
@@ -73,10 +92,11 @@ def score_model(
     model: str,
     documents: list[Document],
     caller_factory: Any,
+    ledger: Any = None,
+    labels: Path | None = None,
 ) -> ModelScore:
     """Extract `documents` with one model and aggregate the outcome counts."""
     score = ModelScore(model=model, documents=len(documents))
-    started = time.monotonic()
     outcomes = asyncio.run(
         run_extraction(
             config,
@@ -95,13 +115,23 @@ def score_model(
             score.empty += 1
         else:
             score.failed += 1
-    elapsed = time.monotonic() - started
-    # Requests per document, measured from the ledger the caller writes: a model that
-    # retries its way through every document is expensive even when its replies parse.
-    ledger = getattr(caller_factory(''), '_ledger', None)
-    score.requests = int(getattr(ledger, 'rows_recorded', lambda: 0)())
-    score.latencies.append(elapsed / max(len(documents), 1))
+    if ledger is not None:
+        ledger.flush()
+        import pandas as pd
+
+        attempts = pd.read_parquet(ledger._path)
+        score.http_attempts = int(attempts.request_kind.ne('cache').sum())
+        score.cache_hits = int(attempts.request_kind.eq('cache').sum())
+        attempts = attempts[attempts.request_kind.eq('completion')]
+        score.requests = len(attempts)
+        score.tokens = int(attempts.total_tokens.sum())
+        score.throttled = int(attempts.status_code.eq(429).sum())
+        score.latencies = list(attempts.latency_seconds.dropna())
     frame = consolidate(config, [model])
+    if not frame.empty:
+        score.nonempty = int(frame[['reported_eps', 'revenue']].notna().any(axis=1).sum())
+    if labels is not None:
+        score.accuracy = score_labels(frame, labels)
     for name in FIELDS:
         if frame.empty or name not in frame.columns:
             continue
@@ -114,22 +144,42 @@ def run_bakeoff(
     models: list[str],
     index: Path,
     count: int,
+    labels: Path | None = None,
 ) -> dict[str, Any]:
     """Measure every candidate on the same documents and return the table."""
     documents = documents_for(config, index, count)
+    from nowcast.config import manifests_dir
     from nowcast.llm.composition import make_caller
+    from nowcast.llm.ledger import BudgetLedger
 
+    run_root = manifests_dir(config) / 'bakeoff' / uuid.uuid4().hex
+    run_root.mkdir(parents=True)
+    isolated = dataclasses.replace(
+        config,
+        paths=dataclasses.replace(config.paths, extractions_dir=str(run_root / 'extractions')),
+        extraction=dataclasses.replace(
+            config.extraction, review_queue_path=str(run_root / 'review_queue.parquet')
+        ),
+    )
     scores: list[ModelScore] = []
     for model in models:
+        ledger = BudgetLedger(
+            run_root / (model.replace('/', '__').replace(':', '-') + '.ledger.parquet'),
+            config.budget.max_usd,
+        )
         shared: dict[str, Any] = {}
 
-        def factory(_model: str, shared: dict[str, Any] = shared) -> Any:
+        def factory(
+            _model: str, shared: dict[str, Any] = shared, ledger: BudgetLedger = ledger
+        ) -> Any:
             if 'caller' not in shared:
-                shared['caller'] = make_caller(config)
+                shared['caller'] = make_caller(isolated, ledger=ledger)
             return shared['caller']
 
         try:
-            scores.append(score_model(config, model, documents, factory))
+            scores.append(
+                score_model(isolated, model, documents, factory, ledger=ledger, labels=labels)
+            )
         except (AuthError, EmptyCompletion, BudgetExceeded) as exc:
             # A model that cannot answer at all is a result, not a reason to lose the run.
             score = ModelScore(model=model, documents=len(documents), failed=len(documents))
@@ -137,13 +187,45 @@ def run_bakeoff(
             scores.append(score)
         finally:
             caller = shared.get('caller')
-            inner = getattr(caller, '_caller', None)
-            if inner is not None:
-                inner.close()
-    return {
+            if caller is not None:
+                caller.close()
+            ledger.flush()
+    result = {
+        'run_directory': str(run_root),
         'documents': describe(documents),
         'seed': int(config.aggregation.sample_seed),
         'models': [score.as_dict() for score in scores],
-        'extractions_dir': str(extractions_dir(config)),
+        'extractions_dir': str(extractions_dir(isolated)),
         'prompts_dir': str(prompts_dir(config)),
     }
+
+    (run_root / 'scores.json').write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
+def score_labels(frame: Any, labels: Path) -> dict[str, float]:
+    """Score supplied labels only; absent/unlabelled documents cannot become successes."""
+    import pandas as pd
+
+    truth = pd.read_csv(labels)
+    if 'document_id' not in truth or len(truth.document_id.unique()) < 10:
+        raise ValueError('bakeoff accuracy needs at least ten labelled releases')
+    if truth.document_id.isna().any() or not truth.document_id.is_unique:
+        raise ValueError('labelled releases must have unique document identifiers')
+    predictions = frame.reindex(columns=['document_id', *FIELDS])
+    if not predictions.empty and not predictions.document_id.is_unique:
+        raise ValueError('accuracy requires one prediction per release')
+    joined = truth.merge(predictions, on='document_id', how='left', suffixes=('_label', '_model'))
+    scores = {}
+    for name in FIELDS:
+        if name + '_label' not in joined:
+            continue
+        usable = joined[name + '_label'].notna()
+        if usable.any():
+            scores[name] = float(
+                joined.loc[usable, name + '_label']
+                .eq(joined.loc[usable, name + '_model'])
+                .fillna(False)
+                .mean()
+            )
+    return scores

@@ -19,7 +19,7 @@ import pandas as pd
 
 from nowcast.config import Config, resolve_data_path
 from nowcast.errors import DataError
-from nowcast.ingestion.constituents import active_on, load_constituents
+from nowcast.ingestion.constituents import load_constituents
 
 # Exhibits that carry the earnings release itself, best first. The primary EX-99.1 is
 # the release; an unsuffixed EX-99 is a catch-all used by some filers; an EX-99.2 is
@@ -90,11 +90,9 @@ class Sample:
 
 
 def season_frame(config: Config) -> list[tuple[str, pd.Timestamp]]:
-    """Return each calendar quarter in the window with the date members are checked on.
+    """Return calendar-quarter anchors for the configured window.
 
-    Seasons are calendar quarters (the same convention `aggregate.season_of` uses), and
-    membership is tested at the season's first day, so a company that joined mid-season
-    is not sampled for a season it was only partly a member of.
+    season_sample checks interval overlap; ingestion checks membership on the filing date.
     """
     if not config.data.start_date or not config.data.end_date:
         raise DataError('data.start_date and data.end_date must both be set to sample by season')
@@ -127,7 +125,16 @@ def season_sample(config: Config, frame: pd.DataFrame, limit: int | None = None)
     pairs: list[tuple[str, str]] = []
     skipped: dict[str, int] = {}
     for name, as_of in seasons:
-        members = active_on(frame, as_of)
+        period_end = as_of + pd.offsets.QuarterEnd(startingMonth=3)
+        lower = max(as_of, pd.Timestamp(config.data.start_date))
+        upper = min(period_end, pd.Timestamp(config.data.end_date))
+        members = frame[
+            (pd.to_datetime(frame['effective_from']) <= upper)
+            & (
+                pd.to_datetime(frame['effective_to']).isna()
+                | (pd.to_datetime(frame['effective_to']) >= lower)
+            )
+        ]
         ciks = sorted({str(value).zfill(10) for value in members['cik']})
         if not ciks:
             skipped[f'no_members:{name}'] = 1

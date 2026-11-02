@@ -61,6 +61,41 @@ class Mutant:
 
 
 MUTANTS = (
+    Mutant(
+        'network: reserved default port restored',
+        'src/nowcast/app.py',
+        'port: int = 8767',
+        'port: int = 8765',
+        ('tests/unit/test_contract_properties.py',),
+    ),
+    Mutant(
+        'network: local interface host rejected',
+        'src/nowcast/api.py',
+        'allowed_hosts = local_hosts | ({server[0]} if server else set())',
+        'allowed_hosts = local_hosts',
+        ('tests/integration/test_controls.py',),
+    ),
+    Mutant(
+        'membership: unmapped identifiers reach SEC',
+        'src/nowcast/cli.py',
+        "raise DataError('membership contains unmapped CIKs; resolve them before SEC ingestion')",
+        'pass',
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'telemetry: unknown tokens reported as zero',
+        'src/nowcast/api.py',
+        "tokens['recorded_' + column] = int(measured.sum()) if not measured.empty else None",
+        "tokens['recorded_' + column] = int(measured.sum())",
+        ('tests/integration/test_controls.py',),
+    ),
+    Mutant(
+        'scope: request model multiplier omitted',
+        'src/nowcast/ingestion/universe/builder.py',
+        'requests = self.documents * len(self.models)',
+        'requests = self.documents',
+        ('tests/unit/test_subset_and_estimate.py',),
+    ),
     # validators.py
     Mutant(
         'quote threshold becomes <=',
@@ -79,7 +114,7 @@ MUTANTS = (
     Mutant(
         'number-in-quote check dropped',
         VALIDATORS,
-        'if field.evidence_quote and not number_in_quote(float(field.value), field.evidence_quote):',
+        "if field.evidence_quote and not number_in_quote(\n            float(field.value),\n            field.evidence_quote,\n            span.unit_context if span is not None and name == 'revenue' else '',\n            percent=name == 'revenue_yoy_growth',\n        ):",
         'if False:',
         tuple(VALIDATOR_TESTS),
     ),
@@ -194,7 +229,7 @@ MUTANTS = (
     Mutant(
         'number-in-source check dropped',
         VALIDATORS,
-        'if not number_in_quote(float(field.value), window):',
+        "if not number_in_quote(\n                float(field.value),\n                window,\n                span.unit_context if span is not None and name == 'revenue' else '',\n                percent=name == 'revenue_yoy_growth',\n            ):",
         'if False:',
         tuple(VALIDATOR_TESTS),
     ),
@@ -262,8 +297,8 @@ MUTANTS = (
     Mutant(
         'number_in_quote accepts any scale',
         VALIDATORS,
-        'readings = {magnitude, magnitude / scale}',
-        'readings = {magnitude} | {magnitude / divisor for divisor, _ in SCALE_SUFFIXES}',
+        "readings = (printed,) if match['percent'] else (printed, printed * scale)",
+        'readings = (printed, printed * scale, printed * 1e3, printed * 1e6, printed * 1e9)',
         tuple(VALIDATOR_TESTS),
     ),
     # throttle.py — H-a
@@ -332,8 +367,8 @@ MUTANTS = (
     Mutant(
         'windows allocated in document order',
         PACKING,
-        'ranked = sorted(spans, key=lambda item: (item[2], item[0]))',
-        'ranked = sorted(spans, key=lambda item: item[0])',
+        'merged.sort(key=lambda item: (item[2], item[0]))',
+        'merged.sort(key=lambda item: item[0])',
         tuple(PACKING_TESTS),
     ),
     # prompts.py
@@ -348,7 +383,7 @@ MUTANTS = (
     Mutant(
         'company collapse removed',
         AGGREGATE,
-        '            counted, _duplicate_rows = collapse_to_companies(\n                counted, str(config.aggregation.dedupe_rule)\n            )',
+        '            counted, _duplicate_rows = collapse_to_companies(\n                counted,\n                str(config.aggregation.dedupe_rule),\n                tuple(config.aggregation.model_priority or config.llm.models),\n            )',
         '            _duplicate_rows = 0',
         tuple(AGGREGATE_TESTS),
     ),
@@ -362,8 +397,8 @@ MUTANTS = (
     Mutant(
         'review exclusion computed over the whole season',
         AGGREGATE,
-        "excluded = int(reported_docs['in_review'].sum())",
-        "excluded = int(season['in_review'].sum())",
+        "excluded = int(reported_docs.loc[reported_docs['in_review'], 'cik'].nunique())",
+        "excluded = int(season.loc[season['in_review'], 'cik'].nunique())",
         tuple(AGGREGATE_TESTS),
     ),
     Mutant(
@@ -379,6 +414,117 @@ MUTANTS = (
         "counted = reported_docs[~reported_docs['blocked']]",
         'counted = reported_docs',
         tuple(AGGREGATE_TESTS),
+    ),
+)
+
+MUTANTS += (
+    Mutant(
+        'K1 period ignored',
+        VALIDATORS,
+        "if year and str(year) in cell.split(']')[0]",
+        'if True',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K7 consolidation moves files',
+        RUNNER,
+        'current = _settings_digest(config, payload, model, prompt_digest)',
+        'current = (supersede_result(config, path), _settings_digest(config, payload, model, prompt_digest))[1]',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K3 summary blocks record',
+        REVIEW,
+        'return REASON_FIELDS.get(reason, frozenset())',
+        "return REASON_FIELDS.get(reason, frozenset({'record'}))",
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K6 percentage becomes currency',
+        VALIDATORS,
+        "if percent is not None and bool(match['percent']) != percent:",
+        'if False:',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K6 sign discarded',
+        VALIDATORS,
+        'printed = -printed',
+        'printed = printed',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K8 project directory ignored',
+        'src/nowcast/paths.py',
+        'base = Path(config.config_dir) / config.paths.project_dir',
+        'base = Path(config.config_dir)',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+    Mutant(
+        'K10 receipts ignored',
+        'src/nowcast/ingestion/doc_index.py',
+        'self.pending.append(json.loads(line))',
+        'pass',
+        ('tests/unit/test_plan_repairs.py',),
+    ),
+)
+
+MUTANTS += (
+    Mutant(
+        'final: implicit CLI source',
+        'src/nowcast/cli.py',
+        'if not chosen and active.is_file() and not load_index(active).empty:',
+        'if False:',
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: replacement contents unchecked',
+        'src/nowcast/ingestion/rebuild.py',
+        'if report.backup_path is not None:',
+        'if False:',
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: table units leak',
+        'src/nowcast/parsing/html.py',
+        "rows = ['[table units: ' + (unit_match.group() if unit_match else '') + ']']",
+        "rows = ['[table units: ' + unit_match.group() + ']'] if unit_match else []",
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: source period ignored',
+        'src/nowcast/extraction/validators.py',
+        '    return (not years or year is None or str(year) in years) and (\n        not quarters or quarter is None or str(quarter) in quarters\n    )',
+        '    return True',
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: numeric labels compared as text',
+        'src/nowcast/extraction/bakeoff.py',
+        "            scores[name] = float(\n                joined.loc[usable, name + '_label']\n                .eq(joined.loc[usable, name + '_model'])\n                .fillna(False)\n                .mean()\n            )\n",
+        "            scores[name] = float(\n                joined.loc[usable, name + '_label']\n                .astype(str).eq(joined.loc[usable, name + '_model'].astype(str))\n                .fillna(False)\n                .mean()\n            )\n",
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: abandoned queued job ignored',
+        'src/nowcast/jobs.py',
+        "SELECT id,pid,identity FROM jobs WHERE status IN ('queued','running')",
+        "SELECT id,pid,identity FROM jobs WHERE status='running'",
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: human panel overwritten',
+        'scripts/prepare_review.py',
+        'if target.exists():',
+        'if False:',
+        ('tests/unit/test_final_safeguards.py',),
+    ),
+    Mutant(
+        'final: colspan discarded',
+        'src/nowcast/parsing/html.py',
+        "colspan = _span(cell.get('colspan', 1), 1000)",
+        'colspan = 1',
+        ('tests/unit/test_final_safeguards.py',),
     ),
 )
 
@@ -413,11 +559,18 @@ def main(argv: list[str] | None = None) -> int:
     """Run every mutant, restore the sources, and report the survivors."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--verbose', action='store_true', help='print each mutant as it runs')
+    parser.add_argument('--match', default='', help='run mutants whose names contain this text')
     args = parser.parse_args(argv)
+    selected = [mutant for mutant in MUTANTS if args.match in mutant.name]
+    if not selected:
+        parser.error('no matching mutants')
+    if not _run_tests(tuple(sorted({test for mutant in selected for test in mutant.tests}))):
+        print('BASELINE FAILED: mutants were not run')
+        return 2
 
     survivors: list[str] = []
     broken: list[str] = []
-    for index, mutant in enumerate(MUTANTS, start=1):
+    for index, mutant in enumerate(selected, start=1):
         path = ROOT / mutant.path
         original = path.read_bytes()
         before = _digest(path)
@@ -433,17 +586,17 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit(f'FAILED TO RESTORE {path}; restore it from git now')
         label = 'killed  ' if killed else 'SURVIVED'
         if args.verbose:
-            print(f'[{index:2d}/{len(MUTANTS)}] {label} {mutant.name}')
+            print(f'[{index:2d}/{len(selected)}] {label} {mutant.name}')
         if not killed:
             survivors.append(mutant.name)
     for problem in broken:
         print(f'MALFORMED {problem}')
     print(
-        f'{len(MUTANTS)} mutants, {len(MUTANTS) - len(survivors)} killed, {len(survivors)} survived'
+        f'{len(selected)} mutants, {len(selected) - len(survivors) - len(broken)} killed, {len(survivors)} survived, {len(broken)} malformed'
     )
     for name in survivors:
         print(f'  SURVIVED {name}')
-    return 0 if not broken else 2
+    return 2 if broken else int(bool(survivors))
 
 
 if __name__ == '__main__':

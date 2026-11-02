@@ -37,65 +37,153 @@ def verify_quote(quote: str, source: str) -> float:
     return round(fuzz.partial_ratio(quote.lower(), source.lower()) / 100.0, 4)
 
 
-def matched_window(quote: str, source: str) -> str:
-    """Return the part of the source that best matches the quote.
+@dataclass(frozen=True)
+class EvidenceSpan:
+    """Offsets refer to the preserved source; matched_text selects the relevant column."""
 
-    A whole-document fuzzy score says a quote resembles *something* in the source; it
-    cannot say the number in it is real. A forty-character quote with one digit changed
-    scores about 0.97, well past any workable threshold. The number therefore has to
-    appear in the window the quote was matched against, not merely somewhere in the
-    document.
-    """
+    start: int
+    end: int
+    text: str
+    matched_text: str
+    unit_context: str = ''
+
+
+def _period_matches(text: str, year: int | None, quarter: int | None) -> bool:
+    years = re.findall(r'\b20\d{2}\b', text)
+    quarters = re.findall(r'\bQ([1-4])\b', text, re.I)
+    return (not years or year is None or str(year) in years) and (
+        not quarters or quarter is None or str(quarter) in quarters
+    )
+
+
+def evidence_span(
+    quote: str, source: str, year: int | None = None, quarter: int | None = None
+) -> EvidenceSpan | None:
+    """Select by row label and period before checking numbers, never by value alone."""
     if not quote or not source:
-        return ''
+        return None
+    exact = source.lower().find(quote.lower())
+    if exact >= 0:
+        start = source.rfind('\n', 0, exact) + 1
+        end = source.find('\n', exact + len(quote))
+        line = source[start : end if end >= 0 else len(source)]
+        if ' | ' not in line and not _period_matches(quote, year, quarter):
+            return EvidenceSpan(exact, exact + len(quote), source[exact : exact + len(quote)], '')
+        if ' | ' not in line:
+            return EvidenceSpan(
+                exact,
+                exact + len(quote),
+                source[exact : exact + len(quote)],
+                source[exact : exact + len(quote)],
+            )
+    candidates: list[tuple[float, EvidenceSpan]] = []
+    offset = 0
+    unit_context = ''
+    for line in source.splitlines(keepends=True):
+        text = line.rstrip('\r\n')
+        if text.startswith('[table units:'):
+            unit_context = text
+        if ' | ' in text:
+            cells = text.split(' | ')
+            label = cells[0]
+            periods = [cell for cell in cells[1:] if re.match(r'\[.*?20\d{2}.*?\]', cell)]
+            if periods:
+                chosen = [cell for cell in periods if year and str(year) in cell.split(']')[0]]
+                if len(chosen) > 1:
+                    chosen = [
+                        cell
+                        for cell in chosen
+                        if quarter is not None
+                        and re.search(r'\bQ' + str(quarter) + r'\b', cell.split(']')[0], re.I)
+                    ]
+                if len(chosen) > 1:
+                    chosen = []
+
+                projected = (
+                    label + ' ' + ' '.join(re.sub(r'^\[.*?\]\s*', '', cell) for cell in chosen)
+                )
+            else:
+                projected = ' '.join(cells)
+            quote_label = re.sub(
+                r'\b(?:thousands?|millions?|billions?|trillions?|USD|GBP|EUR)\b',
+                '',
+                quote,
+                flags=re.I,
+            )
+            score = fuzz.ratio(
+                re.sub(r'[\d\W]+', ' ', quote_label.lower()).strip(),
+                re.sub(r'[\d\W]+', ' ', label.lower()).strip(),
+            )
+            candidates.append(
+                (score, EvidenceSpan(offset, offset + len(text), text, projected, unit_context))
+            )
+        offset += len(line)
+    if candidates:
+        best_score, best = max(candidates, key=lambda pair: pair[0])
+        # Only a table-label match can select a table row over surrounding prose.
+        if best_score >= 85:
+            tied = [span for score, span in candidates if score == best_score]
+            if len({span.matched_text for span in tied}) > 1:
+                return EvidenceSpan(best.start, best.end, best.text, '')
+            return best
+    if exact >= 0:
+        return EvidenceSpan(exact, exact + len(quote), source[exact : exact + len(quote)], '')
     alignment = fuzz.partial_ratio_alignment(quote.lower(), source.lower())
     if alignment is None:
-        return ''
-    return source[alignment.dest_start : alignment.dest_end + 1]
+        return None
+    start, end = alignment.dest_start, alignment.dest_end
+    text = source[start:end]
+    line_start = source.rfind('\n', 0, start) + 1
+    line_end = source.find('\n', end)
+    context = source[line_start : line_end if line_end >= 0 else len(source)]
+    matched = text if ' | ' not in context and _period_matches(text, year, quarter) else ''
+    return EvidenceSpan(start, end, text, matched)
 
 
-def _digits_in(text: str) -> set[str]:
-    """Return the numeric tokens of a string with commas and signs stripped."""
-    tokens: set[str] = set()
-    for match in NUMBER_RE.findall(text):
-        token = match.replace(',', '').lstrip('-').rstrip('.')
-        if token:
-            tokens.add(token)
-    return tokens
+def matched_window(quote: str, source: str) -> str:
+    """Compatibility accessor for the selected evidence span."""
+    span = evidence_span(quote, source)
+    return span.matched_text if span else ''
 
 
-def _number_forms(value: float) -> set[str]:
-    """Return the printed spellings of one magnitude."""
-    return {
-        repr(value),
-        f'{value:.2f}',
-        f'{value:.4f}'.rstrip('0').rstrip('.'),
-        f'{value:g}',
-    }
+TOKEN_NUMBER_RE = re.compile(
+    r'(?<![\w.])(?P<open>\()?\s*[$€£]?\s*(?P<sign>[-\u2212+]?)'
+    r'(?P<number>\d[\d,]*(?:\.\d+)?)(?P<close>\s*\))?'
+    r'\s*(?P<scale>thousands?|millions?|billions?|trillions?)?'
+    r'\s*(?P<percent>%|percent\b)?',
+    re.I,
+)
 
 
-def number_in_quote(value: float, quote: str) -> bool:
-    """Return True when the value matches a number printed in its evidence quote.
+def number_in_quote(
+    value: float, quote: str, unit_context: str = '', percent: bool | None = None
+) -> bool:
+    """Bind sign and scale to each printed number; percentages remain printed percent."""
+    import math
 
-    Two readings are legitimate. The quote prints the scale word ("$1.20 billion"), and
-    the model recorded either the printed figure (1.2) or its expansion (1.2e9). Any
-    other scale is a mismatch: 1000 against "1.2 billion" is off by 1e6 however close its
-    digits look, and accepting it is how a wrong figure passes as evidence.
-    """
-    if not quote:
-        return False
-    magnitude = abs(float(value))
-    quote_tokens = _digits_in(quote)
-    if not quote_tokens:
-        return False
-    lowered = quote.lower()
-    scale = next(
-        (divisor for divisor, suffix in SCALE_SUFFIXES if suffix and suffix in lowered), 1.0
+    context_scale = next(
+        (scale for scale, word in SCALE_SUFFIXES if word and word in unit_context.lower()), 1.0
     )
-    readings = {magnitude, magnitude / scale}
-    return any(
-        form and form in quote_tokens for reading in readings for form in _number_forms(reading)
-    )
+    for match in TOKEN_NUMBER_RE.finditer(quote):
+        if percent is not None and bool(match['percent']) != percent:
+            continue
+        printed = float(match['number'].replace(',', ''))
+        prefix = quote[max(0, match.start() - 24) : match.start()].lower()
+        decreasing = match['percent'] and re.search(
+            r'(?:down|declined|decreased|fell)(?: by)?\s*$', prefix
+        )
+        if match['sign'] in ('-', '\u2212') or (match['open'] and match['close']) or decreasing:
+            printed = -printed
+        word = (match['scale'] or '').rstrip('s').lower()
+        scale = (
+            next((scale for scale, suffix in SCALE_SUFFIXES if suffix == word), context_scale)
+            if word
+            else context_scale
+        )
+        readings = (printed,) if match['percent'] else (printed, printed * scale)
+        if any(math.isclose(value, reading, rel_tol=1e-10, abs_tol=1e-10) for reading in readings):
+            return True
+    return False
 
 
 def _check_field_quote(
@@ -129,15 +217,30 @@ NUMERIC_FIELDS = (
     'revenue',
     'revenue_yoy_growth',
 )
-TEXT_FIELDS = ('eps_basis', 'guidance_direction', 'guidance_metric', 'tone')
+TEXT_FIELDS = (
+    'eps_basis',
+    'prior_year_basis',
+    'guidance_presence',
+    'guidance_direction',
+    'guidance_metric',
+    'tone',
+)
 
 
 def validate_record(
-    record: ExtractionRecord, source: str, config: Config
+    record: ExtractionRecord, source: str, config: Config, report_date: str | None = None
 ) -> tuple[list[Issue], ExtractionRecord]:
     """Return issue codes and a copy of the record with penalized confidences."""
     issues: list[Issue] = []
     penalty = float(config.extraction.confidence_penalty_on_issue)
+    if report_date and record.fiscal_year is not None and record.fiscal_quarter is not None:
+        from datetime import date
+
+        stamp = date.fromisoformat(report_date[:10])
+        reported_period = record.fiscal_year * 4 + record.fiscal_quarter
+        filing_period = stamp.year * 4 + (stamp.month - 1) // 3 + 1
+        if not 1 <= record.fiscal_quarter <= 4 or abs(filing_period - reported_period) > 1:
+            issues.append(Issue('fiscal_period', 'period_not_near_filing', report_date))
 
     for name in NUMERIC_FIELDS:
         field = getattr(record, name)
@@ -147,15 +250,32 @@ def validate_record(
         def adjust(value: float, target: NumField = field) -> None:
             target.confidence = value
 
-        _check_field_quote(
-            name, field.evidence_quote, source, config, issues, adjust, field.confidence
+        span = evidence_span(
+            field.evidence_quote or '',
+            source,
+            year=record.fiscal_year,
+            quarter=record.fiscal_quarter,
         )
-        if field.evidence_quote and not number_in_quote(float(field.value), field.evidence_quote):
+        selected_source = span.matched_text if span else ''
+        _check_field_quote(
+            name, field.evidence_quote, selected_source, config, issues, adjust, field.confidence
+        )
+        if field.evidence_quote and not number_in_quote(
+            float(field.value),
+            field.evidence_quote,
+            span.unit_context if span is not None and name == 'revenue' else '',
+            percent=name == 'revenue_yoy_growth',
+        ):
             issues.append(Issue(name, 'number_not_in_quote', (field.evidence_quote or '')[:80]))
             field.confidence = field.confidence * penalty
         elif field.evidence_quote:
-            window = matched_window(field.evidence_quote, source)
-            if not number_in_quote(float(field.value), window):
+            window = selected_source
+            if not number_in_quote(
+                float(field.value),
+                window,
+                span.unit_context if span is not None and name == 'revenue' else '',
+                percent=name == 'revenue_yoy_growth',
+            ):
                 # The quote resembles the source (possibly with a changed digit) but the
                 # number is not in the text it matched. Checking the model's own quote
                 # only ever proves the model is consistent with itself.
@@ -181,6 +301,11 @@ def validate_record(
             field.confidence = field.confidence * penalty
 
     for theme, mention in record.theme_mentions.items():
+        if (
+            mention.direction is not None
+            and mention.direction not in config.extraction.theme_direction_vocab
+        ):
+            issues.append(Issue(f'theme.{theme}', 'vocab_invalid', str(mention.direction)))
         if not mention.mentioned:
             continue
         if mention.evidence_quote and verify_quote(mention.evidence_quote, source) < float(

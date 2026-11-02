@@ -98,3 +98,19 @@ def rows_for_record(
     for field, code in issues:
         rows.append({'document_id': document_id, 'field': field, 'reason': code, 'model': model})
     return rows
+
+
+BLOCKING_REASONS = frozenset({'llm_failed', 'truncated', 'document_error', 'empty_extraction'})
+REASON_FIELDS = {
+    'eps_missing': frozenset({'reported_eps'}),
+    'model_disagreement': frozenset({'reported_eps', 'guidance_direction'}),
+}
+
+
+def affected_fields(field: str, reason: str) -> frozenset[str]:
+    """Resolve queue verdicts once; summaries carry no additional field effect."""
+    if reason in BLOCKING_REASONS:
+        return frozenset({'record'})
+    if field != 'record':
+        return frozenset({field})
+    return REASON_FIELDS.get(reason, frozenset())

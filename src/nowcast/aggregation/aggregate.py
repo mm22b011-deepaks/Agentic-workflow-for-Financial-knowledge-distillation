@@ -15,7 +15,7 @@ import pandas as pd
 
 from nowcast.config import Config, manifests_dir, resolve_data_path
 from nowcast.errors import DataError
-from nowcast.extraction.review_queue import load_queue
+from nowcast.extraction.review_queue import affected_fields, load_queue
 from nowcast.ingestion.constituents import active_on, load_constituents
 
 LOGGER = logging.getLogger(__name__)
@@ -73,6 +73,11 @@ def output_columns(config: Config) -> list[str]:
     """Return the aggregate frame's column order."""
     return [
         *SUMMARY_COLUMNS,
+        'n_planned',
+        'n_attempted',
+        'execution_complete',
+        'n_eligible_releases',
+        'n_guidance_providers',
         'share_of_cohort',
         'share_of_index',
         *[f'theme_{theme}_share' for theme in config.extraction.themes],
@@ -128,12 +133,6 @@ def winsorize(series: pd.Series, proportion: float) -> pd.Series:
     return values.clip(lower=lower, upper=upper)
 
 
-# Reasons that mean the record cannot be trusted at all. Any other reason names one
-# field, and only that field's contribution is withdrawn: a truncated document still
-# reports the revenue it did state before the cut.
-BLOCKING_REASONS = frozenset({'llm_failed', 'truncated', 'document_error', 'empty_extraction'})
-
-
 def _review_excluded(config: Config, extractions: pd.DataFrame) -> dict[tuple[str, str], set[str]]:
     """Return {(document, model): flagged fields} from the queue.
 
@@ -147,15 +146,13 @@ def _review_excluded(config: Config, extractions: pd.DataFrame) -> dict[tuple[st
     flagged: dict[tuple[str, str], set[str]] = {}
     for row in queue[['document_id', 'model', 'field', 'reason']].dropna().itertuples(index=False):
         key = (str(row.document_id), str(row.model))
-        if str(row.reason) in BLOCKING_REASONS:
-            flagged.setdefault(key, set()).add('record')
-        else:
-            flagged.setdefault(key, set()).add(str(row.field))
+        effects = affected_fields(str(row.field), str(row.reason))
+        flagged.setdefault(key, set()).update(effects)
     return flagged
 
 
 def collapse_to_companies(
-    frame: pd.DataFrame, rule: str = 'max_confidence'
+    frame: pd.DataFrame, rule: str = 'max_confidence', model_priority: tuple[str, ...] = ()
 ) -> tuple[pd.DataFrame, int]:
     """Return one row per (cik, season), collapsing duplicate reports.
 
@@ -175,7 +172,21 @@ def collapse_to_companies(
     ordered = frame.sort_values(
         [*key, 'confidence', 'document_id'], ascending=[True, True, True, False, True]
     )
-    if rule == 'max_confidence':
+    if rule == 'model_priority':
+        ordered = frame.assign(
+            _priority=frame['model']
+            .map({name: rank for rank, name in enumerate(model_priority)})
+            .fillna(len(model_priority))
+        )
+        kept = (
+            ordered.sort_values(
+                [*key, '_priority', 'report_date', 'document_id'],
+                ascending=[True, True, True, True, False, True],
+            )
+            .drop_duplicates(subset=key)
+            .drop(columns='_priority')
+        )
+    elif rule == 'max_confidence':
         kept = ordered.drop_duplicates(subset=key, keep='first')
     elif rule == 'first_document':
         kept = ordered.drop_duplicates(subset=key, keep='last')
@@ -281,6 +292,9 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
     # Un-winsorised: the clip has to happen inside each as-of snapshot, or an early
     # date's value depends on a document published after it.
     frame['eps_growth'] = (reported - prior) / prior.abs()
+    if 'prior_year_basis' in frame.columns:
+        prior_basis = frame['prior_year_basis'].astype('string').str.lower().str.strip()
+        frame['eps_growth'] = frame['eps_growth'].where(prior_basis.notna() & prior_basis.eq(basis))
     frame.loc[prior.isna() | (prior == 0), 'eps_growth'] = np.nan
     frame['beat'] = withdraw('beat', ('reported_eps', 'consensus_eps'))
     frame['eps_growth'] = withdraw('eps_growth', ('reported_eps', 'prior_year_eps'))
@@ -288,11 +302,16 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
         frame['revenue_growth'] = pd.to_numeric(frame['revenue_yoy_growth_pct'], errors='coerce')
     else:
         frame['revenue_growth'] = np.nan
-    frame['revenue_growth'] = withdraw('revenue_growth', ('revenue', 'revenue_yoy_growth'))
+    frame['revenue_growth'] = withdraw('revenue_growth', ('revenue_yoy_growth',))
 
     direction = frame['guidance_direction'].astype('string').str.lower().str.strip()
     frame['guidance_raised'] = (direction == 'raised').astype(float)
     frame['guidance_lowered'] = (direction == 'lowered').astype(float)
+    providers = direction.notna() & direction.ne('not_provided')
+    frame['guidance_raised'] = frame['guidance_raised'].where(providers)
+    frame['guidance_lowered'] = frame['guidance_lowered'].where(providers)
+    presence = frame.get('guidance_presence', pd.Series(index=frame.index, dtype='string'))
+    frame['guidance_provider'] = presence.eq('provided') | (presence.isna() & providers)
     frame['guidance_raised'] = withdraw('guidance_raised', ('guidance_direction',))
     frame['guidance_lowered'] = withdraw('guidance_lowered', ('guidance_direction',))
     scores = {str(k).lower(): float(v) for k, v in config.extraction.tone_scores.items()}
@@ -390,6 +409,17 @@ def aggregate_index(
     minimum = int(config.aggregation.min_constituents)
     rows: list[dict[str, object]] = []
 
+    frame = frame[
+        [
+            str(row.cik)
+            in set(active_on(constituents, str(row.report_date)).cik.astype(str).str.zfill(10))
+            for row in frame.itertuples()
+        ]
+    ].copy()
+    pair_path = manifests_dir(config) / 'pair_outcomes.csv'
+    planned_pairs = (
+        pd.read_csv(pair_path, dtype={'cik': str}) if pair_path.exists() else pd.DataFrame()
+    )
     season_keys = frame[['season_year', 'season_quarter']].dropna().drop_duplicates()
     for year, quarter in season_keys.itertuples(index=False, name=None):
         season = frame[(frame['season_year'] == year) & (frame['season_quarter'] == quarter)]
@@ -399,10 +429,12 @@ def aggregate_index(
             members = active_on(constituents, stamp)
             # The queue is consulted at this date, so one company excluded later does
             # not appear as excluded from every earlier date in the season.
-            excluded = int(reported_docs['in_review'].sum())
+            excluded = int(reported_docs.loc[reported_docs['in_review'], 'cik'].nunique())
             counted = reported_docs[~reported_docs['blocked']]
             counted, _duplicate_rows = collapse_to_companies(
-                counted, str(config.aggregation.dedupe_rule)
+                counted,
+                str(config.aggregation.dedupe_rule),
+                tuple(config.aggregation.model_priority or config.llm.models),
             )
 
             # Identifiers are used here only to join weights; they never reach the output.
@@ -425,7 +457,12 @@ def aggregate_index(
             # The denominator is the sampled cohort, not all ~500 members: a 100-document
             # run against the whole index reports a share near 0.03 and suppresses
             # everything. Without a cohort file the index is the cohort.
-            member_ciks = set(members['cik'].astype(str).str.zfill(10))
+            season_start = pd.Timestamp(year=int(year), month=(int(quarter) - 1) * 3 + 1, day=1)
+            interval_members = constituents[
+                (constituents.effective_from <= stamp)
+                & (constituents.effective_to.isna() | (constituents.effective_to >= season_start))
+            ]
+            member_ciks = set(interval_members.cik.astype(str).str.zfill(10))
             # The season's own cohort when the ingest recorded one: a company sampled for
             # another quarter did not report this one, and counting it as expected makes
             # share_reported look like a coverage failure instead of a partial season.
@@ -445,7 +482,23 @@ def aggregate_index(
                     f'{n_reported} reported companies against {n_expected} cohort members; '
                     'the cohort file does not cover the reports being aggregated'
                 )
+            season_pairs = (
+                planned_pairs[planned_pairs.season.eq(season_key)]
+                if not planned_pairs.empty
+                else pd.DataFrame()
+            )
+            if not season_pairs.empty:
+                n_expected = int(season_pairs.outcome.ne('unvisited').sum())
+                if n_reported > n_expected:
+                    raise DataError('share_reported would exceed 1: reports exceed attempted pairs')
+                share = n_reported / n_expected if n_expected else float('nan')
+            n_planned = len(season_pairs) if not season_pairs.empty else n_expected
             row: dict[str, object] = {
+                'n_planned': n_planned,
+                'n_attempted': n_expected,
+                'execution_complete': bool(n_expected == n_planned),
+                'n_eligible_releases': int(reported_docs.document_id.nunique()),
+                'n_guidance_providers': int(counted.guidance_provider.fillna(False).sum()),
                 'as_of_date': stamp,
                 'season_year': year,
                 'season_quarter': quarter,

@@ -71,7 +71,7 @@ def _resolve_input(config: Config, relative: str) -> Path | None:
     candidate = Path(relative)
     if candidate.is_absolute():
         return candidate if candidate.is_file() else None
-    for base in (data_root(config), Path.cwd()):
+    for base in (data_root(config), Path(config.config_dir) / config.paths.project_dir):
         path = base / candidate
         if path.is_file():
             return path
@@ -315,9 +315,15 @@ class ScopeEstimate:
     input_tokens: int
     output_tokens: int
     models: tuple[str, ...]
+    retry_attempts: int
+    requests_per_day: int
 
     def as_lines(self) -> list[str]:
         """Render the estimate as printable lines, explicitly labelled an estimate."""
+        requests = self.documents * len(self.models)
+        maximum = requests * self.retry_attempts
+        days = -(-requests // self.requests_per_day)
+        maximum_days = -(-maximum // self.requests_per_day)
         lines = [
             'ESTIMATE ONLY - not a promise of cost or document count',
             f'  companies                 {self.companies}',
@@ -325,9 +331,12 @@ class ScopeEstimate:
             f'  company-quarters          {self.company_quarters}',
             f'  document types            {", ".join(self.document_types) or "(none)"}',
             f'  expected documents        {self.documents}',
-            f'  estimated input tokens    {self.input_tokens:,}',
-            f'  estimated output tokens   {self.output_tokens:,}',
+            f'  estimated input tokens    {self.input_tokens:,} (per model)',
+            f'  estimated output tokens   {self.output_tokens:,} (per model)',
             f'  models                    {", ".join(self.models) or "(none)"}',
+            f'  base model requests       {requests}',
+            f'  maximum model requests    {maximum}',
+            f'  UTC days at configured cap {days}..{maximum_days} (assuming every estimated release; account allowance unverified)',
         ]
         free_only = bool(self.models) and all(
             model.endswith(FREE_MODEL_SUFFIX) for model in self.models
@@ -403,6 +412,8 @@ def estimate_scope(config: Config, constituents_path: Path | None = None) -> Sco
         input_tokens=documents * per_doc_in,
         output_tokens=documents * per_doc_out,
         models=tuple(config.llm.models),
+        retry_attempts=max(1, int(config.llm.retry_attempts)),
+        requests_per_day=int(config.llm.requests_per_day),
     )
 
 
