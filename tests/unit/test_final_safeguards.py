@@ -381,6 +381,12 @@ def test_ingest_records_unvisited_plan_before_rejecting_unmapped_members(
             'data.start_date=2025-01-01',
             '--set',
             'data.end_date=2025-03-31',
+            '--set',
+            'scope.profile=custom',
+            '--set',
+            'scope.companies=0',
+            '--set',
+            'scope.seasons=0',
         ]
     )
     assert code == 2

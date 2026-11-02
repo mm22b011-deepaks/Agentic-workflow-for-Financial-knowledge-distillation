@@ -50,6 +50,9 @@ def _frame(count: int = 20) -> pd.DataFrame:
 def _config(**overrides: Any) -> Config:
     """Load the project config with the given overrides."""
     values = {
+        'scope.profile': 'custom',
+        'scope.companies': '0',
+        'scope.seasons': '0',
         'data.start_date': '2022-01-01',
         'data.end_date': '2024-12-31',
         'universe.avg_tokens_per_doc_in': '6000',
@@ -179,6 +182,9 @@ def test_scope_reports_request_budget_and_configured_reply_ceiling(tmp_path: Pat
     config = load_config(
         REPO / 'configs/config.yaml',
         overrides={
+            'scope.profile': 'custom',
+            'scope.companies': '0',
+            'scope.seasons': '0',
             'data.start_date': '2025-01-01',
             'data.end_date': '2025-12-31',
             'llm.requests_per_day': '3',
@@ -186,9 +192,9 @@ def test_scope_reports_request_budget_and_configured_reply_ceiling(tmp_path: Pat
     )
     estimate = estimate_scope(config, constituents_path=path)
     lines = '\n'.join(estimate.as_lines())
-    # Eight releases x two models; three attempts per request is the upper plan.
-    assert 'base model requests       16' in lines
-    assert 'maximum model requests    48' in lines
-    assert 'UTC days at configured cap 6..16' in lines
+    # Eight releases use one primary model; retries remain the upper plan.
+    assert 'base model requests       8' in lines
+    assert 'maximum model requests    24' in lines
+    assert 'UTC days at configured cap 3..8' in lines
     assert estimate.output_tokens >= estimate.documents * config.llm.max_tokens
     assert 'per model' in lines

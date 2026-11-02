@@ -317,10 +317,26 @@ class ScopeEstimate:
     models: tuple[str, ...]
     retry_attempts: int
     requests_per_day: int
+    scope_plan: dict[str, Any] | None = None
 
     def as_lines(self) -> list[str]:
         """Render the estimate as printable lines, explicitly labelled an estimate."""
-        requests = self.documents * len(self.models)
+        if self.scope_plan is not None:
+            plan = self.scope_plan
+            return [
+                'ESTIMATE ONLY - account allowance UNSURE',
+                f'  profile                   {plan["profile"]}',
+                f'  companies                 {plan["companies"]}',
+                f'  seasons                   {", ".join(plan["seasons"])}',
+                f'  expected documents        {plan["releases"]}',
+                f'  base model requests       {plan["base_requests"]}',
+                f'  retry reserve             {plan["retry_reserve"]}',
+                f'  bakeoff requests          {plan["bakeoff_requests"]}',
+                f'  expected requests         {plan["expected_requests"]}',
+                f'  usable daily requests     {plan["daily_capacity"]}',
+                f'  UTC days                  {plan["model_days"]}',
+            ]
+        requests = self.documents
         maximum = requests * self.retry_attempts
         days = -(-requests // self.requests_per_day)
         maximum_days = -(-maximum // self.requests_per_day)
@@ -394,6 +410,11 @@ def estimate_scope(config: Config, constituents_path: Path | None = None) -> Sco
     if not config.data.start_date or not config.data.end_date:
         raise DataError('data.start_date and data.end_date must both be set for estimate-scope')
 
+    from nowcast.scope import dimensions, scope_summary, scoped_membership
+
+    reduced = any(dimensions(config))
+    plan = scope_summary(config) if reduced else None
+    config, frame = scoped_membership(config, frame)
     companies = int(frame['ticker'].nunique())
     quarter_map = _quarter_map(frame, config.data.start_date, config.data.end_date)
     document_types = tuple(config.data.edgar_forms) or ('8-K',)
@@ -414,6 +435,7 @@ def estimate_scope(config: Config, constituents_path: Path | None = None) -> Sco
         models=tuple(config.llm.models),
         retry_attempts=max(1, int(config.llm.retry_attempts)),
         requests_per_day=int(config.llm.requests_per_day),
+        scope_plan=plan,
     )
 
 

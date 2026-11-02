@@ -90,10 +90,10 @@ MUTANTS = (
         ('tests/integration/test_controls.py',),
     ),
     Mutant(
-        'scope: request model multiplier omitted',
+        'scope: primary request count doubled',
         'src/nowcast/ingestion/universe/builder.py',
-        'requests = self.documents * len(self.models)',
         'requests = self.documents',
+        'requests = self.documents * 2',
         ('tests/unit/test_subset_and_estimate.py',),
     ),
     # validators.py

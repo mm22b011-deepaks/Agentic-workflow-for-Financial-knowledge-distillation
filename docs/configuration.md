@@ -19,3 +19,14 @@ Quota reservations share the jobs database beneath the same DATA_DIR and provide
 `estimate-scope` labels token assumptions per model and reports base requests, the configured retry upper plan and UTC days at the configured cap. The shipped output-token assumption is 32,768, based on the measured historical maximum plus headroom; it is a conservative planning assumption, not measured average use. Expected documents assume one release per eligible company-quarter/form. Missing releases, cache reuse, prior daily usage and verified account limits can change elapsed days.
 
 SEC ingestion refuses unmapped, non-ASCII or zero CIKs before any SEC request. It retains every planned pair as unvisited when this check fails. Resolve the seven recorded unmapped eligible intervals before attempting the full production window; do not hide them by reducing the universe.
+
+## Reduced scope
+
+- `scope.profile`: `small` (20x4), `standard` (40x4, default), `large` (100x4), or `custom`.
+- `scope.companies`: count for custom; zero with zero seasons means the full configured window. Presets determine their own counts.
+- `scope.seasons`: latest N completed calendar quarters for custom; presets use four. Zero with zero companies retains the original window.
+- `scope.seed`: deterministic panel seed, default 42.
+
+The same point-in-time companies are frozen across all seasons in `data/manifests/panel.json`. Changed input specifications/universe never silently redraw the file. A changed panel requires preserving/archiving the old one or choosing a separate DATA_DIR. The historical 150-company panel remains separate and preserved.
+
+The shared forecast also reads `scheduler.safety_margin` (0.10), `scheduler.retry_reserve` (5 requests held per model day), `scheduler.bakeoff_requests` (20), `scheduler.max_days` (365), and `schedule.run_at_utc` (`00:10`, HH:MM UTC). The usable daily capacity is floor(limit x (1-margin)) minus reserve. The human sets `llm.requests_per_day` and `llm.requests_per_minute`; these are UNSURE until verified and are never raised automatically. Insufficient numeric per-season scope is warned against `aggregation.min_observations`.

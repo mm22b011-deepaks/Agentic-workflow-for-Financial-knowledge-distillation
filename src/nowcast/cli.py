@@ -148,6 +148,9 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     from nowcast.ingestion.sampling import season_sample
 
     frame = load_constituents(constituents)
+    from nowcast.scope import scoped_membership
+
+    config, frame = scoped_membership(config, frame)
     limit = int(config.data.edgar_max_documents)
     per_cik = int(config.data.edgar_docs_per_cik)
     # Seeded per-season walk order, not the sorted head of the CIK list: the ingest stops
@@ -266,10 +269,25 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     if not source_index.is_file():
         raise DataError(f'no document index at {source_index}; run ingest or rebuild-index first')
     documents = load_documents(config, source_index)
+    from nowcast.scope import dimensions, freeze_scope
+
+    if any(dimensions(config)):
+        from nowcast.ingestion.constituents import load_constituents
+
+        members = load_constituents(resolve_data_path(config, config.data.constituents_csv))
+        panel = freeze_scope(config, members)
+        pairs = {(row['cik'], row['season']) for row in panel['pairs']}
+        from nowcast.extraction.selection import season_of_date
+
+        documents = [
+            doc
+            for doc in documents
+            if (str(doc.cik).zfill(10), season_of_date(doc.report_date)) in pairs
+        ]
     from nowcast.registry import load_registry
 
     registry = load_registry(config)
-    maximum_requests = len(documents) * len(config.llm.models) * int(config.llm.retry_attempts)
+    maximum_requests = len(documents) * int(config.llm.retry_attempts)
     if maximum_requests > registry.limits.maximum_requests:
         raise DataError('maximum extraction request plan exceeds configured maximum')
     # `--limit` is the index head — the oldest filings of a few companies. `--sample`
@@ -297,7 +315,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     ledger = BudgetLedger(
         resolve_data_path(config, config.budget.ledger_path), config.budget.max_usd
     )
-    models = list(config.llm.models)
+    models = list(config.llm.models[:1])
     shared: Any = None
 
     def factory(model: str) -> Any:
