@@ -62,6 +62,13 @@ class Mutant:
 
 MUTANTS = (
     Mutant(
+        'delivery: label sheet includes stale scope',
+        'src/nowcast/operations.py',
+        'frame = frame[frame.document_id.isin(eligible)]',
+        'frame = frame',
+        ('tests/integration/test_inspection.py',),
+    ),
+    Mutant(
         'delivery: private bakeoff sample exposed',
         'src/nowcast/inspection.py',
         "if node == 'model-bakeoff':",

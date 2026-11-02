@@ -66,7 +66,6 @@ def doctor(config: Config) -> dict[str, Any]:
         'configured_limit': config.llm.requests_per_day,
         'quota_left': max(0, config.llm.requests_per_day - used),
         'pending_human': ['labels-30', 'spot-check-5', 'nda'],
-        'model_gate': 'pending human',
     }
 
 
@@ -89,7 +88,9 @@ def export_index(config: Config) -> dict[str, Any]:
 
 
 def prepare_labels(config: Config) -> dict[str, Any]:
-    from nowcast.extraction.runner import consolidate
+    from nowcast.extraction.runner import consolidate, load_documents
+    from nowcast.ingestion.rebuild import index_path
+    from nowcast.scope import select_documents
 
     paths = Paths.from_config(config)
     target = paths.resolve('inputs/label-sheet.json')
@@ -100,11 +101,11 @@ def prepare_labels(config: Config) -> dict[str, Any]:
         }
     frame = consolidate(config, list(config.llm.models))
     if not frame.empty:
-        panel = paths.resolve('manifests/panel.json')
-        if panel.exists():
-            frame = frame[
-                frame.cik.astype(str).str.zfill(10).isin(json.loads(panel.read_text())['companies'])
-            ]
+        eligible = {
+            document.document_id
+            for document in select_documents(config, load_documents(config, index_path(config)))
+        }
+        frame = frame[frame.document_id.isin(eligible)]
         frame = frame.sample(n=min(30, len(frame)), random_state=config.scope.seed)
     rows = json.loads(frame.to_json(orient='records', date_format='iso')) if not frame.empty else []
     atomic_json({'version': 'v1', 'seed': config.scope.seed, 'target': 30, 'records': rows}, target)

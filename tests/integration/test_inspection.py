@@ -150,6 +150,22 @@ def test_public_bakeoff_pane_does_not_serialize_private_sample_identifiers(corpu
         assert response.json()['rows'][0]['model'] == 'synthetic:free'
 
 
+def test_label_sheet_uses_only_current_index_scope(corpus, monkeypatch):
+    monkeypatch.setattr('nowcast.cli._load', lambda args: corpus)
+    monkeypatch.setattr(
+        'nowcast.extraction.runner.consolidate',
+        lambda *args: pd.DataFrame(
+            [
+                {'document_id': 'private-record', 'cik': '0000000001'},
+                {'document_id': 'orphaned-old-season', 'cik': '0000000001'},
+            ]
+        ),
+    )
+    assert main(['prepare-labels', '--config', str(CONFIG)]) == 0
+    sheet = json.loads(Paths.from_config(corpus).resolve('inputs/label-sheet.json').read_text())
+    assert [row['document_id'] for row in sheet['records']] == ['private-record']
+
+
 def test_evidence_rejects_number_in_another_row_and_labels_are_csrf_protected(corpus, monkeypatch):
     monkeypatch.setenv('NOWCAST_INTERNAL_TRACE', '1')
     with client_for() as client:
