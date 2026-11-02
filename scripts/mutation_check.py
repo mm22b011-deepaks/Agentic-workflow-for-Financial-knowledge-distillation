@@ -62,6 +62,15 @@ class Mutant:
 
 MUTANTS = (
     Mutant(
+        'duration: running stage reports startup interval',
+        'src/nowcast/inspection.py',
+        "if len(events) > 1 and job.status not in {'queued', 'running'}:",
+        'if len(events) > 1:',
+        (
+            'tests/integration/test_inspection.py::test_running_stage_does_not_report_startup_time_as_completed_duration',
+        ),
+    ),
+    Mutant(
         'provenance: canonical input omitted',
         'src/nowcast/inspection.py',
         '    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))\n',
