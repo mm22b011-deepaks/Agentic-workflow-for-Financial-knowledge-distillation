@@ -57,6 +57,27 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True)
+class ScopeConfig:
+    profile: str = 'custom'
+    companies: int = 0
+    seasons: int = 0
+    seed: int = 42
+
+
+@dataclass(frozen=True)
+class SchedulerConfig:
+    safety_margin: float = 0.10
+    retry_reserve: int = 5
+    bakeoff_requests: int = 20
+    max_days: int = 365
+
+
+@dataclass(frozen=True)
+class ScheduleConfig:
+    run_at_utc: str = '00:10'
+
+
+@dataclass(frozen=True)
 class PathsConfig:
     """Directory layout settings, relative to the project or data directory."""
 
@@ -145,7 +166,7 @@ class LLMConfig:
     # Free tiers are limited by requests, not by dollars: a spend cap of $0.05 stops
     # nothing when every call is free. These are the real limit and the real budget.
     requests_per_minute: int = 20
-    requests_per_day: int = 1000
+    requests_per_day: int = 50
     # After a provider says "retry after", every caller waits this long, not just the
     # one that was refused: the pool is shared, so the next call would be refused too.
     cooldown_seconds: float = 30.0
@@ -187,7 +208,7 @@ class ExtractionConfig:
 
     schema_version: str = 'v1'
     max_doc_chars: int = 24000
-    max_repairs: int = 2
+    max_repairs: int = 0
     quote_match_min_ratio: float = 0.85
     confidence_penalty_on_issue: float = 0.7
     min_confidence: float = 0.5
@@ -285,6 +306,9 @@ class Config:
     # run started from another working directory still finds its prompts.
     config_dir: str = '.'
     runtime: RuntimeConfig = RuntimeConfig()
+    scope: ScopeConfig = ScopeConfig()
+    scheduler: SchedulerConfig = SchedulerConfig()
+    schedule: ScheduleConfig = ScheduleConfig()
     paths: PathsConfig = PathsConfig()
     data: DataConfig = DataConfig()
     parsing: ParsingConfig = ParsingConfig()
@@ -427,6 +451,9 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
     return Config(
         config_dir=str(config_path.resolve().parent),
         runtime=RuntimeConfig(**runtime),
+        scope=ScopeConfig(**_section(raw, 'scope', _fields(ScopeConfig))),
+        scheduler=SchedulerConfig(**_section(raw, 'scheduler', _fields(SchedulerConfig))),
+        schedule=ScheduleConfig(**_section(raw, 'schedule', _fields(ScheduleConfig))),
         paths=PathsConfig(**paths),
         data=DataConfig(
             **{
@@ -479,6 +506,18 @@ def load_config(path: Path | str | None = None, overrides: dict[str, str] | None
 def validate_config(config: Config, strict: bool = False) -> list[str]:
     """Return validation problems; raise ConfigError when strict and any exist."""
     problems: list[str] = []
+    if config.scope.profile not in {'small', 'standard', 'large', 'custom'}:
+        problems.append('scope.profile must be small, standard, large or custom')
+    if config.scope.companies < 0 or config.scope.seasons < 0:
+        problems.append('scope counts must be >= 0')
+    if not 0 <= config.scheduler.safety_margin < 1 or config.scheduler.retry_reserve < 0:
+        problems.append('scheduler margin/reserve is invalid')
+    if config.scheduler.bakeoff_requests < 0 or config.scheduler.max_days < 1:
+        problems.append('scheduler bakeoff/max_days is invalid')
+    import re
+
+    if not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', config.schedule.run_at_utc):
+        problems.append('schedule.run_at_utc must be HH:MM UTC')
     if config.runtime.max_concurrency < 1:
         problems.append('runtime.max_concurrency must be >= 1')
     if config.data.sec_max_requests_per_sec <= 0:

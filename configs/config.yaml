@@ -1,3 +1,9 @@
+scope:
+  profile: standard
+  companies: 40
+  seasons: 4
+  seed: 42
+
 runtime:
   max_concurrency: 4
   seed: 7

@@ -7,10 +7,25 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from nowcast.cli import main
+from nowcast.cli import main as pipeline_main
 
 REPO = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = REPO / 'configs' / 'config.yaml'
+
+
+def main(argv):
+    # These compatibility cases exercise the explicit full-window profile.
+    return pipeline_main(
+        [
+            *argv,
+            '--set',
+            'scope.profile=custom',
+            '--set',
+            'scope.companies=0',
+            '--set',
+            'scope.seasons=0',
+        ]
+    )
 
 
 def test_validate_config_cli_ok(capsys: pytest.CaptureFixture[str]) -> None:
