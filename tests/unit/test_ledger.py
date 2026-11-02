@@ -42,6 +42,9 @@ def test_ledger_total_and_parquet(tmp_path: Path) -> None:
         'status_code',
         'attempt_id',
         'request_kind',
+        'request_id',
+        'retry_number',
+        'document_id',
     ]
     assert len(frame) == 2
     # The budget each call ran under is recorded, so a truncated reply is visible.

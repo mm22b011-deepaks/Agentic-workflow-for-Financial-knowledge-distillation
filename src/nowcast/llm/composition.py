@@ -158,7 +158,10 @@ class RetryingCaller:
                 if self._limiter is not None:
                     reservation = self._limiter.acquire()
                 try:
-                    result = self._caller.complete(model, messages, max_tokens=budget)
+                    from nowcast.llm.ledger import measure_attempt
+
+                    with measure_attempt(key, attempt):
+                        result = self._caller.complete(model, messages, max_tokens=budget)
                 except RateLimited as exc:
                     # One refusal means the shared pool is busy: pause every caller, not
                     # just this one, or the next thread walks straight into the same 429.

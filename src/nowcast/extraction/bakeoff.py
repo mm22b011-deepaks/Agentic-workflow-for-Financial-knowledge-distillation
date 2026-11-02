@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import json
 import statistics
 import uuid
 from dataclasses import dataclass, field
@@ -19,7 +18,6 @@ from typing import Any
 import numpy as np
 
 from nowcast.config import Config, extractions_dir, prompts_dir, resolve_data_path
-from nowcast.errors import AuthError, BudgetExceeded, EmptyCompletion
 from nowcast.extraction.runner import (
     Document,
     consolidate,
@@ -51,6 +49,8 @@ class ModelScore:
     accuracy: dict[str, float] | None = None
     coverage: dict[str, int] = field(default_factory=dict)
     unvisited: int = 0
+    completion_tokens: int | None = None
+    reasoning_tokens: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return the score as a flat record for the report."""
@@ -72,6 +72,8 @@ class ModelScore:
             'nonempty_extractions': self.nonempty,
             'throttled': self.throttled,
             'tokens': self.tokens,
+            'completion_tokens': self.completion_tokens,
+            'reasoning_tokens': self.reasoning_tokens,
             'accuracy': self.accuracy,
             'latency_p95_seconds': float(np.percentile(self.latencies, 95))
             if self.latencies
@@ -128,27 +130,83 @@ def score_model(
             score.empty += 1
         else:
             score.failed += 1
+    measured = score_existing(config, model, documents, ledger, labels)
+    measured.unvisited = score.unvisited
+    measured.ok = score.ok + score.cached_or_skipped
+    measured.empty = score.empty
+    measured.failed = score.failed
+    measured.cached_or_skipped = score.cached_or_skipped
+    return measured
+
+
+def score_existing(
+    config: Config,
+    model: str,
+    documents: list[Document],
+    ledger: Any = None,
+    labels: Path | None = None,
+) -> ModelScore:
+    """Read durable results and attempts without issuing a request."""
+    import pandas as pd
+
+    from nowcast.extraction.review_queue import affected_fields, load_queue
+
+    score = ModelScore(model=model, documents=len(documents))
+    ids = {document.document_id for document in documents}
+    attempted: set[str] = set()
     if ledger is not None:
         ledger.flush()
         import pandas as pd
 
-        attempts = pd.read_parquet(ledger._path)
+        from nowcast.llm.ledger import LEDGER_COLUMNS
+
+        attempts = (
+            pd.read_parquet(ledger._path)
+            if ledger._path.exists()
+            else pd.DataFrame(columns=LEDGER_COLUMNS)
+        )
+        if 'document_id' in attempts:
+            attempted.update(set(attempts.document_id.dropna().astype(str)) & ids)
         score.http_attempts = int(attempts.request_kind.ne('cache').sum())
         score.cache_hits = int(attempts.request_kind.eq('cache').sum())
         attempts = attempts[attempts.request_kind.eq('completion')]
         score.requests = len(attempts)
         score.tokens = int(attempts.total_tokens.sum())
+        for name in ('completion_tokens', 'reasoning_tokens'):
+            values = pd.to_numeric(
+                attempts.get(name, pd.Series(dtype=float)), errors='coerce'
+            ).dropna()
+            setattr(score, name, int(values.sum()) if len(values) else None)
         score.throttled = int(attempts.status_code.eq(429).sum())
         score.latencies = list(attempts.latency_seconds.dropna())
     frame = consolidate(config, [model])
     if not frame.empty:
-        score.nonempty = int(frame[['reported_eps', 'revenue']].notna().any(axis=1).sum())
+        frame = frame[frame.document_id.isin(ids)].drop_duplicates('document_id')
+        attempted.update(frame.document_id)
+        score.ok = len(frame)
+    effects: dict[str, set[str]] = {}
+    for issue in load_queue(resolve_data_path(config, config.extraction.review_queue_path)).to_dict(
+        'records'
+    ):
+        if issue['model'] == model:
+            effects.setdefault(issue['document_id'], set()).update(
+                affected_fields(issue['field'], issue['reason'])
+            )
+    for row in frame.to_dict('records'):
+        excluded = effects.get(row['document_id'], set())
+        usable = {
+            name
+            for name in FIELDS
+            if 'record' not in excluded and name not in excluded and pd.notna(row.get(name))
+        }
+        score.nonempty += bool(usable & {'reported_eps', 'revenue'})
+        for name in usable:
+            score.coverage[name] = score.coverage.get(name, 0) + 1
+    score.unvisited = max(0, len(ids) - len(attempted))
+    score.failed = max(0, len(attempted) - score.ok)
     if labels is not None:
         score.accuracy = score_labels(frame, labels)
-    for name in FIELDS:
-        if frame.empty or name not in frame.columns:
-            continue
-        score.coverage[name] = int(frame[name].notna().sum())
+
     return score
 
 
@@ -174,8 +232,22 @@ def run_bakeoff(
             config.extraction, review_queue_path=str(run_root / 'review_queue.parquet')
         ),
     )
-    scores: list[ModelScore] = []
-    for model in models:
+    from nowcast.storage import atomic_json
+
+    scores = [
+        ModelScore(model=model, documents=len(documents), unvisited=len(documents))
+        for model in models
+    ]
+    result = {
+        'run_directory': str(run_root),
+        'documents': describe(documents),
+        'seed': int(config.aggregation.sample_seed),
+        'models': [],
+        'extractions_dir': str(extractions_dir(isolated)),
+        'prompts_dir': str(prompts_dir(config)),
+        'execution_complete': False,
+    }
+    for position, model in enumerate(models):
         ledger = BudgetLedger(
             run_root / (model.replace('/', '__').replace(':', '-') + '.ledger.parquet'),
             config.budget.max_usd,
@@ -190,31 +262,24 @@ def run_bakeoff(
             return shared['caller']
 
         try:
-            scores.append(
-                score_model(isolated, model, documents, factory, ledger=ledger, labels=labels)
+            scores[position] = score_model(
+                isolated, model, documents, factory, ledger=ledger, labels=labels
             )
-        except (AuthError, EmptyCompletion, BudgetExceeded) as exc:
-            if config.runtime.durable_requests and isinstance(exc, (AuthError, BudgetExceeded)):
-                raise
-            # A model that cannot answer at all is a result, not a reason to lose the run.
-            score = ModelScore(model=model, documents=len(documents), failed=len(documents))
-            score.model = f'{model} ({type(exc).__name__}: {str(exc)[:80]})'
-            scores.append(score)
+        except Exception as exc:
+            scores[position] = score_existing(isolated, model, documents, ledger, labels)
+            result['error_kind'] = type(exc).__name__
+            raise
         finally:
             caller = shared.get('caller')
             if caller is not None:
                 caller.close()
             ledger.flush()
-    result = {
-        'run_directory': str(run_root),
-        'documents': describe(documents),
-        'seed': int(config.aggregation.sample_seed),
-        'models': [score.as_dict() for score in scores],
-        'extractions_dir': str(extractions_dir(isolated)),
-        'prompts_dir': str(prompts_dir(config)),
-    }
+            result['models'] = [score.as_dict() for score in scores]
+            result['execution_complete'] = (
+                all(score.unvisited == 0 for score in scores) and 'error_kind' not in result
+            )
+            atomic_json(result, run_root / 'scores.json')
 
-    (run_root / 'scores.json').write_text(json.dumps(result, indent=2) + '\n')
     return result
 
 

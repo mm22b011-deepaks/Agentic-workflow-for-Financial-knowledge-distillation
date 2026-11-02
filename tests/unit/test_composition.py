@@ -111,8 +111,21 @@ def test_runner_retries_429_with_retry_after(
     # RetryingCaller sleeps through its own injected `sleep`, which the runner builds
     # from config, so patch the default at the composition module.
     import nowcast.llm.composition as composition
+    import nowcast.llm.throttle as throttle
 
-    monkeypatch.setattr(composition.time, 'sleep', lambda seconds: sleeps.append(float(seconds)))
+    original = throttle.RequestLimiter
+    now = [0.0]
+
+    def advance(seconds):
+        sleeps.append(float(seconds))
+        now[0] += seconds
+
+    monkeypatch.setattr(composition.time, 'sleep', advance)
+    monkeypatch.setattr(
+        throttle,
+        'RequestLimiter',
+        lambda **kwargs: original(**kwargs, clock=lambda: now[0], sleep=advance),
+    )
     outcomes = _run(config, documents, lambda _model: inner)
 
     assert [outcome.status for outcome in outcomes] == ['ok']
@@ -253,3 +266,54 @@ class _NullManifest:
 def _config_path(config: Config) -> Path:
     """Return the repo config path the CLI parses."""
     return Path(__file__).resolve().parent.parent.parent / 'configs' / 'config.yaml'
+
+
+def test_attempt_context_measures_retries_and_keeps_unknown_history(config, tmp_path):
+    import dataclasses
+
+    import pandas as pd
+
+    from nowcast.llm.cache import ResponseCache
+    from nowcast.llm.composition import RetryingCaller
+    from nowcast.llm.ledger import DOCUMENT_CONTEXT, BudgetLedger
+
+    local = dataclasses.replace(
+        config,
+        llm=dataclasses.replace(config.llm, retry_attempts=2, retry_backoff_seconds=0),
+        cache=dataclasses.replace(config.cache, enabled=False),
+    )
+    ledger = BudgetLedger(tmp_path / 'usage.parquet', 1)
+
+    class Provider:
+        calls = 0
+
+        def complete(self, model, messages, max_tokens=None):
+            self.calls += 1
+            usage = LLMResult(
+                text=REPLY,
+                model=model,
+                prompt_tokens=10,
+                completion_tokens=5,
+                total_tokens=15,
+                latency_seconds=float(self.calls),
+                status_code=500 if self.calls == 1 else 200,
+            )
+            ledger.record(model, usage)
+            if self.calls == 1:
+                raise RuntimeError('temporary provider failure')
+            return usage
+
+    provider = Provider()
+    caller = RetryingCaller(provider, ResponseCache(local.cache, tmp_path / 'cache'), local)
+    token = DOCUMENT_CONTEXT.set('private-test-document')
+    try:
+        caller.complete('fake/model:free', [{'role': 'user', 'content': 'request'}])
+    finally:
+        DOCUMENT_CONTEXT.reset(token)
+    ledger.record('fake/model:free', LLMResult(text='', model='fake/model:free'))
+    ledger.flush()
+    frame = pd.read_parquet(tmp_path / 'usage.parquet')
+    assert frame.retry_number.iloc[:2].tolist() == [0, 1]
+    assert frame.request_id.iloc[0] == frame.request_id.iloc[1]
+    assert frame.document_id.iloc[:2].tolist() == ['private-test-document'] * 2
+    assert pd.isna(frame.retry_number.iloc[2]) and pd.isna(frame.document_id.iloc[2])
