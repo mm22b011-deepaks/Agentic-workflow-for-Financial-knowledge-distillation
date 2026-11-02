@@ -47,9 +47,11 @@ export function usePipeline() {
   const [traceAvailable, setTraceAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const refreshing = useRef(false);
+  const revision = useRef(0);
   const refresh = useCallback(async () => {
     if (useSession.getState().mode === "replay" || refreshing.current) return;
     refreshing.current = true;
+    const started = revision.current;
     try {
       const token = await api("session", validSessionResponse);
       setToken(token.csrf_token);
@@ -58,7 +60,14 @@ export function usePipeline() {
       if (JSON.stringify(remote) !== JSON.stringify(registryData))
         throw Error(copy.drift);
       const [jobs, snapshot, stageData, q, c, b, p, s] = await Promise.all([
-        apiList("runs", validRunStatus),
+        apiList("runs", validRunStatus).then((jobs) => {
+          if (
+            started === revision.current &&
+            useSession.getState().mode === "live"
+          )
+            setRuns(jobs);
+          return jobs;
+        }),
         api("index", validIndexSnapshot),
         api("stages", validStageSnapshot),
         api("coverage", validMetricSnapshot),
@@ -67,7 +76,11 @@ export function usePipeline() {
         api("plan", validMetricSnapshot),
         api("schedule", validScheduleSnapshot),
       ]);
-      if (useSession.getState().mode === "replay") return;
+      if (
+        useSession.getState().mode === "replay" ||
+        started !== revision.current
+      )
+        return;
       setRuns(jobs);
       const real =
         snapshot.source !== "synthetic" &&
@@ -130,8 +143,11 @@ export function usePipeline() {
   async function mutate(path: string, body: unknown) {
     if (useSession.getState().mode === "replay") return;
     setBusy(true);
+    revision.current++;
     try {
-      await api(path, validRunStatus, body);
+      const run = await api(path, validRunStatus, body);
+      if (useSession.getState().mode === "live")
+        setRuns((old) => [run, ...old.filter((item) => item.id !== run.id)]);
       await refresh();
     } catch (error) {
       session.set({
