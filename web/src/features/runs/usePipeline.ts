@@ -83,7 +83,7 @@ export function usePipeline() {
         return;
       setRuns(jobs);
       const real =
-        snapshot.source !== "synthetic" &&
+        (snapshot.source !== "synthetic" || useSession.getState().trace) &&
         (snapshot.status === "available" ||
           stageData.nodes.some(
             (node) =>

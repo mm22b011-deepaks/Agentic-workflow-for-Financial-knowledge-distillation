@@ -18,7 +18,77 @@
           "direction": "out",
           "kind": "trigger"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ],
+        "source": null
+      }
     },
     {
       "id": "validate-config",
@@ -44,7 +114,67 @@
           "direction": "out",
           "kind": "config"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "build-constituents",
@@ -70,7 +200,49 @@
           "direction": "out",
           "kind": "membership"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "gives": {
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
+        },
+        "example_fields": [
+          {
+            "key": "member_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "effective_from",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "effective_to",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "mapped",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "joined",
+          "membership",
+          "mapping"
+        ],
+        "source": "validate-config"
+      }
     },
     {
       "id": "estimate-scope",
@@ -96,7 +268,57 @@
           "direction": "out",
           "kind": "plan"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
+        },
+        "gives": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "example_fields": [
+          {
+            "key": "companies",
+            "unit": "members",
+            "format": "value"
+          },
+          {
+            "key": "seasons",
+            "unit": "quarters",
+            "format": "value"
+          },
+          {
+            "key": "releases",
+            "unit": "releases",
+            "format": "value"
+          },
+          {
+            "key": "base_requests",
+            "unit": "requests",
+            "format": "value"
+          },
+          {
+            "key": "expected_requests",
+            "unit": "requests",
+            "format": "value"
+          },
+          {
+            "key": "model_days",
+            "unit": "days",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "equation"
+        ],
+        "source": "build-constituents"
+      }
     },
     {
       "id": "ingest",
@@ -137,7 +359,58 @@
           "kind": "rate_config",
           "required": false
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "gives": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "downloaded_at",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "size_bytes",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "chars",
+            "unit": "characters",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "found",
+          "sizes"
+        ],
+        "source": "estimate-scope"
+      }
     },
     {
       "id": "extract",
@@ -192,7 +465,142 @@
           "kind": "validators_config",
           "required": false
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ],
+        "source": "parse"
+      }
     },
     {
       "id": "aggregate",
@@ -226,7 +634,77 @@
           "kind": "kpi_config",
           "required": false
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "heatmap"
+        ],
+        "source": "consolidate"
+      }
     },
     {
       "id": "gate",
@@ -257,7 +735,77 @@
           "direction": "out",
           "kind": "gate"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ],
+        "source": "aggregate"
+      }
     },
     {
       "id": "publish",
@@ -283,7 +831,77 @@
           "direction": "out",
           "kind": "kpis"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ],
+        "source": "gate"
+      }
     },
     {
       "id": "suppressed",
@@ -309,7 +927,77 @@
           "direction": "out",
           "kind": "index"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ],
+        "source": "gate"
+      }
     },
     {
       "id": "nowcast",
@@ -335,7 +1023,77 @@
           "direction": "out",
           "kind": "forecast"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "quarters"
+        ],
+        "source": "publish"
+      }
     },
     {
       "id": "cohort",
@@ -358,7 +1116,42 @@
           "direction": "out",
           "kind": "pairs"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "gives": {
+          "noun": "company-quarters",
+          "unit_label": "company-quarter",
+          "plain_line": "One member in one quarter",
+          "icon": "calendar"
+        },
+        "example_fields": [
+          {
+            "key": "member_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "quarters"
+        ],
+        "source": "estimate-scope"
+      }
     },
     {
       "id": "discover",
@@ -381,7 +1174,57 @@
           "direction": "out",
           "kind": "filings"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "company-quarters",
+          "unit_label": "company-quarter",
+          "plain_line": "One member in one quarter",
+          "icon": "calendar"
+        },
+        "gives": {
+          "noun": "filings",
+          "unit_label": "release",
+          "plain_line": "Earnings filings found for each quarter",
+          "icon": "search"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "member_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "items",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "found"
+        ],
+        "source": "cohort"
+      }
     },
     {
       "id": "download",
@@ -404,7 +1247,58 @@
           "direction": "out",
           "kind": "documents"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "filings",
+          "unit_label": "release",
+          "plain_line": "Earnings filings found for each quarter",
+          "icon": "search"
+        },
+        "gives": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "downloaded_at",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "size_bytes",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "chars",
+            "unit": "characters",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "sizes",
+          "skipped"
+        ],
+        "source": "discover"
+      }
     },
     {
       "id": "parse",
@@ -427,7 +1321,58 @@
           "direction": "out",
           "kind": "documents"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "gives": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "chars",
+            "unit": "characters",
+            "format": "value"
+          },
+          {
+            "key": "chars_sent",
+            "unit": "characters",
+            "format": "value"
+          },
+          {
+            "key": "truncated",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "text",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "lengths",
+          "truncated"
+        ],
+        "source": "download"
+      }
     },
     {
       "id": "extract-step",
@@ -450,7 +1395,142 @@
           "direction": "out",
           "kind": "records"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ],
+        "source": "parse"
+      }
     },
     {
       "id": "validate",
@@ -473,7 +1553,142 @@
           "direction": "out",
           "kind": "records"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": "extract-step"
+      }
     },
     {
       "id": "consolidate",
@@ -502,7 +1717,142 @@
           "kind": "facts",
           "required": false
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "duplicates"
+        ],
+        "source": "validate"
+      }
     },
     {
       "id": "review",
@@ -525,7 +1875,57 @@
           "direction": "out",
           "kind": "issues"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "flags",
+          "unit_label": "flag",
+          "plain_line": "Issues needing a person to review",
+          "icon": "review"
+        },
+        "gives": {
+          "noun": "flags",
+          "unit_label": "flag",
+          "plain_line": "Issues needing a person to review",
+          "icon": "review"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reason",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "review_field",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "reasons"
+        ],
+        "source": "validate"
+      }
     },
     {
       "id": "xbrl",
@@ -542,7 +1942,67 @@
           "direction": "out",
           "kind": "facts"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "model",
@@ -561,7 +2021,67 @@
           "kind": "model_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "cache",
@@ -580,7 +2100,67 @@
           "kind": "cache_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "limiter",
@@ -599,7 +2179,67 @@
           "kind": "limiter_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "validators",
@@ -618,7 +2258,67 @@
           "kind": "validators_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "sec",
@@ -637,7 +2337,67 @@
           "kind": "sec_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "rate",
@@ -656,7 +2416,67 @@
           "kind": "rate_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "kpi",
@@ -675,7 +2495,77 @@
           "kind": "kpi_config",
           "required": true
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ],
+        "source": null
+      }
     },
     {
       "id": "rebuild-index",
@@ -697,7 +2587,77 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ],
+        "source": "download"
+      }
     },
     {
       "id": "model-bakeoff",
@@ -719,7 +2679,142 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ],
+        "source": "parse"
+      }
     },
     {
       "id": "doctor",
@@ -741,7 +2836,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "freeze-panel",
@@ -763,7 +2918,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "validate-index",
@@ -785,7 +3000,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "supersede-stale",
@@ -807,7 +3082,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo",
@@ -823,7 +3158,77 @@
           "direction": "out",
           "kind": "demo"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "season",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "metric_unit",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "suppressed",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ],
+        "source": null
+      }
     },
     {
       "id": "serve",
@@ -845,7 +3250,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "export",
@@ -867,7 +3332,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "prepare-labels",
@@ -889,7 +3414,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "quality-summary",
@@ -911,7 +3496,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "report",
@@ -933,7 +3578,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-plan",
@@ -955,7 +3660,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-status",
@@ -977,7 +3742,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-run",
@@ -999,7 +3824,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-pause",
@@ -1021,7 +3906,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-resume",
@@ -1043,7 +3988,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-install",
@@ -1065,7 +4070,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule-uninstall",
@@ -1087,7 +4152,67 @@
           "direction": "out",
           "kind": "report"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "raptor",
@@ -1110,7 +4235,67 @@
           "direction": "out",
           "kind": "narrative"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo-ingest",
@@ -1132,7 +4317,67 @@
           "direction": "out",
           "kind": "documents"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo-parse",
@@ -1154,7 +4399,67 @@
           "direction": "out",
           "kind": "documents"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo-extract",
@@ -1176,7 +4481,67 @@
           "direction": "out",
           "kind": "records"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo-validate",
@@ -1198,7 +4563,67 @@
           "direction": "out",
           "kind": "records"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "demo-aggregate",
@@ -1220,7 +4645,67 @@
           "direction": "out",
           "kind": "index"
         }
-      ]
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "cli",
@@ -1228,7 +4713,67 @@
       "icon": "config",
       "group": "maintenance",
       "capability": "terminal",
-      "ports": []
+      "ports": [],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     },
     {
       "id": "schedule",
@@ -1236,7 +4781,67 @@
       "icon": "clock",
       "group": "maintenance",
       "capability": "terminal",
-      "ports": []
+      "ports": [],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
     }
   ],
   "edges": [

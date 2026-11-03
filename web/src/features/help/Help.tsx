@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { copy, helpAnswers, glyphs } from "../../copy";
+import { copy, helpAnswers, glyphs, label } from "../../copy";
 import { Button } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
 import { usePreferences, useSession } from "../../shared/state";
+import registry from "../../registry.json";
 export function Help() {
   const session = useSession();
+  const node = registry.nodes.find((n) => n.id === session.panel);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -69,6 +71,17 @@ export function Help() {
               onClick={() => session.set({ help: null })}
             />
           </div>
+          {node && (
+            <div className="help-answer" data-help-answer="true">
+              <strong>{label(node.label_key)}</strong>
+              <p>{node.io.takes.noun + " → " + node.io.gives.noun}</p>
+              <p>{node.io.takes.plain_line}</p>
+              <p>{node.io.gives.plain_line}</p>
+              <a href="/io.md" target="_blank" rel="noreferrer">
+                {copy.docs}
+              </a>
+            </div>
+          )}
           <div className="questions">
             {questions.slice(page * 4, page * 4 + 4).map(({ question, i }) => (
               <div key={question}>

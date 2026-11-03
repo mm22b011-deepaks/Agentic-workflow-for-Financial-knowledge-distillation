@@ -31,6 +31,8 @@ import type { CanvasRegistry } from "../../CanvasRegistry";
 import type { StageSnapshot } from "../../StageSnapshot";
 import type { MetricSnapshot } from "../../MetricSnapshot";
 
+import { quantity } from "../../shared/io";
+
 type CanvasData = {
   definition: CanvasRegistry["nodes"][number];
   stage?: StageSnapshot["nodes"][number];
@@ -42,7 +44,7 @@ type CanvasData = {
 type FlowNode = Node<CanvasData, "stage">;
 function StageNode({ data, selected }: NodeProps<FlowNode>) {
   const { definition: n, stage, lens } = data;
-  const count = stage?.out_count;
+  const count = quantity(n, stage);
   const status =
     n.capability === "planned" ? "planned" : (stage?.status ?? "idle");
   const variant = n.variant;
@@ -120,7 +122,7 @@ function StageNode({ data, selected }: NodeProps<FlowNode>) {
       </div>
       <div className="flow-label">
         <span>{label(n.label_key)}</span>
-        <small>{count == null ? copy.unknown : count.toLocaleString()}</small>
+        <small>{count?.text ?? (n.capability === "planned" ? "Not built yet" : "")}</small>
       </div>
       {variant === "branch" ? (
         <>
@@ -215,9 +217,9 @@ function FlowEdge(props: EdgeProps) {
       )}
       {props.label != null && (
         <foreignObject
-          x={(props.sourceX + props.targetX) / 2 - 18}
+          x={(props.sourceX + props.targetX) / 2 - 65}
           y={(props.sourceY + props.targetY) / 2 - 14}
-          width={36}
+          width={130}
           height={25}
         >
           <span className="edge-number">{String(props.label)}</span>
@@ -401,8 +403,7 @@ function Surface({
             : { type: MarkerType.ArrowClosed, color: "var(--edge)" },
           label: e.sub
             ? undefined
-            : (stages.nodes.find((s) => s.id === e.source)?.out_count ??
-              undefined),
+            : quantity(registry.nodes.find(n => n.id === e.source)!, stages.nodes.find(s => s.id === e.source))?.text,
           data: {
             active:
               active &&
@@ -434,8 +435,7 @@ function Surface({
         ...e,
         label: e.data?.sub
           ? undefined
-          : (stages.nodes.find((s) => s.id === e.source)?.out_count ??
-            undefined),
+          : quantity(registry.nodes.find(n => n.id === e.source)!, stages.nodes.find(s => s.id === e.source))?.text,
         data: {
           ...e.data,
           active:

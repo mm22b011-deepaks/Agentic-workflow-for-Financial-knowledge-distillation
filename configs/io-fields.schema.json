@@ -1,0 +1,437 @@
+{
+  "type": "object",
+  "properties": {
+    "member_token": {
+      "title": "Member",
+      "description": "Session-only member pseudonym",
+      "unit": "",
+      "format": "value"
+    },
+    "release_token": {
+      "title": "Release",
+      "description": "Session-only release pseudonym",
+      "unit": "",
+      "format": "value"
+    },
+    "joined": {
+      "title": "Joined index",
+      "description": "Membership start date",
+      "unit": "",
+      "format": "date"
+    },
+    "left": {
+      "title": "Left index",
+      "description": "Membership end date",
+      "unit": "",
+      "format": "date"
+    },
+    "start_date": {
+      "title": "Joined index",
+      "description": "Membership start date",
+      "unit": "",
+      "format": "date"
+    },
+    "end_date": {
+      "title": "Left index",
+      "description": "Membership end date",
+      "unit": "",
+      "format": "date"
+    },
+    "season": {
+      "title": "Quarter",
+      "description": "Calendar quarter",
+      "unit": "",
+      "format": "value"
+    },
+    "report_date": {
+      "title": "Filed",
+      "description": "Filing date",
+      "unit": "",
+      "format": "date"
+    },
+    "downloaded_at": {
+      "title": "Saved",
+      "description": "Download date",
+      "unit": "",
+      "format": "date"
+    },
+    "items": {
+      "title": "Filing item",
+      "description": "SEC form item",
+      "unit": "",
+      "format": "value"
+    },
+    "bytes": {
+      "title": "File size",
+      "description": "Downloaded file size",
+      "unit": "bytes",
+      "format": "value"
+    },
+    "size_bytes": {
+      "title": "File size",
+      "description": "Downloaded file size",
+      "unit": "bytes",
+      "format": "value"
+    },
+    "chars": {
+      "title": "Text length",
+      "description": "Parsed text length",
+      "unit": "characters",
+      "format": "value"
+    },
+    "chars_sent": {
+      "title": "Text sent",
+      "description": "Text sent for extraction",
+      "unit": "characters",
+      "format": "value"
+    },
+    "confidence": {
+      "title": "Confidence",
+      "description": "Mean confidence",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "record_confidence": {
+      "title": "Record confidence",
+      "description": "Mean record confidence",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "flagged": {
+      "title": "Flagged",
+      "description": "Requires review",
+      "unit": "",
+      "format": "value"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "description": "Text shortened",
+      "unit": "",
+      "format": "value"
+    },
+    "issues": {
+      "title": "Checks failed",
+      "description": "Validation failures",
+      "unit": "checks",
+      "format": "value"
+    },
+    "outcome": {
+      "title": "Status",
+      "description": "Processing outcome",
+      "unit": "",
+      "format": "value"
+    },
+    "companies": {
+      "title": "Members",
+      "description": "Planned members",
+      "unit": "members",
+      "format": "value"
+    },
+    "quarters": {
+      "title": "Quarters",
+      "description": "Planned quarters",
+      "unit": "quarters",
+      "format": "value"
+    },
+    "releases": {
+      "title": "Releases",
+      "description": "Planned releases",
+      "unit": "releases",
+      "format": "value"
+    },
+    "requests": {
+      "title": "Requests",
+      "description": "Estimated requests",
+      "unit": "requests",
+      "format": "value"
+    },
+    "days": {
+      "title": "Time needed",
+      "description": "Estimated duration",
+      "unit": "days",
+      "format": "value"
+    },
+    "field": {
+      "title": "Setting",
+      "description": "Configuration setting",
+      "unit": "",
+      "format": "value"
+    },
+    "value": {
+      "title": "Value",
+      "description": "Configured value",
+      "unit": "",
+      "format": "value"
+    },
+    "mapped": {
+      "title": "Mapped",
+      "description": "A filing identifier is available",
+      "unit": "",
+      "format": "value"
+    },
+    "season_year": {
+      "title": "Year",
+      "description": "Calendar year",
+      "unit": "",
+      "format": "value"
+    },
+    "season_quarter": {
+      "title": "Quarter",
+      "description": "Calendar quarter",
+      "unit": "",
+      "format": "value"
+    },
+    "n_reported": {
+      "title": "Reported",
+      "description": "Observed records",
+      "unit": "records",
+      "format": "value"
+    },
+    "n_expected": {
+      "title": "Expected",
+      "description": "Expected records",
+      "unit": "records",
+      "format": "value"
+    },
+    "coverage": {
+      "title": "Coverage",
+      "description": "Fraction of expected records",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "suppressed": {
+      "title": "Suppressed",
+      "description": "Below publication threshold",
+      "unit": "",
+      "format": "value"
+    },
+    "reported_eps": {
+      "title": "EPS",
+      "description": "Reported earnings per share",
+      "unit": "per share",
+      "format": "value"
+    },
+    "revenue": {
+      "title": "Revenue",
+      "description": "Reported revenue",
+      "unit": "",
+      "format": "value"
+    },
+    "guidance_presence": {
+      "title": "Guidance",
+      "description": "Forward outlook",
+      "unit": "",
+      "format": "value"
+    },
+    "tone": {
+      "title": "Tone",
+      "description": "Management tone",
+      "unit": "",
+      "format": "value"
+    },
+    "reason": {
+      "title": "Review reason",
+      "description": "Why review is needed",
+      "unit": "",
+      "format": "value"
+    },
+    "quote_check": {
+      "title": "Quote",
+      "description": "Evidence check passed",
+      "unit": "",
+      "format": "value"
+    },
+    "number_check": {
+      "title": "Number",
+      "description": "Number check passed",
+      "unit": "",
+      "format": "value"
+    },
+    "scale_check": {
+      "title": "Scale",
+      "description": "Scale check passed",
+      "unit": "",
+      "format": "value"
+    },
+    "row_check": {
+      "title": "Row",
+      "description": "Row check passed",
+      "unit": "",
+      "format": "value"
+    },
+    "period_check": {
+      "title": "Period",
+      "description": "Period check passed",
+      "unit": "",
+      "format": "value"
+    },
+    "eps_growth_agg": {
+      "title": "EPS growth",
+      "description": "Index EPS growth",
+      "unit": "%",
+      "format": "percent"
+    },
+    "revenue_growth_agg": {
+      "title": "Revenue growth",
+      "description": "Index revenue growth",
+      "unit": "%",
+      "format": "percent"
+    },
+    "model": {
+      "title": "Model",
+      "description": "Extraction model",
+      "unit": "",
+      "format": "value"
+    },
+    "status": {
+      "title": "Status",
+      "description": "Step outcome",
+      "unit": "",
+      "format": "value"
+    },
+    "text": {
+      "title": "Text preview",
+      "description": "First three lines; Internal trace only",
+      "unit": "",
+      "format": "value"
+    },
+    "effective_from": {
+      "title": "Joined index",
+      "description": "Membership start date",
+      "unit": "",
+      "format": "date"
+    },
+    "effective_to": {
+      "title": "Left index",
+      "description": "Membership end date",
+      "unit": "",
+      "format": "date"
+    },
+    "seasons": {
+      "title": "Quarters",
+      "description": "Planned calendar quarters",
+      "unit": "quarters",
+      "format": "value"
+    },
+    "base_requests": {
+      "title": "Requests",
+      "description": "One request for each release",
+      "unit": "requests",
+      "format": "value"
+    },
+    "expected_requests": {
+      "title": "Total requests",
+      "description": "Includes retries and model comparisons",
+      "unit": "requests",
+      "format": "value"
+    },
+    "model_days": {
+      "title": "Time needed",
+      "description": "Estimated duration at the daily limit",
+      "unit": "days",
+      "format": "value"
+    },
+    "kind": {
+      "title": "Type",
+      "description": "Setting value type",
+      "unit": "",
+      "format": "value"
+    },
+    "setting": {
+      "title": "Setting",
+      "description": "Configuration setting",
+      "unit": "",
+      "format": "value"
+    },
+    "setting_value": {
+      "title": "Value",
+      "description": "Configured non-identifying value",
+      "unit": "",
+      "format": "value"
+    },
+    "eps_confidence": {
+      "title": "EPS confidence",
+      "description": "Confidence in EPS",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "revenue_confidence": {
+      "title": "Revenue confidence",
+      "description": "Confidence in revenue",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "guidance_confidence": {
+      "title": "Guidance confidence",
+      "description": "Confidence in guidance",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "tone_confidence": {
+      "title": "Tone confidence",
+      "description": "Confidence in tone",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "eps_status": {
+      "title": "EPS status",
+      "description": "Evidence validation status",
+      "unit": "",
+      "format": "value"
+    },
+    "revenue_status": {
+      "title": "Revenue status",
+      "description": "Evidence validation status",
+      "unit": "",
+      "format": "value"
+    },
+    "guidance_status": {
+      "title": "Guidance status",
+      "description": "Evidence validation status",
+      "unit": "",
+      "format": "value"
+    },
+    "tone_status": {
+      "title": "Tone status",
+      "description": "Evidence validation status",
+      "unit": "",
+      "format": "value"
+    },
+    "metric": {
+      "title": "KPI",
+      "description": "Index measure",
+      "unit": "",
+      "format": "value"
+    },
+    "metric_value": {
+      "title": "Value",
+      "description": "KPI value",
+      "unit": "",
+      "format": "value"
+    },
+    "metric_unit": {
+      "title": "Unit",
+      "description": "KPI unit",
+      "unit": "",
+      "format": "value"
+    },
+    "threshold": {
+      "title": "Minimum coverage",
+      "description": "Minimum observations as share of expected records",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "pass": {
+      "title": "Gate",
+      "description": "Meets publication checks",
+      "unit": "",
+      "format": "value"
+    },
+    "review_field": {
+      "title": "Field needing review",
+      "description": "Affected extracted field",
+      "unit": "",
+      "format": "value"
+    }
+  }
+}

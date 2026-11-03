@@ -16,9 +16,18 @@ def extension_path() -> Path:
 def canvas_registry() -> CanvasRegistry:
     source = extension_path()
     extension = json.loads(source.read_text())
+    fields = json.loads((source.parent / 'io-fields.schema.json').read_text())['properties']
     commands = {item['id']: item for item in catalogue()}
     nodes = []
     for item in extension['nodes']:
+        item['io']['example_fields'] = [
+            {
+                **field,
+                'label': fields[field['key']]['title'],
+                'description': fields[field['key']]['description'],
+            }
+            for field in item['io']['example_fields']
+        ]
         command = commands.pop(item['id'], None)
         if item['id'] == 'extract-step':
             command = next(c for c in catalogue() if c['id'] == 'extract')

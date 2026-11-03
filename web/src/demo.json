@@ -8,12 +8,17 @@
       "out_count": 500
     },
     {
+      "id": "validate-config",
+      "status": "done",
+      "out_count": 1
+    },
+    {
       "id": "build-constituents",
       "status": "done",
       "out_count": 125
     },
     {
-      "id": "cohort",
+      "id": "estimate-scope",
       "status": "done",
       "out_count": 500
     },
@@ -28,7 +33,62 @@
       "out_count": 500
     },
     {
+      "id": "aggregate",
+      "status": "done",
+      "out_count": 16
+    },
+    {
+      "id": "gate",
+      "status": "done",
+      "out_count": 4
+    },
+    {
+      "id": "publish",
+      "status": "done",
+      "out_count": 4
+    },
+    {
+      "id": "suppressed",
+      "status": "idle",
+      "out_count": 0
+    },
+    {
+      "id": "nowcast",
+      "status": "planned",
+      "out_count": null
+    },
+    {
+      "id": "cohort",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "discover",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "download",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "parse",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "extract-step",
+      "status": "done",
+      "out_count": 500
+    },
+    {
       "id": "validate",
+      "status": "done",
+      "out_count": 500
+    },
+    {
+      "id": "consolidate",
       "status": "done",
       "out_count": 500
     },
@@ -36,6 +96,181 @@
       "id": "review",
       "status": "done",
       "out_count": 400
+    },
+    {
+      "id": "xbrl",
+      "status": "planned",
+      "out_count": null
+    },
+    {
+      "id": "model",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "cache",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "limiter",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "validators",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "sec",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "rate",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "kpi",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "rebuild-index",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "model-bakeoff",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "doctor",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "freeze-panel",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "validate-index",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "supersede-stale",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "demo",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "serve",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "export",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "prepare-labels",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "quality-summary",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "report",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-plan",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-status",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-run",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-pause",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-resume",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-install",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule-uninstall",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "raptor",
+      "status": "planned",
+      "out_count": null
+    },
+    {
+      "id": "demo-ingest",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "demo-parse",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "demo-extract",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "demo-validate",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "demo-aggregate",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "cli",
+      "status": "idle",
+      "out_count": null
+    },
+    {
+      "id": "schedule",
+      "status": "idle",
+      "out_count": null
     }
   ]
 }
