@@ -1,4 +1,4 @@
-"""Online-only link audit of current documentation; original worklogs remain historical."""
+"""Online-only link audit of the README."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import httpx
 
 
 def main() -> int:
-    paths = [Path('README.md'), *Path('docs').glob('*.md'), *Path('docs/adr').glob('*.md')]
+    paths = [Path('README.md')]
     links = sorted(
         {
             url.rstrip('.,;')

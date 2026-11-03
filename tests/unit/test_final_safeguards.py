@@ -86,17 +86,15 @@ def test_bakeoff_scores_numeric_labels_and_missing_predictions(tmp_path: Path) -
 
 
 def test_preparing_review_does_not_overwrite_human_work(
-    config: Config, monkeypatch: object
+    config: Config,
 ) -> None:
-    import runpy
+    from nowcast.operations import prepare_labels
 
-    root = Path(__file__).resolve().parents[2]
-    monkeypatch.syspath_prepend(str(root / 'scripts'))
-    path = Paths.from_config(config).resolve('verification/human-panel.json')
+    path = Paths.from_config(config).resolve('inputs/label-sheet.json')
     path.parent.mkdir(parents=True)
     path.write_text('{"labels":"human work"}')
     before = path.read_bytes()
-    runpy.run_path(str(root / 'scripts/prepare_review.py'))['main']()
+    assert prepare_labels(config)['preserved'] is True
     assert path.read_bytes() == before
 
 

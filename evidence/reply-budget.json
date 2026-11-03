@@ -1,1 +1,0 @@
-{"source":"private historical ledger, 2026-11-01","successful_calls":60,"truncations":42,"successful_completion_tokens":{"median":17876.5,"p95":26990.85,"maximum":30973},"configured_max_tokens":32768,"reasoning_breakdown":"unknown","latency":"unknown","one_call_live_verification":"not run after change"}
