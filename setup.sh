@@ -2,7 +2,7 @@
 set -euo pipefail
 checkout=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 cd "$checkout"
-action=${1:-bootstrap}
+action=${1:-init}
 if (($#)); then shift; fi
 mise_bin=$(command -v mise || true)
 if [[ -z "$mise_bin" ]]; then mise_bin="$checkout/.tools/bin/mise"; fi
