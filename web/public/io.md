@@ -521,16 +521,11 @@ Output: checked settings (check). Settings checked before running.
 ## supersede-stale
 
 Input: settings (file). Settings used by this step.
-Output: checked settings (check). Settings checked before running.
+Output: completed checks (check). Action completed without creating data rows.
 
-- Setting: Configuration setting
-- Value: Configured non-identifying value
-- Type: Setting value type
-- Quote: Evidence check passed
-- Number: Number check passed
-- Scale: Scale check passed
-- Row: Row check passed
-- Period: Period check passed
+- Status: Step outcome
+- Completed: Action completion time
+- Completed checks: Successful action completions (checks)
 
 ## demo
 
@@ -621,30 +616,20 @@ Output: checked settings (check). Settings checked before running.
 ## schedule-plan
 
 Input: settings (file). Settings used by this step.
-Output: checked settings (check). Settings checked before running.
+Output: completed checks (check). Action completed without creating data rows.
 
-- Setting: Configuration setting
-- Value: Configured non-identifying value
-- Type: Setting value type
-- Quote: Evidence check passed
-- Number: Number check passed
-- Scale: Scale check passed
-- Row: Row check passed
-- Period: Period check passed
+- Status: Step outcome
+- Completed: Action completion time
+- Completed checks: Successful action completions (checks)
 
 ## schedule-status
 
 Input: settings (file). Settings used by this step.
-Output: checked settings (check). Settings checked before running.
+Output: completed checks (check). Action completed without creating data rows.
 
-- Setting: Configuration setting
-- Value: Configured non-identifying value
-- Type: Setting value type
-- Quote: Evidence check passed
-- Number: Number check passed
-- Scale: Scale check passed
-- Row: Row check passed
-- Period: Period check passed
+- Status: Step outcome
+- Completed: Action completion time
+- Completed checks: Successful action completions (checks)
 
 ## schedule-run
 
@@ -663,30 +648,20 @@ Output: checked settings (check). Settings checked before running.
 ## schedule-pause
 
 Input: settings (file). Settings used by this step.
-Output: checked settings (check). Settings checked before running.
+Output: completed checks (check). Action completed without creating data rows.
 
-- Setting: Configuration setting
-- Value: Configured non-identifying value
-- Type: Setting value type
-- Quote: Evidence check passed
-- Number: Number check passed
-- Scale: Scale check passed
-- Row: Row check passed
-- Period: Period check passed
+- Status: Step outcome
+- Completed: Action completion time
+- Completed checks: Successful action completions (checks)
 
 ## schedule-resume
 
 Input: settings (file). Settings used by this step.
-Output: checked settings (check). Settings checked before running.
+Output: completed checks (check). Action completed without creating data rows.
 
-- Setting: Configuration setting
-- Value: Configured non-identifying value
-- Type: Setting value type
-- Quote: Evidence check passed
-- Number: Number check passed
-- Scale: Scale check passed
-- Row: Row check passed
-- Period: Period check passed
+- Status: Step outcome
+- Completed: Action completion time
+- Completed checks: Successful action completions (checks)
 
 ## schedule-install
 

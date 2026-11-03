@@ -5,6 +5,7 @@ import rawDemo from "../../demo.json";
 import {
   validCanvasRegistry,
   validIndexSnapshot,
+  validPaneResponse,
   validMetricSnapshot,
   validRunEvent,
   validRunStatus,
@@ -45,10 +46,11 @@ export function usePipeline() {
   const [plan, setPlan] = useState<MetricSnapshot>(empty);
   const [schedule, setSchedule] = useState<ScheduleSnapshot | null>(null);
   const [traceAvailable, setTraceAvailable] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const refreshing = useRef(false);
   const revision = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<void> => {
     if (useSession.getState().mode === "replay" || refreshing.current) return;
     refreshing.current = true;
     const started = revision.current;
@@ -56,6 +58,7 @@ export function usePipeline() {
       const token = await api("session", validSessionResponse);
       setToken(token.csrf_token);
       setTraceAvailable(token.internal_trace_available);
+      setReadOnly(token.read_only ?? false);
       const remote = await api("registry", validCanvasRegistry);
       if (JSON.stringify(remote) !== JSON.stringify(registryData))
         throw Error(copy.drift);
@@ -83,13 +86,16 @@ export function usePipeline() {
         return;
       setRuns(jobs);
       const real =
-        (snapshot.source !== "synthetic" || useSession.getState().trace) &&
-        (snapshot.status === "available" ||
-          stageData.nodes.some(
-            (node) =>
-              ["ingest", "extract", "download"].includes(node.id) &&
-              (node.out_count ?? 0) > 0,
-          ));
+        jobs.some(
+          (job) => job.workflow_id !== "demo" && job.stage !== "demo",
+        ) ||
+        (snapshot.source !== "synthetic" && snapshot.status === "available") ||
+        stageData.nodes.some(
+          (node) =>
+            ["build-constituents", "ingest", "extract", "download"].includes(
+              node.id,
+            ) && (node.out_count ?? 0) > 0,
+        );
       setIndex(
         real ? snapshot : snapshot.status === "available" ? snapshot : fixture,
       );
@@ -109,6 +115,8 @@ export function usePipeline() {
       });
     } finally {
       refreshing.current = false;
+      if (started !== revision.current && useSession.getState().mode === "live")
+        void refresh();
     }
   }, []);
   useEffect(() => {
@@ -155,7 +163,7 @@ export function usePipeline() {
     (r) => r.status === "running" || r.status === "queued",
   );
   async function mutate(path: string, body: unknown) {
-    if (useSession.getState().mode === "replay") return;
+    if (readOnly || useSession.getState().mode === "replay") return;
     setBusy(true);
     revision.current++;
     try {
@@ -171,34 +179,50 @@ export function usePipeline() {
       setBusy(false);
     }
   }
-  function execute(
+  async function execute(
     command: string,
     parameters: Record<string, string | number | boolean | string[]> = {},
     upstream?: string,
   ) {
-    if (session.mode === "replay") return;
-    void mutate("runs", {
-      version: "v1",
-      workflow_id: "command",
-      submission_id: crypto.randomUUID(),
-      command_id: command,
-      node_id:
-        command === "run-all" || command === "demo" ? undefined : command,
-      parameters: {
-        ...Object.fromEntries(
-          Object.entries(parameters).filter(
-            ([key]) => !key.startsWith("config:"),
+    if (readOnly || useSession.getState().mode === "replay") return;
+    setBusy(true);
+    try {
+      if (!upstream && command !== "run-all" && command !== "demo") {
+        const input = await api(
+          "nodes/" + command + "/input",
+          validPaneResponse,
+        );
+        upstream = input.runs?.[0];
+      }
+      await mutate("runs", {
+        version: "v1",
+        workflow_id: "command",
+        submission_id: crypto.randomUUID(),
+        command_id: command,
+        node_id:
+          command === "run-all" || command === "demo" ? undefined : command,
+        parameters: {
+          ...Object.fromEntries(
+            Object.entries(parameters).filter(
+              ([key]) => !key.startsWith("config:"),
+            ),
           ),
-        ),
-        set: [
-          ...Object.entries(session.overrides).map(
-            ([key, value]) => key + "=" + JSON.stringify(value),
-          ),
-          ...((parameters.set ?? []) as string[]),
-        ],
-      },
-      upstream_run_id: upstream,
-    });
+          set: [
+            ...Object.entries(session.overrides).map(
+              ([key, value]) => key + "=" + JSON.stringify(value),
+            ),
+            ...((parameters.set ?? []) as string[]),
+          ],
+        },
+        upstream_run_id: upstream,
+      });
+    } catch (error) {
+      session.set({
+        error: error instanceof Error ? error.message : copy.unavailable,
+      });
+    } finally {
+      setBusy(false);
+    }
   }
   function cancel() {
     if (active) void mutate("runs/" + active.id + "/cancel", {});
@@ -221,6 +245,7 @@ export function usePipeline() {
     plan,
     schedule,
     traceAvailable,
+    readOnly,
     busy,
     active,
     execute,

@@ -324,8 +324,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
         LOGGER.warning('--limit takes the head of the index, which is not a representative sample')
         documents = documents[: int(args.limit)]
     if not documents:
-        LOGGER.info('no documents to extract')
-        return 0
+        raise DataError('no documents to extract; run Ingest or Download first')
 
     ledger = BudgetLedger(
         resolve_data_path(config, config.budget.ledger_path), config.budget.max_usd

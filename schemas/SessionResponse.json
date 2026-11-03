@@ -14,6 +14,11 @@
     "internal_trace_available": {
       "title": "Internal Trace Available",
       "type": "boolean"
+    },
+    "read_only": {
+      "default": false,
+      "title": "Read Only",
+      "type": "boolean"
     }
   },
   "required": [

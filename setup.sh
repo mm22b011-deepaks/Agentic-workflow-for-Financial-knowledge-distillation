@@ -39,7 +39,12 @@ fi
 [[ -x "$mise_bin" ]] || { echo 'Run setup.sh bootstrap first.' >&2; exit 2; }
 case "$action" in
   cli) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher "$@" ;;
-  website) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher serve "$@" ;;
+  website)
+    [[ -x "$checkout/.venv/bin/python" ]] || "$checkout/setup.sh" bootstrap
+    .venv/bin/python -c 'from pathlib import Path; from nowcast.setup_wizard import bootstrap; bootstrap(Path.cwd())'
+    "$mise_bin" exec -- make references web-build
+    exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher serve "$@"
+    ;;
   schedule|doctor) exec "$mise_bin" exec -- .venv/bin/python -m nowcast.launcher "$action" "$@" ;;
   demo) exec "$mise_bin" exec -- make demo ;;
   check) exec "$mise_bin" exec -- make check ;;

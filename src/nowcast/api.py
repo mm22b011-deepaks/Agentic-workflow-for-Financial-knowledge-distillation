@@ -93,6 +93,7 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
             'version': 'v1',
             'csrf_token': nonce,
             'internal_trace_available': os.environ.get('NOWCAST_INTERNAL_TRACE') == '1',
+            'read_only': saved_snapshot(config, 'index', IndexSnapshot) is not None,
         }
 
     @app.get('/api/v1/registry')

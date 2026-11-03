@@ -18,7 +18,6 @@ import { api } from "./shared/api";
 import {
   validIndexSnapshot,
   validKPIKnowledgeBase,
-  validPaneResponse,
 } from "./validators.js";
 import { sourceBadge } from "./shared/io";
 import "./style.css";
@@ -58,23 +57,18 @@ function App() {
       session.set({ error: copy.unavailable });
     }
   }
-  async function runSelected() {
+  function runSelected() {
     const node = pipeline.registry.nodes.find(
       (item) => item.id === session.selected,
     );
     if (!node || node.capability !== "executable" || session.mode === "replay")
       return;
-    try {
-      const saved = inspectionState(node.id);
-      const input = await api("nodes/" + node.id + "/input", validPaneResponse);
-      execute(
-        (node.command ?? []).join("-"),
-        saved?.parameters ?? {},
-        saved?.runs?.input || input.runs?.[0],
-      );
-    } catch {
-      session.set({ error: copy.unavailable });
-    }
+    const saved = inspectionState(node.id);
+    execute(
+      (node.command ?? []).join("-"),
+      saved?.parameters ?? {},
+      saved?.runs?.input,
+    );
   }
   useEffect(() => {
     document.documentElement.dataset.theme = preferences.theme;
@@ -146,7 +140,7 @@ function App() {
     (n) => n.id === session.selected,
   );
   const disabled =
-    pipeline.busy || !!pipeline.active || session.mode === "replay";
+    pipeline.busy || !!pipeline.active || pipeline.readOnly || session.mode === "replay";
   function execute(
     command: string,
     parameters: Record<string, string | number | boolean | string[]> = {},
@@ -277,7 +271,7 @@ function App() {
         <Canvas
           registry={pipeline.registry}
           stages={pipeline.stages}
-          active={!!pipeline.active || session.mode === "replay"}
+          active={!!pipeline.active || pipeline.readOnly || session.mode === "replay"}
           coverage={pipeline.coverage}
           cost={pipeline.cost}
         />
@@ -316,6 +310,12 @@ function App() {
         </Suspense>
         <Tour />
       </div>
+      {pipeline.readOnly && (
+        <div className="trace-banner" role="status">
+          <Icon name="privacy" size={16} />
+          {copy.savedSnapshot}
+        </div>
+      )}
       {session.trace && (
         <div className="trace-banner" role="status">
           <Icon name="privacy" size={16} />
@@ -326,7 +326,7 @@ function App() {
         registry={pipeline.registry}
         stages={pipeline.stages}
         timestamp={timestamp}
-        active={!!pipeline.active || pipeline.busy}
+        active={!!pipeline.active || pipeline.busy || pipeline.readOnly}
         onExecute={execute}
       />
       <Help />

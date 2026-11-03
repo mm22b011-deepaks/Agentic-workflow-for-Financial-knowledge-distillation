@@ -40,15 +40,26 @@ research. These announcements describe a company's sales, profits and expectatio
 for the coming months. Reading them one by one is repetitive, especially when a
 researcher wants to understand what is happening across many companies.
 
-The tool downloads public announcements, uses AI to find relevant information, and
-keeps a short quote showing where each answer came from. Code then checks the answers
-and combines the usable records into indicators for a group of companies. This
-organised dataset is the project's \textbf{knowledge base}.
+The workflow starts by selecting a group of companies and a reporting period. It
+downloads their announcements, converts the documents into readable text, and uses
+AI to identify revenue, earnings, future outlook and recurring business themes.
+Each answer is stored with a short quote from the document. Code checks the numbers,
+units and reporting periods, removes duplicate company records, and combines the
+usable information into indicators for the group. This organised dataset is the
+project's \textbf{knowledge base}.
 
-For example, a researcher can look at how sales are growing and how many companies
-are raising their outlook. The output also shows \textbf{coverage}: how many companies
-had enough usable information to support the result. Missing or doubtful values are
-flagged for review rather than filled in with guesses.
+\smalltopic{A simple example}
+Suppose an announcement says, ``Revenue grew 10\% compared with last year.'' The AI
+records the stated 10\% and its supporting quote. The checks look for that value in
+the source and the relevant reporting period. If it passes, it can contribute to the
+group's average revenue growth. If a figure is missing or doubtful, it is left out of
+that calculation and flagged when review is needed.
+
+The final output is a set of research indicators, including revenue growth, earnings
+growth and the share of companies raising their outlook. Each includes
+\textbf{coverage}: how many companies supplied usable information. The website shows
+the workflow as connected nodes; clicking a node reveals its inputs and outputs.
+Researchers can inspect the process and export the indicators for further analysis.
 
 \smalltopic{Why I chose this problem}
 The entire project idea came from my experience working as a quantitative researcher
@@ -57,13 +68,11 @@ into inputs for alpha research---the search for signals that can inform investme
 strategies. I wanted to build the data preparation workflow behind that kind of work,
 using public documents and results that could be checked against their sources.
 
-An analyst doing this manually has to compare revenue, earnings per share
-(EPS, or profit per share), and guidance (the company's future outlook). Mixing up
-years, units, or standard-accounting and company-adjusted earnings can distort the
-result. I have not measured the time or money saved yet; that is part of the next test.
-Public filings and free AI models made a small prototype practical without buying a
-data feed. One important detail was preserving table columns: the right number from
-the wrong year is still a wrong answer.
+Manual comparison can mix up years, units or accounting definitions. Public filings
+and free AI models made a prototype practical without buying a data feed; actual
+time and cost savings still need measuring. An important detail was preserving table
+columns: the right number from the wrong year is still a wrong answer. Earnings per
+share (EPS) means profit per share; guidance means the company's future outlook.
 
 \begin{center}
 \includegraphics[width=\linewidth,trim=0 240 0 280,clip]{screenshots/01-workflow.png}
@@ -74,9 +83,8 @@ Nowcast is still planned.}
 \topic{What this version covers}
 The sources are earnings announcements filed with the SEC, the U.S. securities
 regulator, as 8-K Item 2.02 releases and text exhibits. Historical S\&P 500 membership
-and SEC company identifiers determine which
-companies belong in the sample. The default panel is 40 companies across four completed
-calendar seasons, selected with seed 42 and frozen for the run. Panel coverage and
+determines eligibility. The default sample is 40 companies across four completed
+calendar seasons, selected with seed 42 and fixed for the run. Sample coverage and
 full-index coverage are reported separately.
 
 This version stops at research indicators. It does not generate trading advice or
@@ -166,7 +174,7 @@ while XBRL alone would leave out guidance and tone. Retrieval and XBRL are worth
 revisiting once the remaining extraction errors are better understood.
 
 \newpage
-\topic{3\enspace Results and what needs work}
+\topic{3\enspace Results}
 The repo contains the Python pipeline, a CLI, a FastAPI backend and a React workflow
 view. The website lets me inspect a step's inputs and outputs, review quality and cost,
 replay results and export the KPIs. The saved runs show both progress and problems:

@@ -10,8 +10,16 @@ from typing import Any
 from sqlalchemy import text
 
 from nowcast.config import Config
-from nowcast.jobs import JobStore, config_fingerprint
+from nowcast.jobs import JobStore, config_fingerprint, utc_now
 from nowcast.paths import Paths
+
+COMPLETION_ACTIONS = {
+    'supersede-stale',
+    'schedule-plan',
+    'schedule-status',
+    'schedule-pause',
+    'schedule-resume',
+}
 
 
 def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
@@ -20,6 +28,7 @@ def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
         'validate-config': [config_path],
         'build-constituents': [paths.resolve(config.data.constituents_csv)],
         'ingest': [paths.resolve(config.data.document_index)],
+        'rebuild-index': [paths.resolve(config.data.document_index)],
         'extract': [paths.extractions(config) / 'extractions.parquet'],
         'aggregate': [paths.aggregates(config) / 'index_aggregates.parquet'],
         'demo': [paths.resolve('demo/verification.json')],
@@ -40,6 +49,12 @@ def stage_files(config: Config, config_path: Path, stage: str) -> list[Path]:
             key=lambda path: path.stat().st_mtime,
         )[-1:],
     }
+    choices.update(
+        {
+            action: [paths.resolve('manifests/actions/' + action + '.json')]
+            for action in COMPLETION_ACTIONS
+        }
+    )
     from nowcast.phase_services import PHASES, phase_path
 
     if stage in PHASES:
@@ -64,8 +79,13 @@ def record_artifacts(
     config_path: Path,
     parameters: dict[str, Any] | None = None,
 ) -> None:
-    payload = fingerprint_files(stage_files(config, config_path, stage))
-    from nowcast.storage import atomic_bytes
+    from nowcast.storage import atomic_bytes, atomic_json
+
+    files = stage_files(config, config_path, stage)
+    if stage in COMPLETION_ACTIONS:
+        # These actions finish without a data file; the worker calls us only after success.
+        atomic_json({'status': 'succeeded', 'completed_at': utc_now(), 'checks': 1}, files[0])
+    payload = fingerprint_files(files)
 
     for index, item in enumerate(payload):
         snapshot = (
@@ -145,32 +165,76 @@ def validate_upstream(
                 raise ValueError('upstream artifacts changed; run the workflow again')
 
 
-def validate_command_upstream(store: JobStore, request: Any, config: Config) -> None:
-    """An inspector step consumes one known, unchanged server-owned artifact version."""
-    if not request.node_id:
-        return
+def upstream_stages(command: str) -> tuple[str, ...]:
+    """Combined and detailed nodes can produce equivalent inputs."""
     from nowcast.inspection import UPSTREAM
 
-    stage = UPSTREAM.get(request.command_id)
-    if not stage:
+    alternatives = {
+        'parse': ('download', 'ingest', 'rebuild-index'),
+        'extract': ('parse', 'download', 'ingest', 'rebuild-index'),
+        'extract-step': ('parse', 'download', 'ingest', 'rebuild-index'),
+        'aggregate': ('consolidate', 'extract'),
+    }
+    primary = UPSTREAM.get(command)
+    return alternatives.get(command, (primary,) if primary else ())
+
+
+def _artifact_matches(files: str) -> bool:
+    entries = json.loads(files)
+    try:
+        return fingerprint_files([Path(item['path']) for item in entries]) == [
+            {'path': item['path'], 'sha256': item['sha256']} for item in entries
+        ]
+    except (OSError, ValueError):
+        return False
+
+
+def latest_upstream(
+    store: JobStore, config: Config, command: str, source: str | None = None
+) -> tuple[str, str] | None:
+    candidates = upstream_stages(command)
+    if not candidates:
+        return None
+    if source in candidates:
+        candidates = (source,)
+    with store.engine.connect() as connection:
+        rows = connection.execute(
+            text('SELECT job_id,stage,files,config_fingerprint FROM artifacts ORDER BY rowid DESC')
+        ).mappings()
+        for row in rows:
+            if (
+                row['stage'] in candidates
+                and row['config_fingerprint'] == config_fingerprint(config)
+                and _artifact_matches(row['files'])
+            ):
+                return row['job_id'], row['stage']
+    return None
+
+
+def validate_command_upstream(store: JobStore, request: Any, config: Config) -> None:
+    """Recheck equivalent upstream artifacts at submission and under the worker lock."""
+    if not request.node_id:
+        return
+    candidates = upstream_stages(request.command_id)
+    if not candidates:
         return
     if not request.upstream_run_id:
         raise ValueError('inspector requires a validated upstream run')
     with store.engine.connect() as connection:
-        row = (
+        rows = list(
             connection.execute(
                 text(
-                    'SELECT config_fingerprint,files FROM artifacts WHERE job_id=:run AND stage=:stage'
+                    'SELECT stage,config_fingerprint,files FROM artifacts WHERE job_id=:run ORDER BY rowid DESC'
                 ),
-                {'run': request.upstream_run_id, 'stage': stage},
-            )
-            .mappings()
-            .first()
+                {'run': request.upstream_run_id},
+            ).mappings()
         )
-    if row is None or row['config_fingerprint'] != config_fingerprint(config):
+    rows = [
+        row
+        for row in rows
+        if row['stage'] in candidates and row['config_fingerprint'] == config_fingerprint(config)
+    ]
+    if not rows:
         raise ValueError('upstream fingerprint is missing or stale')
-    files = json.loads(row['files'])
-    if fingerprint_files([Path(item['path']) for item in files]) != [
-        {'path': item['path'], 'sha256': item['sha256']} for item in files
-    ]:
+    if not any(_artifact_matches(row['files']) for row in rows):
         raise ValueError('upstream artifacts changed')

@@ -111,6 +111,9 @@ export const copy = {
   saved: "✓",
   rejected: "Schema rejected",
   unavailable: "Unavailable",
+  runPrevious: "Run the previous step first",
+  inputsChanged: "Inputs changed. Rerun the previous step.",
+  stepRunning: "Another step is running",
   noTrace: "Internal trace unavailable",
   drift: "Registry changed",
   exportName: "workflow.json",
@@ -188,7 +191,7 @@ export const copy = {
   questions: [
     "What is a node?",
     "What do the colours mean?",
-    "What is a company-season?",
+    "What is a company-quarter?",
     "Why is a value blank?",
     "What is the coverage gate?",
     "What is the review queue?",
@@ -201,7 +204,8 @@ export const copy = {
     "How do I verify a record?",
     "How do I add a node?",
   ],
-  tourLabels: ["Run", "Inspect", "Lens", "Help"],
+  savedSnapshot: "Saved snapshot · Read only · Per-document data unavailable",
+  tourLabels: ["Start with Validate config", "Double-click a step to inspect data", "Charts show coverage and cost", "Help explains each step"],
 } as const;
 export function label(key: string): string {
   return (
@@ -240,16 +244,16 @@ export function fieldLabel(key: string): string {
   );
 }
 export const helpAnswers = [
-  "One CLI stage. Double-click to inspect input and output. ○ → ○",
+  "One pipeline step. Start with Validate config; follow arrows. Double-click to inspect. Run selected executes this step.",
   "Teal tools, coral selection; green done, amber attention, red error. ○ ✓ △ ×",
-  "One company × one filing quarter. Frozen panels reuse companies. 40 × 4",
+  "One company in one filing quarter. Frozen panels reuse the same companies across quarters.",
   "○ means unavailable or unmeasured. It never means zero. ○ ≠ 0",
   "Observations must meet configured publish thresholds. Coverage is not accuracy. n ÷ N → ◆",
   "Inspect flagged fields here. Four blocking reasons exclude the record. △ → ✓ / ×",
   "RAPTOR, XBRL and Nowcast are planned and cannot execute. ◌ ⇢ ◇",
   "Validated Index fixtures only. Replay executes nothing and excludes private evidence. ▶ → ◇",
   "Resume requires unchanged configuration and upstream hashes; quotas still apply. Ⅱ → ▶",
-  "Identifier-free proxies and anonymous rows. Internal trace lasts this session only. ◇ → ○",
+  "Names are hidden behind session pseudonyms; dates, sizes and statuses remain visible. Source text requires Internal trace, which lasts this session only.",
   "Only configured :free models. Bakeoff selects measured results within quota. ○ → 1",
   "Persisted UTC reservations count against your cap, minus schedule reserves. n / N",
   "Internal trace → Evidence. J/K navigate; 1/2/3 mark verdicts; E opens evidence. ✓ × ?",

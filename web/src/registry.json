@@ -4946,71 +4946,36 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Step outcome"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Setting value type"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -5966,71 +5931,36 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Step outcome"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Setting value type"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -6110,71 +6040,36 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Step outcome"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Setting value type"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -6442,71 +6337,36 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Step outcome"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Setting value type"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -6586,71 +6446,36 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Step outcome"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Setting value type"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [

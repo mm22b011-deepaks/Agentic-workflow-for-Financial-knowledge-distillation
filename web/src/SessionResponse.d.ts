@@ -8,9 +8,11 @@
 export type Version = "v1";
 export type CsrfToken = string;
 export type InternalTraceAvailable = boolean;
+export type ReadOnly = boolean;
 
 export interface SessionResponse {
   version?: Version;
   csrf_token: CsrfToken;
   internal_trace_available: InternalTraceAvailable;
+  read_only?: ReadOnly;
 }

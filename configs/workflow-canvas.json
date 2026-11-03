@@ -3091,55 +3091,30 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
+            "key": "status",
+            "format": "value",
+            "unit": ""
           },
           {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
         "source": null
       }
@@ -3669,55 +3644,30 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
+            "key": "status",
+            "format": "value",
+            "unit": ""
           },
           {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
         "source": null
       }
@@ -3751,55 +3701,30 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
+            "key": "status",
+            "format": "value",
+            "unit": ""
           },
           {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
         "source": null
       }
@@ -3915,55 +3840,30 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
+            "key": "status",
+            "format": "value",
+            "unit": ""
           },
           {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
         "source": null
       }
@@ -3997,55 +3897,30 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "completed checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Action completed without creating data rows",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
+            "key": "status",
+            "format": "value",
+            "unit": ""
           },
           {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
         "source": null
       }
@@ -5027,6 +4902,12 @@
     "kpi": [
       "aggregation.min_observations",
       "aggregation.min_constituents"
+    ],
+    "freeze-panel": [
+      "scope.profile",
+      "scope.companies",
+      "scope.seasons",
+      "scope.seed"
     ]
   }
 }

@@ -27,8 +27,24 @@ export async function api<T>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    if (response.status === 409) {
+      const failure = await response.json().catch(() => null);
+      const detail = failure?.detail;
+      if (detail === "inspector requires a validated upstream run")
+        throw Error(copy.runPrevious);
+      if (
+        [
+          "upstream fingerprint is missing or stale",
+          "upstream artifacts changed",
+        ].includes(detail)
+      )
+        throw Error(copy.inputsChanged);
+      if (detail === "another job is active for this workstation")
+        throw Error(copy.stepRunning);
+    }
     throw Error(response.status === 403 ? copy.noTrace : copy.unavailable);
+  }
   const value: unknown = await response.json();
   if (!validator(value)) throw Error(copy.rejected);
   return value;

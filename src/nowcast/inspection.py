@@ -94,6 +94,7 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
         'effective_to',
         'report_date',
         'downloaded_at',
+        'completed_at',
     }
     numeric = {
         'chars',
@@ -127,6 +128,7 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
         'scale_check',
         'row_check',
         'period_check',
+        'checks',
         'metric_value',
         'threshold',
         'pass',
@@ -179,7 +181,14 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
             'tone',
         ],
         'metric_unit': ['fraction', 'percent', 'score'],
-        'status': ['ok', 'suppressed', 'unavailable', 'insufficient_observations', 'no_consensus'],
+        'status': [
+            'succeeded',
+            'ok',
+            'suppressed',
+            'unavailable',
+            'insufficient_observations',
+            'no_consensus',
+        ],
     }.items():
         if column in frame:
             public[column] = frame[column].where(frame[column].isin(allowed))
@@ -509,15 +518,25 @@ def pane(
     sample: int = 0,
     seed: int = 42,
 ) -> PaneResponse:
+    from nowcast.artifacts import latest_upstream, upstream_stages
+
     definitions = canvas_registry()
     sources = {n.id: n.io.source for n in definitions.nodes}
     if node not in {n.id for n in definitions.nodes}:
         raise DataError('unknown node')
     incoming = [e.source for e in definitions.edges if e.target == node and not e.sub]
-    incoming = list(dict.fromkeys([name for name in [sources.get(node), *incoming] if name]))
+    incoming = list(
+        dict.fromkeys(
+            [name for name in [sources.get(node), *upstream_stages(node), *incoming] if name]
+        )
+    )
+    execution_input = latest_upstream(store, config, node, upstream) if side == 'input' else None
     selected = node
     if side == 'input':
         selected = upstream or sources.get(node) or (incoming[0] if incoming else node)
+        if not upstream and selected in upstream_stages(node) and execution_input:
+            selected = execution_input[1]
+            incoming = [selected, *(name for name in incoming if name != selected)]
         if upstream and upstream not in [*incoming, sources.get(node)]:
             raise DataError('invalid upstream')
     frame = frame_for(config, config_path, store, selected, run)
@@ -598,9 +617,11 @@ def pane(
         versions = list(
             connection.execute(
                 text('SELECT job_id FROM artifacts WHERE stage=:stage ORDER BY rowid DESC'),
-                {'stage': (UPSTREAM.get(node) or selected) if side == 'input' else selected},
+                {'stage': selected},
             ).scalars()
         )
+    if side == 'input' and upstream_stages(node):
+        versions = [execution_input[0]] if execution_input else []
     profiles = []
     for field_key in frame:
         column = str(field_key)
@@ -675,7 +696,10 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
         files = source_files(config, config_path, node.id)
         present = any(p.is_file() for p in files)
         status = 'done' if present else 'idle'
-        job = next((r for r in latest if r.stage == node.id or r.workflow_id == node.id), None)
+        command = '-'.join(node.command) or node.id
+        job = next(
+            (r for r in latest if r.stage in {node.id, command} or r.workflow_id == node.id), None
+        )
         duration = None
         if job:
             status = {

@@ -432,6 +432,18 @@
       "description": "Affected extracted field",
       "unit": "",
       "format": "value"
+    },
+    "completed_at": {
+      "title": "Completed",
+      "description": "Action completion time",
+      "unit": "",
+      "format": "date"
+    },
+    "checks": {
+      "title": "Completed checks",
+      "description": "Successful action completions",
+      "unit": "checks",
+      "format": "value"
     }
   }
 }

@@ -462,6 +462,7 @@ class SessionResponse(Contract):
     version: Literal['v1'] = 'v1'
     csrf_token: str
     internal_trace_available: bool
+    read_only: bool = False
 
 
 class ConfigControl(Contract):

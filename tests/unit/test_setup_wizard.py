@@ -25,6 +25,31 @@ def checkout(tmp_path):
     return tmp_path
 
 
+def test_website_refreshes_generated_ui_before_serving_from_any_directory(tmp_path):
+    root = checkout(tmp_path)
+    shutil.copy2(ROOT / 'setup.sh', root / 'setup.sh')
+    python = root / '.venv/bin/python'
+    python.parent.mkdir(parents=True)
+    python.write_text('#!/bin/sh\nprintf "python %s\\n" "$*" >> startup-log\n')
+    python.chmod(0o755)
+    mise = root / '.tools/bin/mise'
+    mise.parent.mkdir(parents=True)
+    mise.write_text('#!/bin/sh\nprintf "mise %s\\n" "$*" >> startup-log\n')
+    mise.chmod(0o755)
+    child = {**os.environ, 'PATH': str(mise.parent) + os.pathsep + os.environ['PATH']}
+    subprocess.run(
+        ['/bin/bash', str(root / 'setup.sh'), 'website', '--port', '8768'],
+        cwd=root.parent,
+        env=child,
+        check=True,
+    )
+    lines = (root / 'startup-log').read_text().splitlines()
+    assert len(lines) == 3
+    assert 'bootstrap(Path.cwd())' in lines[0]
+    assert lines[1] == 'mise exec -- make references web-build'
+    assert lines[2] == 'mise exec -- .venv/bin/python -m nowcast.launcher serve --port 8768'
+
+
 @pytest.mark.parametrize('arguments', [[], ['init', '--yes', '--no-key']])
 def test_bare_setup_enters_wizard_and_forwards_explicit_init_flags(tmp_path, arguments):
     root = checkout(tmp_path)

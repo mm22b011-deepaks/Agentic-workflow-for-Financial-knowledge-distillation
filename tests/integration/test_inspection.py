@@ -198,6 +198,13 @@ def test_running_stage_does_not_report_startup_time_as_completed_duration(corpus
         )
         assert state['status'] == 'running'
         assert state['duration'] is None
+        alias = next(
+            node
+            for node in client.get('/api/v1/stages').json()['nodes']
+            if node['id'] == 'extract-step'
+        )
+        assert alias['status'] == 'running'
+        assert alias['last_run'] == row['id']
 
 
 def test_evidence_rejects_number_in_another_row_and_labels_are_csrf_protected(corpus, monkeypatch):
@@ -435,3 +442,179 @@ def test_selected_run_evidence_remains_immutable_when_latest_facts_change(corpus
             client.get('/api/v1/records/private-record/evidence?run=' + row['id']).status_code
             == 403
         )
+
+
+@pytest.mark.parametrize('source_stage', ['ingest', 'download', 'rebuild-index'])
+def test_individual_parse_accepts_equivalent_file_producers(corpus, monkeypatch, source_stage):
+    from nowcast.artifacts import latest_upstream, record_artifacts
+    from nowcast.contracts import RunRequest
+    from nowcast.jobs import store_for
+    from nowcast.phase_services import phase_path
+    from nowcast.worker import run
+
+    store = store_for(corpus)
+    if source_stage == 'download':
+        phase_path(corpus, 'download').parent.mkdir(parents=True, exist_ok=True)
+        pd.read_parquet(Paths.from_config(corpus).resolve(corpus.data.document_index)).to_parquet(
+            phase_path(corpus, 'download')
+        )
+    root, _ = store.create(
+        RunRequest(
+            workflow_id='command',
+            command_id=source_stage,
+            submission_id='equivalent-source-' + source_stage,
+        ),
+        corpus,
+        CONFIG,
+    )
+    record_artifacts(store, root['id'], source_stage, corpus, CONFIG)
+    store.update(root['id'], status='succeeded')
+    assert latest_upstream(store, corpus, 'parse') == (root['id'], source_stage)
+    with client_for() as client:
+        data = client.get('/api/v1/nodes/parse/input').json()
+        assert data['runs'] == [root['id']]
+        assert data['upstream'][0] == source_stage
+    row, _ = store.create(
+        RunRequest(
+            workflow_id='command',
+            command_id='parse',
+            node_id='parse',
+            upstream_run_id=root['id'],
+            submission_id='equivalent-parse-' + source_stage,
+        ),
+        corpus,
+        CONFIG,
+    )
+    monkeypatch.setattr('nowcast.worker.load_config', lambda path: corpus)
+    monkeypatch.setattr('nowcast.cli._load', lambda args: corpus)
+    run(store, row['id'])
+    assert store.get(row['id'])['status'] == 'succeeded'
+    assert phase_path(corpus, 'parse').is_file()
+    # Equivalent producers still require unchanged, fingerprinted files.
+    from nowcast.artifacts import stage_files
+
+    with stage_files(corpus, CONFIG, source_stage)[0].open('ab') as output:
+        output.write(b'changed')
+    assert latest_upstream(store, corpus, 'parse', source_stage) is None
+    with pytest.raises(ValueError, match='upstream artifacts changed'):
+        store.create(
+            RunRequest(
+                workflow_id='command',
+                command_id='parse',
+                node_id='parse',
+                upstream_run_id=root['id'],
+                submission_id='stale-parse-' + source_stage,
+            ),
+            corpus,
+            CONFIG,
+        )
+
+
+def test_aggregate_accepts_the_combined_extraction_output(corpus):
+    from nowcast.artifacts import record_artifacts
+    from nowcast.contracts import RunRequest
+    from nowcast.jobs import store_for
+
+    store = store_for(corpus)
+    target = Paths.from_config(corpus).extractions(corpus) / 'extractions.parquet'
+    pd.DataFrame([{'document_id': 'private-record', 'reported_eps': 1.2}]).to_parquet(target)
+    root, _ = store.create(
+        RunRequest(
+            workflow_id='command', command_id='extract', submission_id='combined-extract-root'
+        ),
+        corpus,
+        CONFIG,
+    )
+    record_artifacts(store, root['id'], 'extract', corpus, CONFIG)
+    store.update(root['id'], status='succeeded')
+    with client_for() as client:
+        data = client.get('/api/v1/nodes/aggregate/input').json()
+        assert data['runs'] == [root['id']]
+        assert data['upstream'][0] == 'extract'
+    row, _ = store.create(
+        RunRequest(
+            workflow_id='command',
+            command_id='aggregate',
+            node_id='aggregate',
+            upstream_run_id=root['id'],
+            submission_id='combined-aggregate',
+        ),
+        corpus,
+        CONFIG,
+    )
+    assert row['status'] == 'queued'
+
+
+@pytest.mark.parametrize(
+    'command',
+    ['supersede-stale', 'schedule-plan', 'schedule-status', 'schedule-pause', 'schedule-resume'],
+)
+def test_nonfile_actions_report_completion_and_readable_output(corpus, monkeypatch, command):
+    from nowcast.artifacts import stage_files
+    from nowcast.contracts import RunRequest
+    from nowcast.jobs import store_for
+    from nowcast.worker import run
+
+    store = store_for(corpus)
+    row, _ = store.create(
+        RunRequest(
+            workflow_id='command',
+            command_id=command,
+            node_id=command,
+            submission_id='completion-' + command,
+        ),
+        corpus,
+        CONFIG,
+    )
+    monkeypatch.setattr('nowcast.worker.load_config', lambda path: corpus)
+    monkeypatch.setattr('nowcast.cli._load', lambda args: corpus)
+    run(store, row['id'])
+    assert store.get(row['id'])['status'] == 'succeeded'
+    assert json.loads(stage_files(corpus, CONFIG, command)[0].read_text())['status'] == 'succeeded'
+    with client_for() as client:
+        data = client.get('/api/v1/nodes/' + command + '/output').json()
+        assert data['total'] == 1
+        assert data['rows'][0]['status'] == 'succeeded'
+        assert len(data['rows'][0]) >= 3
+
+
+def test_empty_extraction_cannot_publish_old_records_as_a_new_success(corpus, monkeypatch):
+    from nowcast.errors import DataError
+    from nowcast.worker import execute_stage
+
+    monkeypatch.setattr('nowcast.cli._load', lambda args: corpus)
+    monkeypatch.setattr('nowcast.extraction.runner.load_documents', lambda *args: [])
+    target = Paths.from_config(corpus).extractions(corpus) / 'extractions.parquet'
+    pd.DataFrame([{'document_id': 'old-record'}]).to_parquet(target)
+    before = target.read_bytes()
+    with pytest.raises(DataError, match='no documents to extract'):
+        execute_stage(CONFIG, 'extract')
+    assert target.read_bytes() == before
+
+
+def test_failed_nonfile_action_has_no_success_receipt(corpus, monkeypatch):
+    from nowcast.artifacts import stage_files
+    from nowcast.contracts import RunRequest
+    from nowcast.jobs import store_for
+    from nowcast.worker import run
+
+    store = store_for(corpus)
+    row, _ = store.create(
+        RunRequest(
+            workflow_id='command',
+            command_id='schedule-pause',
+            node_id='schedule-pause',
+            submission_id='failed-completion-receipt',
+        ),
+        corpus,
+        CONFIG,
+    )
+    monkeypatch.setattr('nowcast.worker.load_config', lambda path: corpus)
+
+    def fail(*args):
+        raise RuntimeError('controlled failure')
+
+    monkeypatch.setattr('nowcast.worker.execute_stage', fail)
+    run(store, row['id'])
+    assert store.get(row['id'])['status'] == 'failed'
+    assert not stage_files(corpus, CONFIG, 'schedule-pause')[0].exists()

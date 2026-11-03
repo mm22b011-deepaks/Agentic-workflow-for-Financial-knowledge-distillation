@@ -18,6 +18,10 @@ Native Linux requires `git`, `curl`, `tar` and `make`. Bootstrap installs the pi
 
 Open **http://localhost:8767**. The website binds to `0.0.0.0`; use it on a trusted workstation/network. It has CSRF protection but no user login.
 
+After `git pull`, restart with `./setup.sh website` and refresh your browser. This checks installed dependencies and rebuilds the website and registry before serving them. Your saved credentials and local configuration are kept.
+
+On the canvas, start with **Validate config** and follow the arrows. Double-click a step to see what it takes and gives. **Run selected** executes that step using the latest unchanged upstream result; **Run all** runs the pipeline. Missing or changed inputs ask you to rerun the previous step. Dashed steps are planned and cannot run.
+
 Bare `./setup.sh` bootstraps the toolchain and opens initialization. When `.env` has no key, it asks for a hidden paste and saves it with owner-only permissions. Skip the key for offline use. Existing values are kept by default; exported environment values take precedence. SEC downloads require a contact-bearing `SEC_USER_AGENT`. Use `./setup.sh bootstrap` for installation only, or `./setup.sh init --yes --no-key` for noninteractive offline setup.
 
 ## Run

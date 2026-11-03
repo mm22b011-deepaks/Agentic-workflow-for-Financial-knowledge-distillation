@@ -15,6 +15,7 @@ const titles: Record<string, string> = {
   truncated: "Truncated",
   presence: "Present / not stated / flagged",
   checks: "Pass / fail",
+  completion: "Action result",
   reasons: "Review reasons",
   duplicates: "Duplicates removed",
   heatmap: "KPI × quarter",
@@ -139,7 +140,12 @@ export function IOSummary({
       {node.io.summaries.slice(0, 3).map((kind) => (
         <article className="io-tile" key={kind}>
           <strong>{titles[kind] ?? "Step summary"}</strong>
-          {kind === "equation" ? (
+          {kind === "completion" ? (
+            <div className="io-empty">
+              <Icon name={rows.length ? "check" : "clock"} />
+              {rows.length ? "Completed" : "Not run yet"}
+            </div>
+          ) : kind === "equation" ? (
             <div className="io-equation">
               {[
                 "companies",

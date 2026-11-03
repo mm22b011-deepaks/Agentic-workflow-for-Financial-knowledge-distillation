@@ -93,6 +93,7 @@ def test_real_public_data_is_viewable_offline_without_keys(tmp_path, monkeypatch
         assert client.get('/api/v1/nodes/aggregate/output').json()['total'] > 0
         session = client.get('/api/v1/session').json()
         assert session['internal_trace_available'] is False
+        assert session['read_only'] is True
         assert client.get('/api/v1/records/private/evidence').status_code == 403
         response = client.post(
             '/api/v1/runs',
