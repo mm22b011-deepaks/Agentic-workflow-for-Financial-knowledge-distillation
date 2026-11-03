@@ -46,7 +46,7 @@ Private runtime files stay ignored under `data/`. The checked-in **`data/offline
 After bootstrap, view the bundled results without an API key or network access:
 
 ```bash
-./setup.sh website --config data/offline/config.yaml
+TRESATA_IGNORE_LOCAL_CONFIG=1 DATA_DIR=data/offline ./setup.sh website --config data/offline/config.yaml
 ```
 
 The bundle is a read-only, historical, partial snapshot; per-document inspection is unavailable. Published KPIs are in `data/offline/exports/kpis.json`, and `exports/index.json` can be loaded through Replay. Coverage gates suppress unsupported values.
@@ -67,3 +67,5 @@ Frontend checks use the `typecheck`, `lint` and `test` npm scripts in `web/`, th
 Package committed source and the public offline bundle with `scripts/package.sh tresata-source.zip`. Private runtime data, credentials, caches, dependency directories and archives are excluded. Do not submit a zip of the working directory.
 
 MIT licensed. Third-party data retains its own rights and terms.
+
+Website verification, command output and provider limits: [verification report](web/public/verification.md).

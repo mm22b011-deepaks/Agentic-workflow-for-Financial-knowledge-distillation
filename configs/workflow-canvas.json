@@ -594,6 +594,12 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
@@ -1524,6 +1530,12 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
@@ -1680,6 +1692,12 @@
           },
           {
             "key": "period_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
             "unit": "",
             "format": "value"
           }
@@ -1846,6 +1864,12 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
@@ -1945,30 +1969,105 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
+          "noun": "files",
           "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Structured financial facts for checking",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
             "unit": "",
             "format": "value"
           },
@@ -1996,12 +2095,18 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "presence"
         ],
-        "source": null
+        "source": "download"
       }
     },
     {
@@ -2498,10 +2603,10 @@
       ],
       "io": {
         "takes": {
-          "noun": "records",
-          "unit_label": "record",
-          "plain_line": "EPS, revenue, guidance and tone",
-          "icon": "extract"
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
         },
         "gives": {
           "noun": "KPIs",
@@ -2598,63 +2703,44 @@
         "gives": {
           "noun": "index rows",
           "unit_label": "index row",
-          "plain_line": "One KPI for each quarter",
-          "icon": "aggregate"
+          "plain_line": "Files listed in the document index",
+          "icon": "table"
         },
         "example_fields": [
           {
-            "key": "metric",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "season",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "downloaded_at",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "size_bytes",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "metric_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "metric_unit",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "n_reported",
-            "unit": "records",
-            "format": "value"
-          },
-          {
-            "key": "n_expected",
-            "unit": "records",
-            "format": "value"
-          },
-          {
-            "key": "coverage",
-            "unit": "%",
-            "format": "fraction"
-          },
-          {
-            "key": "threshold",
-            "unit": "%",
-            "format": "fraction"
-          },
-          {
-            "key": "pass",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "suppressed",
-            "unit": "",
+            "key": "chars",
+            "unit": "characters",
             "format": "value"
           }
         ],
         "summaries": [
-          "funnel"
+          "funnel",
+          "lengths"
         ],
         "source": "download"
       }
@@ -2688,10 +2774,584 @@
           "icon": "parse"
         },
         "gives": {
+          "noun": "model checks",
+          "unit_label": "check",
+          "plain_line": "Extraction quality and speed by model",
+          "icon": "model"
+        },
+        "example_fields": [
+          {
+            "key": "model",
+            "label": "Model",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "parse_success_rate",
+            "label": "Parsed releases",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "empty_completion_rate",
+            "label": "Empty responses",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "latency_p95_seconds",
+            "label": "Slow response time",
+            "unit": "seconds",
+            "format": "value"
+          },
+          {
+            "key": "nonempty_extractions",
+            "label": "Records returned",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "tokens",
+            "label": "Tokens used",
+            "unit": "tokens",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "model-scores"
+        ],
+        "source": "parse"
+      }
+    },
+    {
+      "id": "doctor",
+      "label_key": "doctor",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "readiness report",
+          "unit_label": "check",
+          "plain_line": "Configuration and access report created",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "format",
+            "label": "Contents",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "completed_at",
+            "label": "Completed",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "completion"
+        ],
+        "source": null
+      }
+    },
+    {
+      "id": "freeze-panel",
+      "label_key": "freeze-panel",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
+        },
+        "gives": {
+          "noun": "checked selection",
+          "unit_label": "check",
+          "plain_line": "Members and quarters saved for repeat runs",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "companies",
+            "label": "Members",
+            "unit": "members",
+            "format": "value"
+          },
+          {
+            "key": "seasons",
+            "label": "Quarters",
+            "unit": "quarters",
+            "format": "value"
+          },
+          {
+            "key": "company_quarters",
+            "label": "Company-quarters",
+            "unit": "company-quarters",
+            "format": "value"
+          },
+          {
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "selection",
+          "completion"
+        ],
+        "source": "build-constituents"
+      }
+    },
+    {
+      "id": "validate-index",
+      "label_key": "validate-index",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "Files listed in the document index",
+          "icon": "table"
+        },
+        "gives": {
+          "noun": "index checks",
+          "unit_label": "check",
+          "plain_line": "Document index entries checked against files",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "downloaded_at",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "size_bytes",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "chars",
+            "unit": "characters",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "funnel",
+          "lengths"
+        ],
+        "source": "rebuild-index"
+      }
+    },
+    {
+      "id": "supersede-stale",
+      "label_key": "supersede-stale",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "completed checks",
+          "unit_label": "check",
+          "plain_line": "Action completed without creating data rows",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "status",
+            "format": "value",
+            "unit": ""
+          },
+          {
+            "key": "completed_at",
+            "format": "date",
+            "unit": ""
+          },
+          {
+            "key": "checks",
+            "format": "value",
+            "unit": "checks"
+          }
+        ],
+        "summaries": [
+          "completion"
+        ],
+        "source": null
+      }
+    },
+    {
+      "id": "demo",
+      "label_key": "demo",
+      "icon": "flask",
+      "group": "demo",
+      "variant": "trigger",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "demo"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "offline check",
+          "unit_label": "check",
+          "plain_line": "Offline results checked against reference values",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "status",
+            "label": "Status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "companies",
+            "label": "Members",
+            "unit": "members",
+            "format": "value"
+          },
+          {
+            "key": "seasons",
+            "label": "Quarters",
+            "unit": "quarters",
+            "format": "value"
+          },
+          {
+            "key": "releases",
+            "label": "Releases",
+            "unit": "releases",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "completion",
+          "equation"
+        ],
+        "source": null
+      }
+    },
+    {
+      "id": "serve",
+      "label_key": "serve",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "terminal",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "setting_value",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "kind",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "quote_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "number_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "scale_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "row_check",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "period_check",
+            "unit": "",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ],
+        "source": null
+      }
+    },
+    {
+      "id": "export",
+      "label_key": "export",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "gives": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Public Index and KPI export files",
+          "icon": "export"
+        },
+        "example_fields": [
+          {
+            "key": "format",
+            "label": "Contents",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "completed_at",
+            "label": "Completed",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
+            "format": "value"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ],
+        "source": "aggregate"
+      }
+    },
+    {
+      "id": "prepare-labels",
+      "label_key": "prepare-labels",
+      "icon": "config",
+      "group": "maintenance",
+      "variant": "square",
+      "capability": "executable",
+      "help_question": 0,
+      "ports": [
+        {
+          "id": "in",
+          "direction": "in",
+          "kind": "config",
+          "required": true
+        },
+        {
+          "id": "out",
+          "direction": "out",
+          "kind": "report"
+        }
+      ],
+      "io": {
+        "takes": {
           "noun": "records",
           "unit_label": "record",
           "plain_line": "EPS, revenue, guidance and tone",
           "icon": "extract"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Records sampled for a person to label",
+          "icon": "review"
         },
         "example_fields": [
           {
@@ -2808,647 +3468,18 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
           "presence"
         ],
-        "source": "parse"
-      }
-    },
-    {
-      "id": "doctor",
-      "label_key": "doctor",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "freeze-panel",
-      "label_key": "freeze-panel",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "validate-index",
-      "label_key": "validate-index",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "supersede-stale",
-      "label_key": "supersede-stale",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "completed checks",
-          "unit_label": "check",
-          "plain_line": "Action completed without creating data rows",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "status",
-            "format": "value",
-            "unit": ""
-          },
-          {
-            "key": "completed_at",
-            "format": "date",
-            "unit": ""
-          },
-          {
-            "key": "checks",
-            "format": "value",
-            "unit": "checks"
-          }
-        ],
-        "summaries": [
-          "completion"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "demo",
-      "label_key": "demo",
-      "icon": "flask",
-      "group": "demo",
-      "variant": "trigger",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "demo"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "index rows",
-          "unit_label": "index row",
-          "plain_line": "One KPI for each quarter",
-          "icon": "aggregate"
-        },
-        "example_fields": [
-          {
-            "key": "metric",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "season",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "metric_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "metric_unit",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "n_reported",
-            "unit": "records",
-            "format": "value"
-          },
-          {
-            "key": "n_expected",
-            "unit": "records",
-            "format": "value"
-          },
-          {
-            "key": "coverage",
-            "unit": "%",
-            "format": "fraction"
-          },
-          {
-            "key": "threshold",
-            "unit": "%",
-            "format": "fraction"
-          },
-          {
-            "key": "pass",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "suppressed",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "funnel"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "serve",
-      "label_key": "serve",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "terminal",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "export",
-      "label_key": "export",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
-      }
-    },
-    {
-      "id": "prepare-labels",
-      "label_key": "prepare-labels",
-      "icon": "config",
-      "group": "maintenance",
-      "variant": "square",
-      "capability": "executable",
-      "help_question": 0,
-      "ports": [
-        {
-          "id": "in",
-          "direction": "in",
-          "kind": "config",
-          "required": true
-        },
-        {
-          "id": "out",
-          "direction": "out",
-          "kind": "report"
-        }
-      ],
-      "io": {
-        "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
-        },
-        "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
-        },
-        "example_fields": [
-          {
-            "key": "setting",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "setting_value",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
-            "format": "value"
-          }
-        ],
-        "summaries": [
-          "checks"
-        ],
-        "source": null
+        "source": "consolidate"
       }
     },
     {
@@ -3474,63 +3505,53 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "quality report",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Validation and review counts summarized",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "completed_at",
+            "label": "Completed",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ],
-        "source": null
+        "source": "consolidate"
       }
     },
     {
@@ -3556,63 +3577,53 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "file",
+          "unit_label": "file",
+          "plain_line": "Saved summary report",
+          "icon": "export"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "completed_at",
+            "label": "Completed",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel"
         ],
-        "source": null
+        "source": "aggregate"
       }
     },
     {
@@ -4113,30 +4124,105 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Records prepared for retrieval",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
             "unit": "",
             "format": "value"
           },
@@ -4164,12 +4250,18 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel"
         ],
-        "source": null
+        "source": "consolidate"
       }
     },
     {
@@ -4201,57 +4293,47 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "downloaded_at",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "size_bytes",
+            "unit": "bytes",
+            "format": "value"
+          },
+          {
+            "key": "outcome",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
-            "unit": "",
+            "key": "chars",
+            "unit": "characters",
             "format": "value"
           }
         ],
         "summaries": [
-          "checks"
-        ],
-        "source": null
+          "sizes",
+          "skipped"
+        ]
       }
     },
     {
@@ -4277,63 +4359,54 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
+          "noun": "files",
           "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "chars",
+            "unit": "characters",
+            "format": "value"
+          },
+          {
+            "key": "chars_sent",
+            "unit": "characters",
+            "format": "value"
+          },
+          {
+            "key": "truncated",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "quote_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "number_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
+            "key": "text",
             "unit": "",
             "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "lengths",
+          "truncated"
         ],
-        "source": null
+        "source": "demo-ingest"
       }
     },
     {
@@ -4359,30 +4432,105 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
             "unit": "",
             "format": "value"
           },
@@ -4410,12 +4558,18 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "presence"
         ],
-        "source": null
+        "source": "demo-parse"
       }
     },
     {
@@ -4441,30 +4595,105 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "release_token",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "report_date",
+            "unit": "",
+            "format": "date"
+          },
+          {
+            "key": "season",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
+            "key": "reported_eps",
+            "unit": "per share",
+            "format": "value"
+          },
+          {
+            "key": "eps_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "eps_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "revenue_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "revenue_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_presence",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "guidance_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "guidance_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "tone_confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "tone_status",
+            "unit": "",
+            "format": "value"
+          },
+          {
+            "key": "confidence",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "issues",
+            "unit": "checks",
+            "format": "value"
+          },
+          {
+            "key": "flagged",
             "unit": "",
             "format": "value"
           },
@@ -4492,12 +4721,18 @@
             "key": "period_check",
             "unit": "",
             "format": "value"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value"
           }
         ],
         "summaries": [
           "checks"
         ],
-        "source": null
+        "source": "demo-extract"
       }
     },
     {
@@ -4523,63 +4758,73 @@
       ],
       "io": {
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
         },
         "example_fields": [
           {
-            "key": "setting",
+            "key": "metric",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "setting_value",
+            "key": "season",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "kind",
+            "key": "metric_value",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "quote_check",
+            "key": "metric_unit",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "number_check",
+            "key": "n_reported",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "n_expected",
+            "unit": "records",
+            "format": "value"
+          },
+          {
+            "key": "coverage",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "threshold",
+            "unit": "%",
+            "format": "fraction"
+          },
+          {
+            "key": "pass",
             "unit": "",
             "format": "value"
           },
           {
-            "key": "scale_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "row_check",
-            "unit": "",
-            "format": "value"
-          },
-          {
-            "key": "period_check",
+            "key": "suppressed",
             "unit": "",
             "format": "value"
           }
         ],
         "summaries": [
-          "checks"
+          "heatmap"
         ],
-        "source": null
+        "source": "demo-validate"
       }
     },
     {

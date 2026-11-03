@@ -3,7 +3,7 @@ import type { CanvasRegistry } from "../../CanvasRegistry";
 import type { PaneResponse } from "../../PaneResponse";
 import type { StageSnapshot } from "../../StageSnapshot";
 import { useSession } from "../../shared/state";
-import { quantity, pseudonym, sourceBadge } from "../../shared/io";
+import { quantity, pseudonym } from "../../shared/io";
 import { Icon } from "../../shared/Icon";
 import { Button } from "../../shared/Button";
 import { label } from "../../copy";
@@ -11,6 +11,7 @@ import { IOSummary } from "./IOSummary";
 import { TraceEvidence } from "./TraceEvidence";
 
 type Props = {
+  badge: string;
   nodeId: string;
   side: "input" | "output";
   data: PaneResponse | null;
@@ -57,6 +58,7 @@ export function DataPane(props: Props) {
     .filter(
       (e) =>
         !e.sub &&
+        (side !== "input" || node.io.takes.noun !== "settings") &&
         (side !== "input" ||
           registry.nodes.find((n) => n.id === e.source)?.variant !==
             "trigger") &&
@@ -75,11 +77,14 @@ export function DataPane(props: Props) {
   const peer = registry.nodes.find((n) => n.id === selected);
   const origin = side === "input" ? (peer ?? node) : node;
   const contract = node.io[side === "input" ? "takes" : "gives"];
+  const content = side === "input" && nodeId === "review" ? node
+    : side === "input" && contract.noun === "settings"
+      ? registry.nodes.find((item) => item.id === "validate-config")! : origin;
   const synthetic = stages.source === "synthetic";
   const data =
     (!session.trace && props.data?.view === "trace") || props.data?.node !== nodeId ? null : props.data;
   const stage = stages.nodes.find((n) => n.id === origin.id);
-  const count = quantity(origin, stage, data);
+  const count = quantity(origin, side === "input" && nodeId === "review" ? undefined : stage, data);
   const unit =
     side === "input" ? contract.unit_label : node.io.gives.unit_label;
   const total = count?.total ?? data?.total ?? 0;
@@ -89,7 +94,7 @@ export function DataPane(props: Props) {
       : side === "output" && count
         ? count.text
         : `${total.toLocaleString()} ${unit}${total === 1 ? "" : "s"}`;
-  const fields = [...origin.io.example_fields];
+  const fields = [...content.io.example_fields];
   const allowed = fields.filter((f) => f.key !== "text" || session.trace);
   if (session.trace)
     for (const key of ["document_id", "cik", "ticker", "company", "sector"])
@@ -108,7 +113,7 @@ export function DataPane(props: Props) {
   );
   const row = rows[Math.min(at, Math.max(0, rows.length - 1))];
   const available = !!row && Object.keys(row).length >= 3;
-  const badge = sourceBadge(session.mode, stages.source);
+  const badge = props.badge;
   const value = (key: string, v: unknown, item = row) => {
     if (key === "metric_value" && v != null)
       return `${item.metric_unit === "fraction" ? (Number(v) * 100).toFixed(1) : v}${item.metric_unit === "score" ? " score" : "%"}`;
@@ -141,6 +146,8 @@ export function DataPane(props: Props) {
         timeZone: "UTC",
       });
     if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (key === "reported_eps" || key === "revenue")
+      return `${String(v)} ${item.currency ?? "currency not stated"}${key === "reported_eps" ? " per share" : ""}`;
     if (field?.unit === "%")
       return `${field.format === "fraction" ? Math.round(Number(v) * 100) : Number(v)}%`;
     return `${String(v)}${field?.unit ? " " + field.unit : ""}`;
@@ -226,6 +233,7 @@ export function DataPane(props: Props) {
                 "revenue_status",
                 "guidance_status",
                 "tone_status",
+                "currency",
               ].includes(key),
           )
           .map(([key, v]) => (
@@ -323,7 +331,7 @@ export function DataPane(props: Props) {
           />
         )}
       </nav>
-      <div className="io-body" aria-busy={loading}>
+      <div className="io-body" aria-busy={loading} tabIndex={0} role="region" aria-label={side + " details"}>
         {loading ? (
           <div className="io-shimmer" aria-label={"Loading"} />
         ) : node.capability === "planned" ? (
@@ -346,8 +354,8 @@ export function DataPane(props: Props) {
             {view === "summary" && (
               <>
                 <IOSummary
-                  before={props.other?.total}
-                  node={origin}
+                  before={side === "output" ? props.other?.total : stage?.in_count ?? undefined}
+                  node={content}
                   rows={rows}
                   total={total}
                   countText={countText}
@@ -358,7 +366,7 @@ export function DataPane(props: Props) {
             {view === "example" && example}
             {view === "table" &&
               (available ? (
-                <div className="table-scroll">
+                <div className="table-scroll" tabIndex={0} role="region" aria-label={side + " table"}>
                   <table>
                     <thead>
                       <tr>
@@ -384,7 +392,7 @@ export function DataPane(props: Props) {
                 example
               ))}
             {view === "json" && (
-              <pre>
+              <pre tabIndex={0} role="region" aria-label={side + " JSON"}>
                 {JSON.stringify(
                   row
                     ? Object.fromEntries(

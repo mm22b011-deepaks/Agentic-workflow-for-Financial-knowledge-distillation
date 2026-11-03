@@ -33,7 +33,7 @@
       "id": "estimate-scope",
       "status": "done",
       "in_count": 637,
-      "out_count": 4,
+      "out_count": 160,
       "duration": 5.441197,
       "skipped_by_reason": {},
       "last_run": null
@@ -333,7 +333,7 @@
       "id": "export",
       "status": "done",
       "in_count": null,
-      "out_count": 340,
+      "out_count": 2,
       "duration": 12.285088,
       "skipped_by_reason": {},
       "last_run": null
@@ -477,7 +477,7 @@
       "id": "demo-aggregate",
       "status": "done",
       "in_count": null,
-      "out_count": 4,
+      "out_count": 16,
       "duration": null,
       "skipped_by_reason": {},
       "last_run": null

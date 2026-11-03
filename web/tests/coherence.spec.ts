@@ -1,5 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 const upstream = {
   node: "build-constituents",
   side: "input",
@@ -25,7 +29,7 @@ const job = {
   created_at: "2026-11-03T00:00:00Z",
 };
 
-async function open(page: Page, holdInput = false) {
+async function open(page: Page, holdInput = false, badge = "DEMO") {
   let submitted: Record<string, unknown> | undefined;
   let release: () => void = () => {};
   let requested = false;
@@ -46,7 +50,7 @@ async function open(page: Page, holdInput = false) {
       json: {
         version: "v1",
         source: "pipeline",
-        status: "unavailable",
+        status: badge === "REPLAY" ? "available" : "unavailable",
         snapshots: [],
       },
     }),
@@ -84,7 +88,7 @@ async function open(page: Page, holdInput = false) {
       route.fulfill({ json: { metrics: {}, series: [] } }),
     );
   await page.goto("/");
-  await expect(page.locator(".pipeline-badge")).toContainText("DEMO");
+  await expect(page.locator(".pipeline-badge")).toContainText(badge);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await page.getByRole("textbox", { name: "Commands" }).fill("Build members");
@@ -144,8 +148,9 @@ test("saved snapshots explain read-only mode and disable execution", async ({ pa
     const response = await route.fetch();
     await route.fulfill({ json: { ...(await response.json()), read_only: true } });
   });
-  await open(page);
+  await open(page, false, "REPLAY");
   await expect(page.getByRole("status")).toContainText("Saved snapshot");
+  await expect(page.locator(".io-footer b")).toHaveText(["REPLAY", "REPLAY"]);
   await expect(page.getByRole("button", { name: "Execute step", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Run selected", exact: true })).toBeDisabled();
@@ -191,6 +196,7 @@ test("real Pause and Resume buttons complete and expose action receipts", async 
   );
   await page.goto("/");
   await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
   for (const [id, search, paused] of [
     ["schedule-pause", "pause", true],
     ["schedule-resume", "resume", false],
@@ -225,7 +231,7 @@ test("real Pause and Resume buttons complete and expose action receipts", async 
     await expect(output.getByTestId("io-count")).toHaveText("1 check", {
       timeout: 15000,
     });
-    await expect(output.getByTestId("example-card")).toContainText("succeeded");
+    await expect(output.getByTestId("example-card")).toContainText("succeeded", { timeout: 15000 });
     await page.keyboard.press("Escape");
     await expect(page.locator(".node-panel")).toHaveCount(0);
   }

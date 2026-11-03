@@ -77,9 +77,37 @@ def index_rows(config: Config, frame: pd.DataFrame) -> pd.DataFrame:
 
 def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFrame:
     """Allow only typed, non-identifying attributes; never forward text or quotes."""
+    if 'filing_date' in frame and 'report_date' not in frame:
+        frame = frame.rename(columns={'filing_date': 'report_date'})
+    currencies = (
+        'USD',
+        'EUR',
+        'GBP',
+        'CAD',
+        'JPY',
+        'AUD',
+        'CHF',
+        'CNY',
+        'HKD',
+        'INR',
+        'SEK',
+        'NOK',
+        'DKK',
+        'SGD',
+        'NZD',
+        'BRL',
+        'MXN',
+        'ZAR',
+        'KRW',
+        'TWD',
+    )
     public = pd.DataFrame(index=frame.index)
-    for source, target in [('cik', 'member_token'), ('document_id', 'release_token')]:
-        if source in frame:
+    for source, target in [
+        ('cik', 'member_token'),
+        ('document_id', 'release_token'),
+        ('accession', 'release_token'),
+    ]:
+        if source in frame and target not in public:
             public[target] = frame[source].map(
                 lambda value: hmac.new(
                     _PANE_TOKEN_KEY, str(value).encode(), hashlib.sha256
@@ -132,6 +160,9 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
         'metric_value',
         'threshold',
         'pass',
+        'reported_eps',
+        'revenue',
+        'company_quarters',
     }
     for column in frame:
         if column in numeric:
@@ -181,8 +212,13 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
             'tone',
         ],
         'metric_unit': ['fraction', 'percent', 'score'],
+        'format': ['Index snapshot', 'KPI records', 'Report'],
+        'currency': currencies,
+        'tone': ['confident', 'neutral', 'cautious', 'mixed', 'positive', 'negative'],
+        'guidance_presence': ['provided', 'not_provided', 'yes', 'no'],
         'status': [
             'succeeded',
+            'failed',
             'ok',
             'suppressed',
             'unavailable',
@@ -245,6 +281,10 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
         records = frame.record.map(
             lambda value: json.loads(value) if isinstance(value, str) else value
         )
+        public['currency'] = records.map(
+            lambda record: record.get('currency') if isinstance(record, dict) else None
+        )
+        public['currency'] = public.currency.where(public.currency.isin(currencies))
         fiscal_seasons = records.map(
             lambda record: (
                 f'{record.get("fiscal_year")}Q{record.get("fiscal_quarter")}'
@@ -282,6 +322,9 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
                             'positive',
                             'negative',
                             'neutral',
+                            'confident',
+                            'cautious',
+                            'mixed',
                             'yes',
                             'no',
                             'provided',
@@ -413,7 +456,29 @@ def frame_for(
             raise DataError('run snapshot unavailable')
     else:
         files = source_files(config, config_path, node)
-    if node == 'model-bakeoff':
+    if node in {'export', 'report', 'doctor', 'quality-summary'}:
+        frames = [
+            pd.DataFrame(
+                [
+                    {
+                        'format': 'Report'
+                        if node != 'export'
+                        else 'KPI records'
+                        if path.name.endswith('kpis.json')
+                        else 'Index snapshot',
+                        'size_bytes': path.stat().st_size,
+                        'completed_at': datetime.fromtimestamp(
+                            path.stat().st_mtime, timezone.utc
+                        ).isoformat(),
+                        'status': 'succeeded',
+                        'checks': 1,
+                    }
+                    for path in files
+                    if path.is_file()
+                ]
+            )
+        ]
+    elif node == 'model-bakeoff':
         # The report also contains a private sample keyed by company identifier.
         frames = [
             pd.DataFrame(json.loads(path.read_text()).get('models', []))
@@ -426,6 +491,67 @@ def frame_for(
         ]
     frames = [f for f in frames if not f.empty]
     frame = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if node == 'freeze-panel' and not frame.empty:
+        frame = pd.DataFrame(
+            [
+                {
+                    'companies': len(row['companies'])
+                    if isinstance(row.get('companies'), list)
+                    else row.get('companies'),
+                    'seasons': len(row['seasons'])
+                    if isinstance(row.get('seasons'), list)
+                    else row.get('seasons'),
+                    'company_quarters': len(row['pairs'])
+                    if isinstance(row.get('pairs'), list)
+                    else None,
+                    'checks': 1,
+                    'status': 'succeeded',
+                }
+                for row in frame.to_dict('records')
+            ]
+        )
+    if node == 'demo' and not frame.empty:
+        frame = pd.DataFrame(
+            [
+                {
+                    'status': 'ok' if row.get('pandas_agreement') else 'failed',
+                    'checks': 1,
+                    'companies': row.get('companies'),
+                    'seasons': row.get('seasons'),
+                    'releases': row.get('documents'),
+                }
+                for row in frame.to_dict('records')
+            ]
+        )
+    if node == 'model-bakeoff' and frame.empty and not run:
+        from nowcast.offline import saved_snapshot
+
+        saved = saved_snapshot(config, 'bakeoff', MetricSnapshot)
+        if saved:
+            scores: dict[str, dict[str, Any]] = {}
+            for point in saved.series:
+                scores.setdefault(point.metric, {'model': point.metric})[point.season] = point.value
+            frame = pd.DataFrame(scores.values())
+    if node == 'estimate-scope' and frame.empty and not run:
+        from nowcast.offline import saved_snapshot
+
+        saved = saved_snapshot(config, 'plan', MetricSnapshot)
+        if saved:
+            values = {point.metric: point.value for point in saved.series}
+            companies = values.get('companies')
+            releases = values.get('releases')
+            frame = pd.DataFrame(
+                [
+                    {
+                        'scope_plan': {
+                            **values,
+                            'seasons': list(range(int(releases / companies)))
+                            if companies and releases
+                            else [],
+                        }
+                    }
+                ]
+            )
     panel_path = Paths.from_config(config).resolve('manifests/panel.json')
     if (
         not run
@@ -477,7 +603,7 @@ def frame_for(
         if not details.empty:
             attributes = [key for key in details if key not in frame or key in {'metric', 'season'}]
             frame = frame.merge(details[attributes], on=['metric', 'season'], how='left')
-    if node in {'aggregate', 'publish', 'suppressed'}:
+    if node in {'aggregate', 'publish', 'suppressed', 'demo-aggregate'}:
         frame = index_rows(config, frame)
     return frame
 
@@ -531,12 +657,18 @@ def pane(
     selected = node
     if side == 'input':
         selected = upstream or sources.get(node) or (incoming[0] if incoming else node)
+        definition = next(item for item in definitions.nodes if item.id == node)
+        if not upstream and not sources.get(node) and definition.io.takes.noun == 'settings':
+            selected = 'validate-config'
+            incoming = [] if node == 'validate-config' else ['validate-config']
         if not upstream and selected in upstream_stages(node) and execution_input:
             selected = execution_input[1]
             incoming = [selected, *(name for name in incoming if name != selected)]
         if upstream and upstream not in [*incoming, sources.get(node)]:
             raise DataError('invalid upstream')
     frame = frame_for(config, config_path, store, selected, run)
+    if node == 'review' and side == 'input' and not run:
+        frame = read_frame(Paths.from_config(config).resolve(config.extraction.review_queue_path))
     if (
         selected in {'extract', 'extract-step', 'validate', 'consolidate'}
         and frame.empty
@@ -655,7 +787,15 @@ def pane(
                 }
             )
         )
-    total = len(frame)
+    total = (
+        1
+        if selected == 'validate-config'
+        else (
+            int(frame.releases.sum())
+            if selected == 'estimate-scope' and 'releases' in frame
+            else len(frame)
+        )
+    )
     values = frame.iloc[offset : offset + limit].copy()
     for value_column in values:
         values[value_column] = values[value_column].map(
@@ -722,7 +862,7 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
         except (ValueError, OSError):
             out = None
         if node.id == 'validate-config':
-            out = 1 if job and job.status == 'succeeded' else None
+            out = 1 if present and (not job or job.status == 'succeeded') else None
         if node.id == 'estimate-scope' and present:
             out = int(frame.releases.sum()) if 'releases' in frame else None
         if node.id == 'extract' and not out:
@@ -730,11 +870,14 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
             from nowcast.ingestion.rebuild import index_path
             from nowcast.scope import select_documents
 
-            ids = {
-                d.document_id
-                for d in select_documents(config, load_documents(config, index_path(config)))
-            }
-            out = sum(p['document_id'] in ids for p in results(config)) or None
+            try:
+                ids = {
+                    d.document_id
+                    for d in select_documents(config, load_documents(config, index_path(config)))
+                }
+                out = sum(p['document_id'] in ids for p in results(config)) or None
+            except DataError:
+                out = None
         cache[node.id] = out
         nodes.append(
             StageState.model_validate(
@@ -963,9 +1106,8 @@ def coverage(config: Config) -> MetricSnapshot:
     from nowcast.ingestion.rebuild import index_path
     from nowcast.scope import select_documents
 
-    eligible = {
-        d.document_id for d in select_documents(config, load_documents(config, index_path(config)))
-    }
+    documents = load_documents(config, index_path(config))
+    eligible = {d.document_id for d in select_documents(config, documents)} if documents else set()
     usable = consolidate(config, list(config.llm.models))
     if not usable.empty:
         usable = usable[usable.document_id.isin(eligible)].drop_duplicates('document_id')

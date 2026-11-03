@@ -28,6 +28,26 @@ from nowcast.workflow_registry import canvas_registry
 CONFIG = Path(__file__).resolve().parents[2] / 'configs/config.yaml'
 
 
+def test_empty_checkout_can_open_dashboard_before_the_first_run(config):
+    with TestClient(create_app(CONFIG, launch_workers=False)) as client:
+        for endpoint in (
+            'session',
+            'registry',
+            'index',
+            'stages',
+            'coverage',
+            'cost',
+            'bakeoff',
+            'plan',
+            'schedule',
+        ):
+            response = client.get('/api/v1/' + endpoint)
+            assert response.status_code == 200, (endpoint, response.text)
+        stages = client.get('/api/v1/stages').json()
+        assert next(n for n in stages['nodes'] if n['id'] == 'extract')['out_count'] is None
+        assert client.get('/api/v1/nodes/build-constituents/input').status_code == 200
+
+
 @pytest.fixture
 def corpus(config, monkeypatch):
     config = dataclasses.replace(config, scope=ScopeConfig())

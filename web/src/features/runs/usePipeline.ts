@@ -132,7 +132,7 @@ export function usePipeline() {
                 status: node.capability === "planned" ? "planned" : "idle",
                 out_count:
                   node.id === "aggregate" && replay.status === "available"
-                    ? replay.snapshots.length
+                    ? replay.snapshots.length * 4 // Each quarter contains four KPI rows.
                     : null,
               })),
             },

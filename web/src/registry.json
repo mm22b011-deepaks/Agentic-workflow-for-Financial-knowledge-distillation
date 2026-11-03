@@ -906,6 +906,13 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
@@ -2475,6 +2482,13 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
@@ -2756,6 +2770,13 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
@@ -3004,6 +3025,13 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
@@ -3213,40 +3241,145 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "download",
         "takes": {
-          "noun": "settings",
+          "noun": "files",
           "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Structured financial facts for checking",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "season",
+            "label": "Quarter",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
           },
           {
             "key": "quote_check",
@@ -3282,10 +3415,17 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
-          "checks"
+          "presence"
         ]
       },
       "ports": [
@@ -3915,10 +4055,10 @@
       "io": {
         "source": null,
         "takes": {
-          "noun": "records",
-          "unit_label": "record",
-          "plain_line": "EPS, revenue, guidance and tone",
-          "icon": "extract"
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
         },
         "gives": {
           "noun": "KPIs",
@@ -4037,83 +4177,56 @@
         "gives": {
           "noun": "index rows",
           "unit_label": "index row",
-          "plain_line": "One KPI for each quarter",
-          "icon": "aggregate"
+          "plain_line": "Files listed in the document index",
+          "icon": "table"
         },
         "example_fields": [
           {
-            "key": "metric",
-            "label": "KPI",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Index measure"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "season",
-            "label": "Quarter",
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "downloaded_at",
+            "label": "Saved",
+            "unit": "",
+            "format": "date",
+            "description": "Download date"
+          },
+          {
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value",
+            "description": "Downloaded file size"
+          },
+          {
+            "key": "outcome",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Calendar quarter"
+            "description": "Processing outcome"
           },
           {
-            "key": "metric_value",
-            "label": "Value",
-            "unit": "",
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
             "format": "value",
-            "description": "KPI value"
-          },
-          {
-            "key": "metric_unit",
-            "label": "Unit",
-            "unit": "",
-            "format": "value",
-            "description": "KPI unit"
-          },
-          {
-            "key": "n_reported",
-            "label": "Reported",
-            "unit": "records",
-            "format": "value",
-            "description": "Observed records"
-          },
-          {
-            "key": "n_expected",
-            "label": "Expected",
-            "unit": "records",
-            "format": "value",
-            "description": "Expected records"
-          },
-          {
-            "key": "coverage",
-            "label": "Coverage",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Fraction of expected records"
-          },
-          {
-            "key": "threshold",
-            "label": "Minimum coverage",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Minimum observations as share of expected records"
-          },
-          {
-            "key": "pass",
-            "label": "Gate",
-            "unit": "",
-            "format": "value",
-            "description": "Meets publication checks"
-          },
-          {
-            "key": "suppressed",
-            "label": "Suppressed",
-            "unit": "",
-            "format": "value",
-            "description": "Below publication threshold"
+            "description": "Parsed text length"
           }
         ],
         "summaries": [
-          "funnel"
+          "funnel",
+          "lengths"
         ]
       },
       "ports": [
@@ -4214,176 +4327,57 @@
           "icon": "parse"
         },
         "gives": {
-          "noun": "records",
-          "unit_label": "record",
-          "plain_line": "EPS, revenue, guidance and tone",
-          "icon": "extract"
+          "noun": "model checks",
+          "unit_label": "check",
+          "plain_line": "Extraction quality and speed by model",
+          "icon": "model"
         },
         "example_fields": [
           {
-            "key": "release_token",
-            "label": "Release",
+            "key": "model",
+            "label": "Model",
             "unit": "",
             "format": "value",
-            "description": "Session-only release pseudonym"
+            "description": "Extraction model"
           },
           {
-            "key": "report_date",
-            "label": "Filed",
-            "unit": "",
-            "format": "date",
-            "description": "Filing date"
-          },
-          {
-            "key": "season",
-            "label": "Quarter",
-            "unit": "",
-            "format": "value",
-            "description": "Calendar quarter"
-          },
-          {
-            "key": "reported_eps",
-            "label": "EPS",
-            "unit": "per share",
-            "format": "value",
-            "description": "Reported earnings per share"
-          },
-          {
-            "key": "eps_confidence",
-            "label": "EPS confidence",
+            "key": "parse_success_rate",
+            "label": "Parsed releases",
             "unit": "%",
             "format": "fraction",
-            "description": "Confidence in EPS"
+            "description": "Share of releases parsed successfully"
           },
           {
-            "key": "eps_status",
-            "label": "EPS status",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence validation status"
-          },
-          {
-            "key": "revenue",
-            "label": "Revenue",
-            "unit": "",
-            "format": "value",
-            "description": "Reported revenue"
-          },
-          {
-            "key": "revenue_confidence",
-            "label": "Revenue confidence",
+            "key": "empty_completion_rate",
+            "label": "Empty responses",
             "unit": "%",
             "format": "fraction",
-            "description": "Confidence in revenue"
+            "description": "Share of responses without extracted values"
           },
           {
-            "key": "revenue_status",
-            "label": "Revenue status",
-            "unit": "",
+            "key": "latency_p95_seconds",
+            "label": "Slow response time",
+            "unit": "seconds",
             "format": "value",
-            "description": "Evidence validation status"
+            "description": "95th percentile model response time"
           },
           {
-            "key": "guidance_presence",
-            "label": "Guidance",
-            "unit": "",
+            "key": "nonempty_extractions",
+            "label": "Records returned",
+            "unit": "records",
             "format": "value",
-            "description": "Forward outlook"
+            "description": "Nonempty model extraction results"
           },
           {
-            "key": "guidance_confidence",
-            "label": "Guidance confidence",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Confidence in guidance"
-          },
-          {
-            "key": "guidance_status",
-            "label": "Guidance status",
-            "unit": "",
+            "key": "tokens",
+            "label": "Tokens used",
+            "unit": "tokens",
             "format": "value",
-            "description": "Evidence validation status"
-          },
-          {
-            "key": "tone",
-            "label": "Tone",
-            "unit": "",
-            "format": "value",
-            "description": "Management tone"
-          },
-          {
-            "key": "tone_confidence",
-            "label": "Tone confidence",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Confidence in tone"
-          },
-          {
-            "key": "tone_status",
-            "label": "Tone status",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence validation status"
-          },
-          {
-            "key": "confidence",
-            "label": "Confidence",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Mean confidence"
-          },
-          {
-            "key": "issues",
-            "label": "Checks failed",
-            "unit": "checks",
-            "format": "value",
-            "description": "Validation failures"
-          },
-          {
-            "key": "flagged",
-            "label": "Flagged",
-            "unit": "",
-            "format": "value",
-            "description": "Requires review"
-          },
-          {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
-            "format": "value",
-            "description": "Evidence check passed"
-          },
-          {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
-            "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Model tokens used for the comparison"
           }
         ],
         "summaries": [
-          "presence"
+          "model-scores"
         ]
       },
       "ports": [
@@ -4495,71 +4489,50 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "readiness report",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Configuration and access report created",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Public export contents"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "Downloaded file size"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Step outcome"
           },
           {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -4641,79 +4614,59 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "build-constituents",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "checked selection",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Members and quarters saved for repeat runs",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
-            "unit": "",
+            "key": "companies",
+            "label": "Members",
+            "unit": "members",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Planned members"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
-            "unit": "",
+            "key": "seasons",
+            "label": "Quarters",
+            "unit": "quarters",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "Planned calendar quarters"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "company_quarters",
+            "label": "Company-quarters",
+            "unit": "company-quarters",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Frozen member and quarter pairs"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Successful action completions"
           },
           {
-            "key": "number_check",
-            "label": "Number",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Step outcome"
           }
         ],
         "summaries": [
-          "checks"
+          "selection",
+          "completion"
         ]
       },
       "ports": [
@@ -4784,79 +4737,66 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "rebuild-index",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "Files listed in the document index",
+          "icon": "table"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "index checks",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Document index entries checked against files",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "downloaded_at",
+            "label": "Saved",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Download date"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Downloaded file size"
           },
           {
-            "key": "number_check",
-            "label": "Number",
+            "key": "outcome",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Number check passed"
+            "description": "Processing outcome"
           },
           {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
             "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Parsed text length"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel",
+          "lengths"
         ]
       },
       "ports": [
@@ -5054,85 +4994,51 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "index rows",
-          "unit_label": "index row",
-          "plain_line": "One KPI for each quarter",
-          "icon": "aggregate"
+          "noun": "offline check",
+          "unit_label": "check",
+          "plain_line": "Offline results checked against reference values",
+          "icon": "check"
         },
         "example_fields": [
           {
-            "key": "metric",
-            "label": "KPI",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Index measure"
+            "description": "Step outcome"
           },
           {
-            "key": "season",
-            "label": "Quarter",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Calendar quarter"
+            "description": "Successful action completions"
           },
           {
-            "key": "metric_value",
-            "label": "Value",
-            "unit": "",
+            "key": "companies",
+            "label": "Members",
+            "unit": "members",
             "format": "value",
-            "description": "KPI value"
+            "description": "Planned members"
           },
           {
-            "key": "metric_unit",
-            "label": "Unit",
-            "unit": "",
+            "key": "seasons",
+            "label": "Quarters",
+            "unit": "quarters",
             "format": "value",
-            "description": "KPI unit"
+            "description": "Planned calendar quarters"
           },
           {
-            "key": "n_reported",
-            "label": "Reported",
-            "unit": "records",
+            "key": "releases",
+            "label": "Releases",
+            "unit": "releases",
             "format": "value",
-            "description": "Observed records"
-          },
-          {
-            "key": "n_expected",
-            "label": "Expected",
-            "unit": "records",
-            "format": "value",
-            "description": "Expected records"
-          },
-          {
-            "key": "coverage",
-            "label": "Coverage",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Fraction of expected records"
-          },
-          {
-            "key": "threshold",
-            "label": "Minimum coverage",
-            "unit": "%",
-            "format": "fraction",
-            "description": "Minimum observations as share of expected records"
-          },
-          {
-            "key": "pass",
-            "label": "Gate",
-            "unit": "",
-            "format": "value",
-            "description": "Meets publication checks"
-          },
-          {
-            "key": "suppressed",
-            "label": "Suppressed",
-            "unit": "",
-            "format": "value",
-            "description": "Below publication threshold"
+            "description": "Planned releases"
           }
         ],
         "summaries": [
-          "funnel"
+          "completion",
+          "equation"
         ]
       },
       "ports": [
@@ -5351,79 +5257,58 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "aggregate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Public Index and KPI export files",
+          "icon": "export"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Public export contents"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "Downloaded file size"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Step outcome"
           },
           {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel"
         ]
       },
       "ports": [
@@ -5494,40 +5379,145 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "consolidate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Records sampled for a person to label",
+          "icon": "review"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "season",
+            "label": "Quarter",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
           },
           {
             "key": "quote_check",
@@ -5563,10 +5553,17 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
-          "checks"
+          "presence"
         ]
       },
       "ports": [
@@ -5637,79 +5634,58 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "consolidate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
+          "noun": "quality report",
           "unit_label": "check",
-          "plain_line": "Settings checked before running",
+          "plain_line": "Validation and review counts summarized",
           "icon": "check"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Public export contents"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "Downloaded file size"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Step outcome"
           },
           {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "completion"
         ]
       },
       "ports": [
@@ -5780,79 +5756,58 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "aggregate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "file",
+          "unit_label": "file",
+          "plain_line": "Saved summary report",
+          "icon": "export"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "format",
+            "label": "Contents",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Public export contents"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "Downloaded file size"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "completed_at",
+            "label": "Completed",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Action completion time"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
+            "key": "status",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Step outcome"
           },
           {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
+            "key": "checks",
+            "label": "Completed checks",
+            "unit": "checks",
             "format": "value",
-            "description": "Number check passed"
-          },
-          {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Successful action completions"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel"
         ]
       },
       "ports": [
@@ -6868,40 +6823,145 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "consolidate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "Records prepared for retrieval",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "season",
+            "label": "Quarter",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
           },
           {
             "key": "quote_check",
@@ -6937,10 +6997,17 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
-          "checks"
+          "funnel"
         ]
       },
       "ports": [
@@ -6982,71 +7049,58 @@
           "icon": "config"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "downloaded_at",
+            "label": "Saved",
             "unit": "",
-            "format": "value",
-            "description": "Setting value type"
+            "format": "date",
+            "description": "Download date"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Downloaded file size"
           },
           {
-            "key": "number_check",
-            "label": "Number",
+            "key": "outcome",
+            "label": "Status",
             "unit": "",
             "format": "value",
-            "description": "Number check passed"
+            "description": "Processing outcome"
           },
           {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
             "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "Parsed text length"
           }
         ],
         "summaries": [
-          "checks"
+          "sizes",
+          "skipped"
         ]
       },
       "ports": [
@@ -7080,79 +7134,66 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "demo-ingest",
         "takes": {
-          "noun": "settings",
+          "noun": "files",
           "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
-            "unit": "",
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Parsed text length"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
+            "key": "chars_sent",
+            "label": "Text sent",
+            "unit": "characters",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Text sent for extraction"
           },
           {
-            "key": "number_check",
-            "label": "Number",
+            "key": "truncated",
+            "label": "Truncated",
             "unit": "",
             "format": "value",
-            "description": "Number check passed"
+            "description": "Text shortened"
           },
           {
-            "key": "scale_check",
-            "label": "Scale",
+            "key": "text",
+            "label": "Text preview",
             "unit": "",
             "format": "value",
-            "description": "Scale check passed"
-          },
-          {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
-          },
-          {
-            "key": "period_check",
-            "label": "Period",
-            "unit": "",
-            "format": "value",
-            "description": "Period check passed"
+            "description": "First three lines; Internal trace only"
           }
         ],
         "summaries": [
-          "checks"
+          "lengths",
+          "truncated"
         ]
       },
       "ports": [
@@ -7186,40 +7227,145 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "demo-parse",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "season",
+            "label": "Quarter",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
           },
           {
             "key": "quote_check",
@@ -7255,10 +7401,17 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
-          "checks"
+          "presence"
         ]
       },
       "ports": [
@@ -7292,40 +7445,145 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "demo-extract",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "release_token",
+            "label": "Release",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Session-only release pseudonym"
           },
           {
-            "key": "setting_value",
-            "label": "Value",
+            "key": "report_date",
+            "label": "Filed",
             "unit": "",
-            "format": "value",
-            "description": "Configured non-identifying value"
+            "format": "date",
+            "description": "Filing date"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "season",
+            "label": "Quarter",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
           },
           {
             "key": "quote_check",
@@ -7361,6 +7619,13 @@
             "unit": "",
             "format": "value",
             "description": "Period check passed"
+          },
+          {
+            "key": "currency",
+            "label": "Currency",
+            "unit": "",
+            "format": "value",
+            "description": "Currency stated in the release"
           }
         ],
         "summaries": [
@@ -7398,79 +7663,93 @@
     },
     {
       "io": {
-        "source": null,
+        "source": "demo-validate",
         "takes": {
-          "noun": "settings",
-          "unit_label": "file",
-          "plain_line": "Settings used by this step",
-          "icon": "config"
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
         },
         "gives": {
-          "noun": "checked settings",
-          "unit_label": "check",
-          "plain_line": "Settings checked before running",
-          "icon": "check"
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
         },
         "example_fields": [
           {
-            "key": "setting",
-            "label": "Setting",
+            "key": "metric",
+            "label": "KPI",
             "unit": "",
             "format": "value",
-            "description": "Configuration setting"
+            "description": "Index measure"
           },
           {
-            "key": "setting_value",
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
             "label": "Value",
             "unit": "",
             "format": "value",
-            "description": "Configured non-identifying value"
+            "description": "KPI value"
           },
           {
-            "key": "kind",
-            "label": "Type",
+            "key": "metric_unit",
+            "label": "Unit",
             "unit": "",
             "format": "value",
-            "description": "Setting value type"
+            "description": "KPI unit"
           },
           {
-            "key": "quote_check",
-            "label": "Quote",
-            "unit": "",
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
             "format": "value",
-            "description": "Evidence check passed"
+            "description": "Observed records"
           },
           {
-            "key": "number_check",
-            "label": "Number",
-            "unit": "",
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
             "format": "value",
-            "description": "Number check passed"
+            "description": "Expected records"
           },
           {
-            "key": "scale_check",
-            "label": "Scale",
-            "unit": "",
-            "format": "value",
-            "description": "Scale check passed"
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
           },
           {
-            "key": "row_check",
-            "label": "Row",
-            "unit": "",
-            "format": "value",
-            "description": "Row check passed"
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
           },
           {
-            "key": "period_check",
-            "label": "Period",
+            "key": "pass",
+            "label": "Gate",
             "unit": "",
             "format": "value",
-            "description": "Period check passed"
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
           }
         ],
         "summaries": [
-          "checks"
+          "heatmap"
         ]
       },
       "ports": [

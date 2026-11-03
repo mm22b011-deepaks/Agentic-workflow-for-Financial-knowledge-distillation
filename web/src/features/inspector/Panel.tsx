@@ -29,12 +29,14 @@ export function inspectionState(id: string) {
 }
 export function Panel({
   registry,
+  badge,
   stages,
   timestamp,
   active,
   onExecute,
 }: {
   registry: CanvasRegistry;
+  badge: string;
   stages: StageSnapshot;
   timestamp: string;
   active: boolean;
@@ -47,6 +49,7 @@ export function Panel({
   const session = useSession();
   const id = session.panel;
   const node = registry.nodes.find((n) => n.id === id);
+  const selectedStage = stages.nodes.find((stage) => stage.id === id);
   const remembered = useRef(id);
   const [input, setInput] = useState<PaneResponse | null>(null);
   const [output, setOutput] = useState<PaneResponse | null>(null);
@@ -90,12 +93,13 @@ export function Panel({
       };
   }, [id, draftParameters, tab, section, session.mode, runs, upstream]);
   useEffect(() => {
-    if (!id) return;
+    if (!id || !node) return;
     let alive = true;
     if (stages.source === "synthetic") {
       const output = (demoPanes as Record<string, PaneResponse>)[id];
-      const source =
-        upstream ||
+      const source = node.io.takes.noun === "settings"
+        ? id === "validate-config" ? undefined : "validate-config"
+        : upstream ||
         registry.nodes.find((n) => n.id === id)?.io.source ||
         registry.edges.find(
           (e) =>
@@ -105,7 +109,7 @@ export function Panel({
               "trigger",
         )?.source;
       const input = (demoPanes as Record<string, PaneResponse>)[
-        source ?? "validate-config"
+        id === "review" ? "review" : source ?? "validate-config"
       ];
       setInput({
         ...input,
@@ -170,6 +174,9 @@ export function Panel({
     upstream,
     queries,
     active,
+    selectedStage?.last_run,
+    selectedStage?.status,
+    selectedStage?.out_count,
     retry,
     stages.source,
     registry,
@@ -278,6 +285,7 @@ export function Panel({
           >
             <DataPane
               key={id + ":input"}
+              badge={badge}
               registry={registry}
               stages={stages}
               timestamp={timestamp}
@@ -523,6 +531,7 @@ export function Panel({
             </section>
             <DataPane
               key={id + ":output"}
+              badge={badge}
               registry={registry}
               stages={stages}
               timestamp={timestamp}

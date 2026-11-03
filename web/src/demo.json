@@ -139,28 +139,28 @@
     },
     {
       "id": "rebuild-index",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "model-bakeoff",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 2
     },
     {
       "id": "doctor",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 1
     },
     {
       "id": "freeze-panel",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 1
     },
     {
       "id": "validate-index",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "supersede-stale",
@@ -170,7 +170,7 @@
     {
       "id": "demo",
       "status": "idle",
-      "out_count": null
+      "out_count": 1
     },
     {
       "id": "serve",
@@ -179,23 +179,23 @@
     },
     {
       "id": "export",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 2
     },
     {
       "id": "prepare-labels",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 30
     },
     {
       "id": "quality-summary",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 1
     },
     {
       "id": "report",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 1
     },
     {
       "id": "schedule-plan",
@@ -239,28 +239,28 @@
     },
     {
       "id": "demo-ingest",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "demo-parse",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "demo-extract",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "demo-validate",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 500
     },
     {
       "id": "demo-aggregate",
-      "status": "idle",
-      "out_count": null
+      "status": "done",
+      "out_count": 16
     },
     {
       "id": "cli",

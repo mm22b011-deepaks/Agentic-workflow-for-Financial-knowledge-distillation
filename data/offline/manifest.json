@@ -20,7 +20,7 @@
     "aggregates/index_aggregates.parquet": "70c1676777f33c8b3a01bf07a5b43fb5d419cbdd69c9613a2616714a3bd24010",
     "exports/index.json": "5b3580f5cf85e6bc7dcac4af459606bba453221d54347027d835df3242215b2e",
     "exports/kpis.json": "3f6c93c31aea5ae0ffe90c535ca45f7ba406b858d4afa2c4ecbf41fd0a458393",
-    "snapshots/stages.json": "14b6ff792cf1dca6abf5adf4e58b28535b7ecb668b2a13e8b45f290da023dd11",
+    "snapshots/stages.json": "b36b3bb15b4519882473c60cb316f897f9ca2374b8b30d255d55c7a195b70e69",
     "snapshots/coverage.json": "bb9d571c0d5c1cbecafc8e00c39cc02e84d510ab3d3ff355e9d2d40e4c850d11",
     "snapshots/cost.json": "4929a78e5c24001c960027886f609d78f04e0fb6e847732562d929188540bc38",
     "snapshots/bakeoff.json": "a98d45c565103dbd4193b40d54e18507d962dcaaffbec579a837cdf1ec525782",

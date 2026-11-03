@@ -91,6 +91,16 @@ def test_real_public_data_is_viewable_offline_without_keys(tmp_path, monkeypatch
             assert response.json() == json.loads((BUNDLE / folder / f'{name}.json').read_text())
         assert client.get('/api/v1/index').json()['source'] == 'pipeline'
         assert client.get('/api/v1/nodes/aggregate/output').json()['total'] > 0
+        plan = client.get('/api/v1/nodes/estimate-scope/output').json()
+        assert plan['total'] == 160
+        assert plan['rows'][0]['releases'] == 160
+        assert plan['rows'][0]['companies'] == 40
+        stages = client.get('/api/v1/stages').json()
+        assert next(n for n in stages['nodes'] if n['id'] == 'estimate-scope')['out_count'] == 160
+        bakeoff = client.get('/api/v1/nodes/model-bakeoff/output').json()
+        assert bakeoff['total'] == 2
+        assert len(bakeoff['rows'][0]) >= 3
+        assert bakeoff['rows'][0]['parse_success_rate'] == 1.0
         session = client.get('/api/v1/session').json()
         assert session['internal_trace_available'] is False
         assert session['read_only'] is True

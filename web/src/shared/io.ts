@@ -37,10 +37,10 @@ export function pseudonym(token: string, kind: string) {
   pseudonyms.set(key, name);
   return name;
 }
-export function sourceBadge(mode: string, source?: string) {
+export function sourceBadge(mode: string, source?: string, readOnly = false) {
   return mode === "replay"
     ? "REPLAY"
     : source === "synthetic"
       ? "DEMO"
-      : "LIVE";
+      : readOnly ? "REPLAY" : "LIVE";
 }

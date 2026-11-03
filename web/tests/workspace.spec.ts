@@ -4,6 +4,9 @@ import registry from "../src/registry.json" with { type: "json" };
 import { readFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { GraphDocument } from "../src/GraphDocument";
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
 const names: Record<string, string> = {
   cli: "CLI",
   "run-all": "Run",
@@ -155,10 +158,10 @@ test("live releases remain Production before KPI publication", async ({
   await expect(page.locator(".pipeline-badge")).toBeVisible({
     timeout: 15000,
   });
-  expect(costRequests).toBe(1);
+  await expect.poll(() => costRequests).toBe(1);
   await expect(
     page.locator('[data-node="ingest"] .flow-label small'),
-  ).toHaveText("156 files");
+  ).toHaveText("156 files", { timeout: 15000 });
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await page.getByLabel("Load replay", { exact: true }).setInputFiles({
     name: "real-index.json",
@@ -168,13 +171,14 @@ test("live releases remain Production before KPI publication", async ({
         version: "v1",
         source: "pipeline",
         status: "available",
-        snapshots: [],
+        snapshots: [{season_year: 2025, season_quarter: 1}],
       }),
     ),
   });
   await expect(
     page.locator('[data-node="extract"] .flow-label small'),
   ).toHaveText("");
+  await expect(page.locator('[data-node="aggregate"] .flow-label small')).toHaveText("4 index rows");
 });
 
 test("every node opens within text budget", async ({ page }) => {

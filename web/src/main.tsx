@@ -167,7 +167,7 @@ function App() {
       >
         <header className="topbar">
           <div className="pipeline-badge">
-            <span title={timestamp}>{sourceBadge(session.mode, pipeline.stages.source)}</span>
+            <span title={timestamp}>{sourceBadge(session.mode, pipeline.stages.source, pipeline.readOnly)}</span>
             <time title={timestamp}>{new Date(timestamp).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>
           </div>
           <div className="toolbar" role="toolbar" aria-label={copy.runAll}>
@@ -324,6 +324,7 @@ function App() {
       )}
       <Panel
         registry={pipeline.registry}
+        badge={sourceBadge(session.mode, pipeline.stages.source, pipeline.readOnly)}
         stages={pipeline.stages}
         timestamp={timestamp}
         active={!!pipeline.active || pipeline.busy || pipeline.readOnly}

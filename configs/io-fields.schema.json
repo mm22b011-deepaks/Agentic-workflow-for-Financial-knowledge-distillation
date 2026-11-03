@@ -444,6 +444,54 @@
       "description": "Successful action completions",
       "unit": "checks",
       "format": "value"
+    },
+    "parse_success_rate": {
+      "title": "Parsed releases",
+      "description": "Share of releases parsed successfully",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "empty_completion_rate": {
+      "title": "Empty responses",
+      "description": "Share of responses without extracted values",
+      "unit": "%",
+      "format": "fraction"
+    },
+    "latency_p95_seconds": {
+      "title": "Slow response time",
+      "description": "95th percentile model response time",
+      "unit": "seconds",
+      "format": "value"
+    },
+    "nonempty_extractions": {
+      "title": "Records returned",
+      "description": "Nonempty model extraction results",
+      "unit": "records",
+      "format": "value"
+    },
+    "tokens": {
+      "title": "Tokens used",
+      "description": "Model tokens used for the comparison",
+      "unit": "tokens",
+      "format": "value"
+    },
+    "format": {
+      "title": "Contents",
+      "description": "Public export contents",
+      "unit": "",
+      "format": "value"
+    },
+    "company_quarters": {
+      "title": "Company-quarters",
+      "description": "Frozen member and quarter pairs",
+      "unit": "company-quarters",
+      "format": "value"
+    },
+    "currency": {
+      "title": "Currency",
+      "description": "Currency stated in the release",
+      "unit": "",
+      "format": "value"
     }
   }
 }

@@ -7,6 +7,7 @@ const titles: Record<string, string> = {
   membership: "Still in / left",
   mapping: "Identifier mapping",
   equation: "Release plan",
+  selection: "Frozen selection",
   quarters: "By quarter",
   found: "Found / missing",
   sizes: "File sizes",
@@ -16,6 +17,7 @@ const titles: Record<string, string> = {
   presence: "Present / not stated / flagged",
   checks: "Pass / fail",
   completion: "Action result",
+  "model-scores": "Model quality",
   reasons: "Review reasons",
   duplicates: "Duplicates removed",
   heatmap: "KPI × quarter",
@@ -130,6 +132,7 @@ export function IOSummary({
   }
   const percent = (v: Row[string]) =>
     v == null ? "Not saved" : `${Math.round(Number(v) * 100)}%`;
+  const failed = rows.some((row) => row.status === "failed");
   const metricValue = (r: Row) =>
     r.metric_value == null
       ? "Not stated"
@@ -142,18 +145,30 @@ export function IOSummary({
           <strong>{titles[kind] ?? "Step summary"}</strong>
           {kind === "completion" ? (
             <div className="io-empty">
-              <Icon name={rows.length ? "check" : "clock"} />
-              {rows.length ? "Completed" : "Not run yet"}
+              <Icon name={failed ? "cross" : rows.length ? "check" : "clock"} />
+              {failed ? "Failed" : rows.length ? "Completed" : "Not run yet"}
             </div>
-          ) : kind === "equation" ? (
+          ) : kind === "model-scores" ? (
+            <>
+              {rows.map((row, index) => (
+                <div className="io-equation" key={index}>
+                  <span>{row.model ?? "Model"}</span>
+                  <progress aria-label={"Parsed releases"} max={1} value={Number(row.parse_success_rate ?? 0)} />
+                  <span>{`${percent(row.parse_success_rate)} parsed`}</span>
+                  <span>{`${row.latency_p95_seconds ?? "Unknown"} seconds · slow response`}</span>
+                </div>
+              ))}
+              {!rows.length && <p className="io-empty">{"Scores not saved"}</p>}
+            </>
+          ) : kind === "equation" || kind === "selection" ? (
             <div className="io-equation">
-              {[
+              {(kind === "selection" ? ["companies", "seasons", "company_quarters"] : [
                 "companies",
                 "seasons",
                 "releases",
                 "base_requests",
                 "model_days",
-              ]
+              ])
                 .filter((k) => rows[0]?.[k] != null)
                 .map((key, i) => (
                   <span key={key}>
@@ -162,7 +177,7 @@ export function IOSummary({
                         {i === 1 ? "×" : i === 2 ? "=" : "→"}
                       </b>
                     ) : null}
-                    {`${rows[0][key]} ${key === "companies" ? "members" : key === "seasons" ? "quarters" : key === "releases" ? "releases" : key === "base_requests" ? "requests" : "days"}`}
+                    {`${rows[0][key]} ${key === "companies" ? "members" : key === "seasons" ? "quarters" : key === "company_quarters" ? "company-quarters" : key === "releases" ? "releases" : key === "base_requests" ? "requests" : "days"}`}
                   </span>
                 ))}
               {!rows.length && <p className="io-empty">{"Plan not saved"}</p>}
@@ -197,10 +212,10 @@ export function IOSummary({
             </>
           ) : kind === "duplicates" ? (
             <div className="io-equation">
-              <span>{`${before ?? total} records before`}</span>
+              {before != null && before >= total && <span>{`${before} records before`}</span>}
               <span>{`${total} records after`}</span>
               <span>
-                {before == null
+                {before == null || before < total
                   ? "Before count not saved"
                   : `${Math.max(0, before - total)} duplicates removed`}
               </span>

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -13,6 +13,9 @@ const demo: StageSnapshot = JSON.parse(
   readFileSync(new URL("../src/demo.json", import.meta.url), "utf8"),
 );
 import type { StageSnapshot } from "../src/StageSnapshot";
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
 
 const lastPanel = new WeakMap<Page, string>();
 const lastGroup = new WeakMap<Page, string>();
@@ -47,7 +50,8 @@ async function open(page: Page, measured = false) {
     await page.route("**/api/v1/runs", (route) => route.fulfill({ json: [] }));
   }
   await page.goto("/");
-  if(!measured) await page.addStyleTag({content:".workstation {display:none !important}"});
+  await expect(page.locator(".react-flow__node").first()).toBeAttached();
+  if(!measured) await page.addStyleTag({content:".workstation {visibility:hidden !important}"});
   if(measured) await expect(page.locator(".react-flow__node").first()).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0, { timeout: 20000 });
 }
@@ -98,19 +102,28 @@ async function panel(page: Page, id: string) {
   await expect(page.locator(".io-shimmer")).toHaveCount(0, { timeout: 20000 });
 }
 
-test("newcomer panes, counts, privacy, axe and screenshots for every node", async ({
-  page,
-}) => {
+test.describe("newcomer panels", () => {
+  let galleryPage: Page;
+  let galleryContext: BrowserContext;
+  test.beforeAll(async ({ browser }, info) => {
+    if (info.project.name !== "1440-dark") return;
+    galleryContext = await browser.newContext();
+    galleryPage = await galleryContext.newPage();
+    await open(galleryPage);
+  });
+  test.afterAll(async () => {
+    await galleryContext?.close();
+  });
+for (const node of registry.nodes) test(`newcomer pane: ${node.id}`, async () => {
+  const page = galleryPage;
   test.skip(
     test.info().project.name !== "1440-dark",
     "This test captures all four viewport/theme combinations itself",
   );
-  test.setTimeout(720000);
-  await open(page);
+  test.setTimeout(180000);
   const root = resolve("../data/screenshots/panels");
   await mkdir(root, { recursive: true });
-  const sentences: string[] = [];
-  for (const node of registry.nodes) {
+
     await panel(page, node.id);
     const input = page.getByRole("region", { name: "INPUT", exact: true });
     const output = page.getByRole("region", { name: "OUTPUT", exact: true });
@@ -147,7 +160,7 @@ test("newcomer panes, counts, privacy, axe and screenshots for every node", asyn
     }
     const sentence = `${label(node.label_key)} takes ${await input.getByTestId("io-count").innerText()} from ${await input.locator(".io-source").innerText()}: ${await input.locator(".io-plain").innerText()}.`;
     console.log(sentence);
-    sentences.push(sentence);
+
     for (const width of [1440, 1280])
       for (const theme of ["dark", "light"]) {
         await page.setViewportSize({ width, height: 900 });
@@ -160,7 +173,7 @@ test("newcomer panes, counts, privacy, axe and screenshots for every node", asyn
               .map((animation) => animation.finished.catch(() => {})),
           );
         }, theme);
-        if (width === 1280 && ["build-constituents","estimate-scope","extract","nowcast"].includes(node.id))
+        if (width === 1280)
           expect(
             (await new AxeBuilder({ page }).include(".node-panel").analyze())
               .violations,
@@ -171,11 +184,12 @@ test("newcomer panes, counts, privacy, axe and screenshots for every node", asyn
           animations: "disabled",
         });
       }
-  }
   await writeFile(
-    resolve(root, `newcomer-${test.info().project.name}.txt`),
-    sentences.join("\n"),
+    resolve(root, `newcomer-${node.id}.txt`),
+    sentence,
   );
+});
+
 });
 
 test("measured fixture counts use the same quantity as canvas and edge labels", async ({
@@ -191,7 +205,7 @@ test("measured fixture counts use the same quantity as canvas and edge labels", 
     await request.get("/api/v1/stages")
   ).json();
   await open(page, true);
-  await page.setViewportSize({width:1440,height:6000});
+  await page.setViewportSize({width:1440,height:1600});
   await expect(page.locator(".pipeline-badge")).toContainText("LIVE");
   for (const node of registry.nodes) {
     const count = quantity(
