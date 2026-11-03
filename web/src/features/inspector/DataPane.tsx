@@ -1,700 +1,440 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  copy,
-  fieldLabel,
-  glyphs,
-  label,
-  tooltip,
-  typeLabel,
-} from "../../copy";
-import { Button } from "../../shared/Button";
-import { Icon } from "../../shared/Icon";
-import { useSession } from "../../shared/state";
-import { api } from "../../shared/api";
-import { validEvidenceResponse, validLabelResponse } from "../../validators.js";
+import { useEffect, useState } from "react";
+import type { CanvasRegistry } from "../../CanvasRegistry";
 import type { PaneResponse } from "../../PaneResponse";
-import type { EvidenceResponse } from "../../EvidenceResponse";
-import type { LabelResponse } from "../../LabelResponse";
-type Row = PaneResponse["rows"][number];
-type Format = "table" | "json" | "schema" | "diff" | "evidence";
-const paneMemory: Record<
-  string,
-  { format: Format; column: number; record: number; fact: number }
-> = {};
-const formats: Format[] = ["table", "json", "schema", "diff", "evidence"];
-export function DataPane({
-  nodeId,
-  side,
-  data: incomingData,
-  other: incomingOther,
-  loading,
-  onRun,
-  onUpstream,
-  onQuery,
-  upstreamValue = "",
-}: {
+import type { StageSnapshot } from "../../StageSnapshot";
+import { useSession } from "../../shared/state";
+import { quantity, pseudonym, sourceBadge } from "../../shared/io";
+import { Icon } from "../../shared/Icon";
+import { Button } from "../../shared/Button";
+import { label } from "../../copy";
+import { IOSummary } from "./IOSummary";
+import { TraceEvidence } from "./TraceEvidence";
+
+type Props = {
   nodeId: string;
   side: "input" | "output";
   data: PaneResponse | null;
   other: PaneResponse | null;
   loading: boolean;
   onRun: (run: string) => void;
-  onUpstream: (node: string) => void;
-  onQuery: (query: Record<string, string>) => void;
+  onUpstream: (id: string) => void;
+  onQuery: (q: Record<string, string>) => void;
   upstreamValue?: string;
-}) {
+  registry: CanvasRegistry;
+  stages: StageSnapshot;
+  timestamp: string;
+  retry: () => void;
+};
+const views = [
+  ["summary", "chart", "Summary"],
+  ["example", "evidence", "Example"],
+  ["table", "table", "Table"],
+  ["json", "json", "JSON"],
+  ["fields", "schema", "Fields"],
+] as const;
+export function DataPane(props: Props) {
+  const { nodeId, side, registry, stages, loading, timestamp } = props;
   const session = useSession();
-  const data =
-    incomingData?.view === "trace" && !session.trace ? null : incomingData;
-  const other =
-    incomingOther?.view === "trace" && !session.trace ? null : incomingOther;
-  const memoryKey = nodeId + ":" + side;
-  const saved = paneMemory[memoryKey];
-  const [format, setFormat] = useState<Format>(saved?.format ?? "table");
-  const [column, setColumn] = useState(saved?.column ?? 0);
-  const [descending, setDescending] = useState(false);
-  const [record, setRecord] = useState(saved?.record ?? 0);
-  const [evidence, setEvidence] = useState<EvidenceResponse | null>(null);
-  const [fact, setFact] = useState(saved?.fact ?? 0);
-  const [stats, setStats] = useState<LabelResponse | null>(null);
-  const [query, setQuery] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState(false);
-  const scroll = useRef<HTMLDivElement>(null);
-  const columns = data?.columns ?? [];
-  const rows = useMemo(
-    () =>
-      [...(data?.rows ?? [])].sort((a, b) => {
-        const key = columns[column];
-        const value =
-          typeof a[key] === "number" && typeof b[key] === "number"
-            ? Number(a[key]) - Number(b[key])
-            : String(a[key] ?? "").localeCompare(String(b[key] ?? ""));
-        return descending ? -value : value;
-      }),
-    [data, column, descending],
-  );
-  const virtual = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scroll.current,
-    estimateSize: () => 48,
-    overscan: 0,
-  });
-  const selected = rows[record];
-  const id = String(selected?.document_id ?? "");
+  const [view, setView] = useState("summary");
+  const [at, setAt] = useState(0);
+  const [target, setTarget] = useState("");
   useEffect(() => {
-    paneMemory[memoryKey] = { format, column, record, fact };
-  }, [memoryKey, format, column, record, fact]);
-  useEffect(() => {
-    if (
-      format !== "evidence" ||
-      !session.trace ||
-      session.mode === "replay" ||
-      !id
-    ) {
-      setEvidence(null);
-      return;
-    }
-    let alive = true;
-    setEvidence(null);
-    void api(
-      "records/" +
-        encodeURIComponent(id) +
-        "/evidence" +
-        (data?.run ? "?run=" + encodeURIComponent(data.run) : ""),
-      validEvidenceResponse,
-    )
-      .then((value) => {
-        if (alive) {
-          setEvidence(value);
-          setFact(0);
-        }
-      })
-      .catch(() => {
-        if (alive) setEvidence(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [format, id, data?.run, session.trace, session.mode]);
-  async function verdict(value: "correct" | "wrong" | "unsure") {
-    if (!evidence || session.mode === "replay" || !session.trace) return;
-    const current =
-      fact < 0 ? { field: "record", value: null } : evidence.fields[fact];
-    if (!current) return;
-    try {
-      const result = await api("labels", validLabelResponse, {
-        record_id: evidence.record_id,
-        field: current.field,
-        value: current.value,
-        verdict: value,
-      });
-      setStats(result);
-      setEvidence({
-        ...evidence,
-        verdicts: { ...evidence.verdicts, [current.field]: value },
-      });
-    } catch {
-      session.set({ error: copy.unavailable });
-    }
-  }
-  useEffect(() => {
-    function key(event: KeyboardEvent) {
-      if ((event.target as HTMLElement).closest("input,textarea,select"))
-        return;
-      if (side !== "output" || session.help !== null) return;
-      if (event.key.toLowerCase() === "e") setFormat("evidence");
-      if (event.key.toLowerCase() === "j")
-        setRecord((old) => Math.min(rows.length - 1, old + 1));
-      if (event.key.toLowerCase() === "k")
-        setRecord((old) => Math.max(0, old - 1));
-      if (["1", "2", "3"].includes(event.key))
-        void verdict(
-          (["correct", "wrong", "unsure"] as const)[Number(event.key) - 1],
-        );
+    function key(e: KeyboardEvent) {
+      if (
+        side === "output" &&
+        session.trace &&
+        session.help === null &&
+        e.key.toLowerCase() === "e" &&
+        !(e.target as HTMLElement).closest("input,select,textarea")
+      )
+        setView("evidence");
     }
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [
-    evidence,
-    fact,
-    rows.length,
-    side,
-    session.mode,
-    session.trace,
-    session.help,
-  ]);
-  function updateQuery(name: string, value: string) {
-    const next = { ...query, offset: "0", [name]: value };
-    setQuery(next);
-    onQuery(next);
-  }
-  function copyPath(path: string) {
-    void navigator.clipboard?.writeText(path);
-  }
-  const visibleColumns = [
-    columns[0],
-    columns[Math.min(column || 1, columns.length - 1)],
-  ].filter((v, i, a) => v && a.indexOf(v) === i);
-  const current =
-    fact < 0 && evidence
-      ? {
-          field: "record",
-          value: null,
-          unit: null,
-          confidence: null,
-          quote: null,
-          issues: [],
-          row_start: null,
-          row_end: null,
-          start: null,
-          end: null,
-          number_present: null,
-        }
-      : evidence?.fields[fact];
-  const excerpt = useMemo(() => {
-    if (!evidence || !current) return null;
-    const start = current.row_start ?? current.start ?? 0;
-    const end =
-      current.row_end ??
-      current.end ??
-      Math.min(evidence.source.length, start + 200);
-    const source = evidence.source.slice(start, end);
-    const words = source.split(/\s+/).slice(0, 12).join(" ");
-    const quote = current.quote ?? "";
-    const at = words.toLowerCase().indexOf(quote.toLowerCase());
-    return (
-      <div
-        className={`source-row ${current.number_present === false ? "wrong-row" : ""}`}
-        data-testid="evidence-row"
-        data-number-present={String(current.number_present)}
-      >
-        {at >= 0 && quote ? (
-          <>
-            {words.slice(0, at)}
-            <mark>{words.slice(at, at + quote.length)}</mark>
-            {words.slice(at + quote.length)}
-          </>
-        ) : (
-          <mark>{words}</mark>
-        )}
-      </div>
-    );
-  }, [evidence, current]);
-  return (
-    <section
-      className={`data-pane ${loading ? "loading" : ""}`}
-      aria-label={side === "input" ? copy.input : copy.output}
-    >
-      <div className="pane-header">
-        <span>{side === "input" ? copy.input : copy.output}</span>
-        <span className="count">
-          {data?.status === "unavailable"
-            ? copy.unknown
-            : (data?.total ?? copy.unknown)}
-        </span>
-        <span className="status-dot" data-status={data?.status} />
-      </div>
-      <div className="pane-selects">
-        {side === "input" && !!data?.upstream?.length && (
-          <select
-            aria-label={copy.upstream}
-            value={upstreamValue || data.upstream[0]}
-            onChange={(e) => onUpstream(e.target.value)}
-          >
-            {data.upstream.map((n) => (
-              <option key={n} value={n}>
-                {label(n)}
-              </option>
-            ))}
-          </select>
-        )}
-        <select
-          aria-label={copy.runs}
-          value={data?.run ?? ""}
-          onChange={(e) => onRun(e.target.value)}
-        >
-          <option value="">{copy.live}</option>
-          {data?.runs?.map((run, i) => (
-            <option key={run} value={run}>
-              {i + 1}
-            </option>
-          ))}
-        </select>
-        {data?.duration != null && (
-          <small>
-            {data.duration.toFixed(1)}
-            {copy.seconds}
-          </small>
-        )}
-      </div>
-      <div className="format-toggle">
-        <div className="format-tabs" role="tablist" aria-label={copy.select}>
-          {formats.map((f) => (
-            <Button
-              key={f}
-              icon={f}
-              title={copy[f]}
-              role="tab"
-              aria-selected={format === f}
-              onClick={() => setFormat(f)}
-              className={format === f ? "active" : ""}
-            />
-          ))}
-        </div>
-        {session.trace && (
+  }, [side, session.trace, session.help]);
+  const node = registry.nodes.find((n) => n.id === nodeId)!;
+  const peers = registry.edges
+    .filter(
+      (e) =>
+        !e.sub &&
+        (side !== "input" ||
+          registry.nodes.find((n) => n.id === e.source)?.variant !==
+            "trigger") &&
+        (side === "input" ? e.target === nodeId : e.source === nodeId),
+    )
+    .map((e) => (side === "input" ? e.source : e.target));
+  const sources =
+    side === "input"
+      ? [...new Set([...(props.data?.upstream ?? []), ...peers])].filter(
+          (id) =>
+            registry.nodes.find((n) => n.id === id)?.variant !== "trigger",
+        )
+      : peers;
+  const selected =
+    (side === "input" ? props.upstreamValue : target) || sources[0];
+  const peer = registry.nodes.find((n) => n.id === selected);
+  const origin = side === "input" ? (peer ?? node) : node;
+  const contract = node.io[side === "input" ? "takes" : "gives"];
+  const synthetic = stages.source === "synthetic";
+  const data =
+    (!session.trace && props.data?.view === "trace") || props.data?.node !== nodeId ? null : props.data;
+  const stage = stages.nodes.find((n) => n.id === origin.id);
+  const count = quantity(origin, stage, data);
+  const unit =
+    side === "input" ? contract.unit_label : node.io.gives.unit_label;
+  const total = count?.total ?? data?.total ?? 0;
+  const countText =
+    nodeId === "run-all" && side === "output"
+      ? "Runs every step"
+      : side === "output" && count
+        ? count.text
+        : `${total.toLocaleString()} ${unit}${total === 1 ? "" : "s"}`;
+  const fields = [...origin.io.example_fields];
+  const allowed = fields.filter((f) => f.key !== "text" || session.trace);
+  if (session.trace)
+    for (const key of ["document_id", "cik", "ticker", "company", "sector"])
+      if (props.data?.columns.includes(key))
+        allowed.push({
+          key,
+          label: key === "cik" ? "CIK" : key.replaceAll("_", " "),
+          unit: "",
+          format: "value",
+          description: "Internal trace identifier",
+        });
+  const rows = (data?.rows ?? []).map((row) =>
+    Object.fromEntries(
+      allowed.filter((f) => f.key in row).map((f) => [f.key, row[f.key]]),
+    ),
+  );
+  const row = rows[Math.min(at, Math.max(0, rows.length - 1))];
+  const available = !!row && Object.keys(row).length >= 3;
+  const badge = sourceBadge(session.mode, stages.source);
+  const value = (key: string, v: unknown, item = row) => {
+    if (key === "metric_value" && v != null)
+      return `${item.metric_unit === "fraction" ? (Number(v) * 100).toFixed(1) : v}${item.metric_unit === "score" ? " score" : "%"}`;
+    if (key === "pass" && v != null) return v ? "Pass" : "Fail";
+    if ((key === "bytes" || key === "size_bytes") && v != null)
+      return `${Math.round(Number(v) / 1000)} KB`;
+    if (key === "review_field")
+      return (
+        registry.nodes
+          .flatMap((n) => n.io.example_fields)
+          .find((f) => f.key === v)?.label ?? "Record"
+      );
+    if (v == null)
+      return key === "left" || key === "end_date" || key === "effective_to"
+        ? "Still in"
+        : "Not stated";
+    if (key === "setting")
+      return String(v).split(".").at(-1)?.replaceAll("_", " ");
+    if (key.endsWith("_token"))
+      return pseudonym(
+        String(v),
+        key === "member_token" ? "Member" : "Release",
+      );
+    const field = fields.find((f) => f.key === key);
+    if (field?.format === "date")
+      return new Date(String(v)).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (field?.unit === "%")
+      return `${field.format === "fraction" ? Math.round(Number(v) * 100) : Number(v)}%`;
+    return `${String(v)}${field?.unit ? " " + field.unit : ""}`;
+  };
+  const example = available ? (
+    <article className="io-example" data-testid="example-card">
+      <header>
+        <strong>{"Example"}</strong>
+        <div>
           <Button
-            icon="config"
-            title={copy.source}
-            onClick={() => setFilter(!filter)}
+            icon="previous"
+            title={"Previous example"}
+            disabled={at === 0}
+            onClick={() => setAt(at - 1)}
           />
-        )}
-      </div>
-      {filter && session.trace && (
-        <div className="filters">
-          <input
-            aria-label={copy.search}
-            placeholder={copy.search}
-            value={query.search ?? ""}
-            onChange={(e) => updateQuery("search", e.target.value)}
+          <Button
+            icon="next"
+            title={"Next example"}
+            disabled={at + 1 >= rows.length}
+            onClick={() => setAt(at + 1)}
           />
-          <select
-            aria-label={copy.reason}
-            value={query.flagged ?? ""}
-            onChange={(e) => updateQuery("flagged", e.target.value)}
-          >
-            <option value="">{copy.unknown}</option>
-            <option value="true">{copy.flagged}</option>
-            <option value="false">{copy.ok}</option>
-          </select>
-          {["reason", "field", "season", "sample", "seed"].map((key) => (
-            <input
-              key={key}
-              type={key === "sample" || key === "seed" ? "number" : "text"}
-              aria-label={label(key)}
-              placeholder={label(key)}
-              value={query[key] ?? ""}
-              onChange={(e) => updateQuery(key, e.target.value)}
-            />
-          ))}
         </div>
-      )}
-      {format === "table" && (
-        <>
-          <div className="column-select">
-            <select
-              aria-label={copy.field}
-              value={columns[column] ?? ""}
-              onChange={(e) => {
-                setColumn(columns.indexOf(e.target.value));
-                setDescending(!descending);
-              }}
-            >
-              {columns.map((col) => (
-                <option key={col} value={col}>
-                  {fieldLabel(col)}
-                </option>
-              ))}
-            </select>
-            <button
-              aria-label={copy.select}
-              onClick={() => setDescending(!descending)}
-            >
-              {glyphs.sort}
-            </button>
-          </div>
-          <div className="table-scroll" ref={scroll}>
-            <table>
-              <thead>
-                <tr>
-                  {visibleColumns.map((col) => (
-                    <th
-                      key={col}
-                      scope="col"
-                      onClick={() => setDescending(!descending)}
-                    >
-                      {fieldLabel(col)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody
-                style={{ height: virtual.getTotalSize(), position: "relative" }}
-              >
-                {virtual
-                  .getVirtualItems()
-                  .slice(0, 1)
-                  .map((item) => (
-                    <tr
-                      key={item.key}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        transform: `translateY(${item.start}px)`,
-                        height: 48,
-                        width: "100%",
-                      }}
-                      onClick={() => {
-                        setRecord(item.index);
-                        if (session.trace && side === "output")
-                          setFormat("evidence");
-                      }}
-                    >
-                      {visibleColumns.map((col, i) => (
-                        <td
-                          key={col}
-                          className={i === 0 ? "pinned" : ""}
-                          title={tooltip(
-                            rows[item.index]?.[col] ?? copy.unknown,
-                          )}
-                        >
-                          {cell(rows[item.index]?.[col])}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-          {(data?.total ?? 0) > 50 && (
-            <Pager
-              current={Math.floor((data?.offset ?? 0) / 50)}
-              total={Math.ceil((data?.total ?? 0) / 50)}
-              onChange={(page) => updateQuery("offset", String(page * 50))}
-            />
-          )}
-        </>
-      )}
-      {format === "json" && <JsonTree row={selected} onCopy={copyPath} />}
-      {format === "schema" && (
-        <div className="schema-view">
-          {columns.slice(column, column + 1).map((key) => {
-            const profile = data?.profiles?.find(
-              (field) => field.field === key,
-            );
-            return (
-              <div key={key}>
-                <code>{fieldLabel(key)}</code>
-                <small>{typeLabel(profile?.inferred_type ?? "null")}</small>
-                <progress
-                  value={profile?.null_rate ?? undefined}
-                  max={1}
-                  aria-label={copy.nulls}
-                />
-                <code>{cell(profile?.example)}</code>
-              </div>
-            );
-          })}
-          <Pager current={column} total={columns.length} onChange={setColumn} />
-        </div>
-      )}
-      {format === "diff" && (
-        <div className="diff-view">
-          {[...new Set([...columns, ...(other?.columns ?? [])])]
-            .slice(column, column + 1)
-            .map((key) => {
-              const before = other?.profiles?.find(
-                (field) => field.field === key,
-              );
-              const after = data?.profiles?.find(
-                (field) => field.field === key,
-              );
+      </header>
+      {row && "reported_eps" in row && (
+        <dl className="io-facts">
+          {["reported_eps", "revenue", "guidance_presence", "tone"].map(
+            (key) => {
+              const prefix =
+                key === "reported_eps"
+                  ? "eps"
+                  : key === "guidance_presence"
+                    ? "guidance"
+                    : key;
               return (
-                <div
-                  key={key}
-                  className={
-                    JSON.stringify(before) !== JSON.stringify(after)
-                      ? "changed"
-                      : ""
-                  }
-                >
-                  <code>{fieldLabel(key)}</code>
-                  <del>
-                    {before ? typeLabel(before.inferred_type) : copy.unknown}
-                  </del>
-                  <ins>
-                    {after ? typeLabel(after.inferred_type) : copy.unknown}
-                  </ins>
+                <div key={key}>
+                  <dt>{fields.find((f) => f.key === key)?.label}</dt>
+                  <dd>
+                    <Icon
+                      name={
+                        row[key] == null
+                          ? "question"
+                          : row.flagged
+                            ? "cross"
+                            : "check"
+                      }
+                      size={13}
+                    />
+                    {value(key, row[key])}
+                    <progress
+                      aria-label={prefix + " confidence"}
+                      max={1}
+                      value={Number(row[prefix + "_confidence"] ?? 0)}
+                    />
+                    <small>
+                      {row[prefix + "_confidence"] == null
+                        ? "Confidence not saved"
+                        : Math.round(
+                            Number(row[prefix + "_confidence"]) * 100,
+                          ) + "% confidence"}
+                    </small>
+                  </dd>
                 </div>
               );
-            })}
-          <Pager
-            current={column}
-            total={Math.max(columns.length, other?.columns.length ?? 0)}
-            onChange={setColumn}
-          />
-        </div>
-      )}
-      {format === "evidence" && (
-        <div className="evidence-view">
-          {!session.trace || !current ? (
-            <span className="hollow">
-              <Icon name="privacy" size={36} />
-              {copy.unknown}
-            </span>
-          ) : (
-            <>
-              <div className="evidence-field">
-                <select
-                  aria-label={copy.field}
-                  value={fact}
-                  onChange={(e) => setFact(Number(e.target.value))}
-                >
-                  <option value={-1}>{copy.record}</option>
-                  {evidence?.fields.map((f, i) => (
-                    <option key={f.field} value={i}>
-                      {fieldLabel(f.field)}
-                    </option>
-                  ))}
-                </select>
-                <strong
-                  className={current.number_present === false ? "invalid" : ""}
-                >
-                  {cell(current.value)}
-                </strong>
-                <small>{current.unit ?? copy.unknown}</small>
-                <progress
-                  value={
-                    current.value === null
-                      ? undefined
-                      : (current.confidence ?? undefined)
-                  }
-                  max={1}
-                  aria-label={copy.value}
-                />
-                <span className="issue-chips">
-                  {current.issues.slice(0, 1).map((issue) => (
-                    <span
-                      key={issue}
-                      role="img"
-                      aria-label={label(issue)}
-                      title={tooltip(label(issue))}
-                    >
-                      {glyphs.cross}
-                    </span>
-                  ))}
-                </span>
-              </div>
-              {excerpt}
-              <div className="verdicts">
-                {(["correct", "wrong", "unsure"] as const).map((v, i) => (
-                  <Button
-                    key={v}
-                    icon={["check", "cross", "question"][i]}
-                    title={copy[v]}
-                    aria-pressed={evidence?.verdicts?.[current.field] === v}
-                    disabled={session.mode === "replay"}
-                    onClick={() => void verdict(v)}
-                  />
-                ))}
-                <svg
-                  className="progress-ring"
-                  viewBox="0 0 36 36"
-                  aria-label={copy.saved}
-                >
-                  <circle cx="18" cy="18" r="15" pathLength="100" />
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    pathLength="100"
-                    strokeDasharray={`${stats?.total ? (stats.checked / stats.total) * 100 : 0} 100`}
-                  />
-                </svg>
-                <small>
-                  {stats?.checked ?? 0}/
-                  {stats?.total ?? data?.total ?? copy.unknown}
-                </small>
-              </div>
-              {stats?.fields?.[current.field] && (
-                <progress
-                  value={stats.fields[current.field].correct}
-                  max={
-                    stats.fields[current.field].correct +
-                    stats.fields[current.field].wrong
-                  }
-                  aria-label={copy.correct}
-                />
-              )}
-              <Pager
-                current={record}
-                total={rows.length}
-                onChange={setRecord}
-              />
-            </>
+            },
           )}
+        </dl>
+      )}
+      <dl>
+        {Object.entries(row)
+          .filter(
+            ([key]) =>
+              !("reported_eps" in row) ||
+              ![
+                "reported_eps",
+                "revenue",
+                "guidance_presence",
+                "tone",
+                "eps_confidence",
+                "revenue_confidence",
+                "guidance_confidence",
+                "tone_confidence",
+                "eps_status",
+                "revenue_status",
+                "guidance_status",
+                "tone_status",
+              ].includes(key),
+          )
+          .map(([key, v]) => (
+            <div key={key}>
+              <dt title={fields.find((f) => f.key === key)?.description}>
+                {fields.find((f) => f.key === key)?.label}
+              </dt>
+              <dd>
+                {value(key, v)}
+                {key.includes("confidence") && (
+                  <progress
+                    aria-label={"Confidence"}
+                    max={1}
+                    value={Number(v)}
+                  />
+                )}
+              </dd>
+            </div>
+          ))}
+      </dl>
+    </article>
+  ) : (
+    <div className="io-empty">
+      <Icon name="privacy" />
+      {data?.status === "private"
+        ? "Details unavailable in this run"
+        : "No example saved for this step"}
+    </div>
+  );
+  return (
+    <section
+      className={`data-pane io-pane ${node.capability === "planned" ? "io-planned" : ""}`}
+      aria-label={side.toUpperCase()}
+    >
+      <div className="pane-header">
+        <span>{side.toUpperCase()}</span>
+        {!session.trace && (
+          <span className="lock-chip">
+            <Icon name="privacy" size={13} />
+            {"Names hidden"}
+          </span>
+        )}
+      </div>
+      <div className="io-source">
+        <Icon name={side === "input" ? (peer?.icon ?? "config") : node.icon} />
+        <span>
+          {side === "input"
+            ? peer
+              ? label(peer.label_key)
+              : "Settings file"
+            : label(node.label_key)}
+        </span>
+        <Icon name="arrow" size={14} />
+        <Icon name={side === "input" ? node.icon : (peer?.icon ?? "publish")} />
+        {side === "output" && (
+          <span>{peer ? label(peer.label_key) : "Saved output"}</span>
+        )}
+      </div>
+      {sources.length > 1 && (
+        <div className="io-chips">
+          {sources.map((id) => (
+            <button
+              key={id}
+              aria-pressed={selected === id}
+              onClick={() =>
+                side === "input" ? props.onUpstream(id) : setTarget(id)
+              }
+            >
+              {label(registry.nodes.find((n) => n.id === id)?.label_key ?? id)}
+            </button>
+          ))}
         </div>
       )}
+      <div className="io-headline" data-testid="io-count">
+        <Icon name={contract.icon} size={26} />
+        <strong>{countText}</strong>
+      </div>
+      <p className="io-plain">{contract.plain_line}</p>
+      <nav className="format-toggle" aria-label={side + " data views"}>
+        {views.map(([id, icon, title]) => (
+          <Button
+            key={id}
+            icon={icon}
+            title={title}
+            aria-pressed={view === id}
+            onClick={() => setView(id)}
+            className={view === id ? "active" : ""}
+          />
+        ))}
+        {session.trace && (
+          <Button
+            icon="evidence"
+            title={"Evidence"}
+            onClick={() => setView("evidence")}
+          />
+        )}
+      </nav>
+      <div className="io-body" aria-busy={loading}>
+        {loading ? (
+          <div className="io-shimmer" aria-label={"Loading"} />
+        ) : node.capability === "planned" ? (
+          <div className="io-empty">
+            <Icon name="clock" />
+            {"Not built yet"}
+          </div>
+        ) : !data && !synthetic && session.mode !== "replay" ? (
+          <div className="io-empty">
+            <Icon name="cross" />
+            {`${label(node.label_key)}: data unavailable`}
+            <Button
+              icon="resume"
+              title={"Retry step data"}
+              onClick={props.retry}
+            />
+          </div>
+        ) : (
+          <>
+            {view === "summary" && (
+              <>
+                <IOSummary
+                  before={props.other?.total}
+                  node={origin}
+                  rows={rows}
+                  total={total}
+                  countText={countText}
+                />
+                {origin.id !== "estimate-scope" && example}
+              </>
+            )}
+            {view === "example" && example}
+            {view === "table" &&
+              (available ? (
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        {Object.keys(row).map((k) => (
+                          <th key={k}>
+                            {fields.find((f) => f.key === k)?.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i}>
+                          {Object.entries(r).map(([k, v]) => (
+                            <td key={k}>{value(k, v, r)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                example
+              ))}
+            {view === "json" && (
+              <pre>
+                {JSON.stringify(
+                  row
+                    ? Object.fromEntries(
+                        Object.entries(row).map(([k, v]) => [
+                          fields.find((f) => f.key === k)?.label,
+                          value(k, v),
+                        ]),
+                      )
+                    : { Status: "No example saved" },
+                  null,
+                  2,
+                )}
+              </pre>
+            )}
+            {view === "fields" && (
+              <dl className="io-fields">
+                {allowed
+                  .filter((f) => data?.columns.includes(f.key))
+                  .map((f) => (
+                    <div key={f.key}>
+                      <dt>{f.label}</dt>
+                      <dd>
+                        {f.description}
+                        {f.unit ? " · " + f.unit : ""}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            )}
+            {view === "evidence" && session.trace && (
+              <TraceEvidence {...props} />
+            )}
+          </>
+        )}
+      </div>
+      <footer className="io-footer">
+        <span title={data?.run ?? stage?.last_run ?? "No saved run"}>
+          {data?.run || stage?.last_run
+            ? "Run " +
+              Math.max(1, (data?.runs?.indexOf(data?.run ?? "") ?? 0) + 1)
+            : "No saved run"}
+        </span>
+        <time title={timestamp}>{age(timestamp)}</time>
+        <b title={timestamp}>{badge}</b>
+        <span title={data?.config_hash ?? "Version 1"}>{"v1"}</span>
+      </footer>
     </section>
   );
 }
-function cell(value: Row[string] | undefined) {
-  return value == null
-    ? copy.unknown
-    : typeof value === "boolean"
-      ? value
-        ? glyphs.check
-        : glyphs.cross
-      : typeof value === "number"
-        ? Number(value.toFixed(3)).toLocaleString()
-        : String(value).trim().startsWith("{") ||
-            String(value).trim().startsWith("[")
-          ? copy.json
-          : String(value).split(/\s+/).slice(0, 2).join(" ").slice(0, 24);
-}
-function Pager({
-  current,
-  total,
-  onChange,
-}: {
-  current: number;
-  total: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="pager">
-      <Button
-        icon="previous"
-        title={copy.previous}
-        disabled={current <= 0}
-        onClick={() => onChange(Math.max(0, current - 1))}
-      />
-      <small>
-        {total ? current + 1 : 0}/{total}
-      </small>
-      <Button
-        icon="next"
-        title={copy.next}
-        disabled={current + 1 >= total}
-        onClick={() => onChange(current + 1)}
-      />
-    </div>
-  );
-}
-
-function parsed(value: unknown): unknown {
-  if (typeof value === "string" && /^[{[]/.test(value.trim())) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
-    }
-  }
-  return value;
-}
-function JsonTree({
-  row,
-  onCopy,
-}: {
-  row: Row | undefined;
-  onCopy: (path: string) => void;
-}) {
-  const [path, setPath] = useState<string[]>([]);
-  const [page, setPage] = useState(0);
-  let value: unknown = row;
-  for (const key of path) {
-    const object = parsed(value);
-    value =
-      object && typeof object === "object"
-        ? (object as Record<string, unknown>)[key]
-        : undefined;
-  }
-  const object = parsed(value);
-  const entries =
-    object && typeof object === "object" ? Object.entries(object) : [];
-  return (
-    <div className="json-tree">
-      <div className="json-level">
-        <Button
-          icon="previous"
-          title={copy.previous}
-          disabled={!path.length}
-          onClick={() => {
-            setPath(path.slice(0, -1));
-            setPage(0);
-          }}
-        />
-        <code>{path.length}</code>
-        <Button
-          icon="copy"
-          title={copy.path}
-          onClick={() => onCopy("$" + path.map((key) => "." + key).join(""))}
-        />
-      </div>
-      {entries.slice(page * 2, page * 2 + 2).map(([key, item]) => {
-        const child = parsed(item);
-        const nested = child !== null && typeof child === "object";
-        return (
-          <div className="json-entry" key={key}>
-            <button
-              aria-expanded={nested ? false : undefined}
-              title={tooltip(key)}
-              disabled={!nested}
-              onClick={() => {
-                setPath([...path, key]);
-                setPage(0);
-              }}
-            >
-              <Icon name={nested ? "json" : "schema"} size={14} />
-              <code>{fieldLabel(key)}</code>
-            </button>
-            {!nested && <code>{cell(item as Row[string])}</code>}
-            <Button
-              icon="copy"
-              title={copy.path}
-              onClick={() =>
-                onCopy("$" + [...path, key].map((part) => "." + part).join(""))
-              }
-            />
-          </div>
-        );
-      })}
-      {!entries.length && copy.unknown}
-      <Pager
-        current={page}
-        total={Math.ceil(entries.length / 2)}
-        onChange={setPage}
-      />
-    </div>
-  );
+function age(timestamp: string) {
+  const seconds = Math.max(0, (Date.now() - Date.parse(timestamp)) / 1000);
+  return seconds < 60 ? "Just now" : Math.floor(seconds / 60) + " min ago";
 }

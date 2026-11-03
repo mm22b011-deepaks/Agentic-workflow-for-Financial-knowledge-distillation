@@ -246,7 +246,31 @@ class FlowPort(Contract):
     required: bool = False
 
 
+class IOQuantity(Contract):
+    noun: str
+    unit_label: str
+    plain_line: str
+    icon: str
+
+
+class IOField(Contract):
+    key: str
+    label: str
+    unit: str
+    format: str
+    description: str = ''
+
+
+class NodeIO(Contract):
+    source: str | None = None
+    takes: IOQuantity
+    gives: IOQuantity
+    example_fields: list[IOField]
+    summaries: list[str]
+
+
 class CanvasNode(Contract):
+    io: NodeIO
     ports: list[FlowPort] = Field(default_factory=list)
     help_question: int = Field(default=0, ge=0, le=13)
     id: str

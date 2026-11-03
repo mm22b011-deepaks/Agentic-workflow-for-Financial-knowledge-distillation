@@ -25,6 +25,23 @@ def main() -> None:
     from nowcast.workflow_registry import canvas_registry
 
     (ROOT / 'web/src/registry.json').write_text(canvas_registry().model_dump_json(indent=2) + '\n')
+    lines = ['# Node inputs and outputs', '']
+    for node in canvas_registry().nodes:
+        lines.extend(
+            [
+                f'## {node.id}',
+                '',
+                f'Input: {node.io.takes.noun} ({node.io.takes.unit_label}). {node.io.takes.plain_line}.',
+                f'Output: {node.io.gives.noun} ({node.io.gives.unit_label}). {node.io.gives.plain_line}.',
+                '',
+            ]
+        )
+        lines.extend(
+            f'- {field.label}: {field.description}' + (f' ({field.unit})' if field.unit else '')
+            for field in node.io.example_fields
+        )
+        lines.append('')
+    (ROOT / 'web/public/io.md').write_text('\n'.join(lines))
     for name in (
         'CanvasRegistry',
         'GraphDocument',

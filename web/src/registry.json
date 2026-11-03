@@ -2,6 +2,96 @@
   "version": "v1",
   "nodes": [
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ]
+      },
       "ports": [
         {
           "id": "out",
@@ -96,6 +186,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -174,6 +340,56 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "validate-config",
+        "takes": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "gives": {
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
+        },
+        "example_fields": [
+          {
+            "key": "member_token",
+            "label": "Member",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only member pseudonym"
+          },
+          {
+            "key": "effective_from",
+            "label": "Joined index",
+            "unit": "",
+            "format": "date",
+            "description": "Membership start date"
+          },
+          {
+            "key": "effective_to",
+            "label": "Left index",
+            "unit": "",
+            "format": "date",
+            "description": "Membership end date"
+          },
+          {
+            "key": "mapped",
+            "label": "Mapped",
+            "unit": "",
+            "format": "value",
+            "description": "A filing identifier is available"
+          }
+        ],
+        "summaries": [
+          "joined",
+          "membership",
+          "mapping"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -241,6 +457,68 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "build-constituents",
+        "takes": {
+          "noun": "members",
+          "unit_label": "member",
+          "plain_line": "Companies that were in the index",
+          "icon": "members"
+        },
+        "gives": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "example_fields": [
+          {
+            "key": "companies",
+            "label": "Members",
+            "unit": "members",
+            "format": "value",
+            "description": "Planned members"
+          },
+          {
+            "key": "seasons",
+            "label": "Quarters",
+            "unit": "quarters",
+            "format": "value",
+            "description": "Planned calendar quarters"
+          },
+          {
+            "key": "releases",
+            "label": "Releases",
+            "unit": "releases",
+            "format": "value",
+            "description": "Planned releases"
+          },
+          {
+            "key": "base_requests",
+            "label": "Requests",
+            "unit": "requests",
+            "format": "value",
+            "description": "One request for each release"
+          },
+          {
+            "key": "expected_requests",
+            "label": "Total requests",
+            "unit": "requests",
+            "format": "value",
+            "description": "Includes retries and model comparisons"
+          },
+          {
+            "key": "model_days",
+            "label": "Time needed",
+            "unit": "days",
+            "format": "value",
+            "description": "Estimated duration at the daily limit"
+          }
+        ],
+        "summaries": [
+          "equation"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -308,6 +586,69 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "estimate-scope",
+        "takes": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "gives": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "downloaded_at",
+            "label": "Saved",
+            "unit": "",
+            "format": "date",
+            "description": "Download date"
+          },
+          {
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value",
+            "description": "Downloaded file size"
+          },
+          {
+            "key": "outcome",
+            "label": "Status",
+            "unit": "",
+            "format": "value",
+            "description": "Processing outcome"
+          },
+          {
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
+            "format": "value",
+            "description": "Parsed text length"
+          }
+        ],
+        "summaries": [
+          "found",
+          "sizes"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -390,6 +731,187 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "parse",
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -519,6 +1041,96 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "consolidate",
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "heatmap"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -594,6 +1206,96 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "aggregate",
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -667,6 +1369,96 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "gate",
+        "takes": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -734,6 +1526,96 @@
       "y": -90.0
     },
     {
+      "io": {
+        "source": "gate",
+        "takes": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "thresholds"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -801,6 +1683,96 @@
       "y": 110.0
     },
     {
+      "io": {
+        "source": "publish",
+        "takes": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "quarters"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -831,6 +1803,47 @@
       "y": -90.0
     },
     {
+      "io": {
+        "source": "estimate-scope",
+        "takes": {
+          "noun": "plan",
+          "unit_label": "release",
+          "plain_line": "Releases and requests planned across quarters",
+          "icon": "plan"
+        },
+        "gives": {
+          "noun": "company-quarters",
+          "unit_label": "company-quarter",
+          "plain_line": "One member in one quarter",
+          "icon": "calendar"
+        },
+        "example_fields": [
+          {
+            "key": "member_token",
+            "label": "Member",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only member pseudonym"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "outcome",
+            "label": "Status",
+            "unit": "",
+            "format": "value",
+            "description": "Processing outcome"
+          }
+        ],
+        "summaries": [
+          "quarters"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -898,6 +1911,68 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "cohort",
+        "takes": {
+          "noun": "company-quarters",
+          "unit_label": "company-quarter",
+          "plain_line": "One member in one quarter",
+          "icon": "calendar"
+        },
+        "gives": {
+          "noun": "filings",
+          "unit_label": "release",
+          "plain_line": "Earnings filings found for each quarter",
+          "icon": "search"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "member_token",
+            "label": "Member",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only member pseudonym"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "items",
+            "label": "Filing item",
+            "unit": "",
+            "format": "value",
+            "description": "SEC form item"
+          },
+          {
+            "key": "outcome",
+            "label": "Status",
+            "unit": "",
+            "format": "value",
+            "description": "Processing outcome"
+          }
+        ],
+        "summaries": [
+          "found"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -965,6 +2040,69 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "discover",
+        "takes": {
+          "noun": "filings",
+          "unit_label": "release",
+          "plain_line": "Earnings filings found for each quarter",
+          "icon": "search"
+        },
+        "gives": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "downloaded_at",
+            "label": "Saved",
+            "unit": "",
+            "format": "date",
+            "description": "Download date"
+          },
+          {
+            "key": "size_bytes",
+            "label": "File size",
+            "unit": "bytes",
+            "format": "value",
+            "description": "Downloaded file size"
+          },
+          {
+            "key": "outcome",
+            "label": "Status",
+            "unit": "",
+            "format": "value",
+            "description": "Processing outcome"
+          },
+          {
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
+            "format": "value",
+            "description": "Parsed text length"
+          }
+        ],
+        "summaries": [
+          "sizes",
+          "skipped"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1032,6 +2170,69 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "download",
+        "takes": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "gives": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "chars",
+            "label": "Text length",
+            "unit": "characters",
+            "format": "value",
+            "description": "Parsed text length"
+          },
+          {
+            "key": "chars_sent",
+            "label": "Text sent",
+            "unit": "characters",
+            "format": "value",
+            "description": "Text sent for extraction"
+          },
+          {
+            "key": "truncated",
+            "label": "Truncated",
+            "unit": "",
+            "format": "value",
+            "description": "Text shortened"
+          },
+          {
+            "key": "text",
+            "label": "Text preview",
+            "unit": "",
+            "format": "value",
+            "description": "First three lines; Internal trace only"
+          }
+        ],
+        "summaries": [
+          "lengths",
+          "truncated"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1099,6 +2300,187 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "parse",
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1199,6 +2581,187 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "extract-step",
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1266,6 +2829,187 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "validate",
+        "takes": {
+          "noun": "checked records",
+          "unit_label": "record",
+          "plain_line": "Records with evidence and number checks",
+          "icon": "validate"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "duplicates"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1339,6 +3083,68 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": "validate",
+        "takes": {
+          "noun": "flags",
+          "unit_label": "flag",
+          "plain_line": "Issues needing a person to review",
+          "icon": "review"
+        },
+        "gives": {
+          "noun": "flags",
+          "unit_label": "flag",
+          "plain_line": "Issues needing a person to review",
+          "icon": "review"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reason",
+            "label": "Review reason",
+            "unit": "",
+            "format": "value",
+            "description": "Why review is needed"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "review_field",
+            "label": "Field needing review",
+            "unit": "",
+            "format": "value",
+            "description": "Affected extracted field"
+          }
+        ],
+        "summaries": [
+          "reasons"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1406,6 +3212,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "out",
@@ -1430,6 +3312,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1454,6 +3412,82 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1478,6 +3512,82 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1502,6 +3612,82 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1526,6 +3712,82 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1550,6 +3812,82 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1574,6 +3912,96 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "gives": {
+          "noun": "KPIs",
+          "unit_label": "KPI",
+          "plain_line": "KPIs meeting the publication threshold",
+          "icon": "publish"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1598,6 +4026,96 @@
       "y": 208.0
     },
     {
+      "io": {
+        "source": "download",
+        "takes": {
+          "noun": "files",
+          "unit_label": "file",
+          "plain_line": "Saved earnings release files",
+          "icon": "ingest"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1687,6 +4205,187 @@
       "y": null
     },
     {
+      "io": {
+        "source": "parse",
+        "takes": {
+          "noun": "texts",
+          "unit_label": "text",
+          "plain_line": "Release text ready for extraction",
+          "icon": "parse"
+        },
+        "gives": {
+          "noun": "records",
+          "unit_label": "record",
+          "plain_line": "EPS, revenue, guidance and tone",
+          "icon": "extract"
+        },
+        "example_fields": [
+          {
+            "key": "release_token",
+            "label": "Release",
+            "unit": "",
+            "format": "value",
+            "description": "Session-only release pseudonym"
+          },
+          {
+            "key": "report_date",
+            "label": "Filed",
+            "unit": "",
+            "format": "date",
+            "description": "Filing date"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "reported_eps",
+            "label": "EPS",
+            "unit": "per share",
+            "format": "value",
+            "description": "Reported earnings per share"
+          },
+          {
+            "key": "eps_confidence",
+            "label": "EPS confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in EPS"
+          },
+          {
+            "key": "eps_status",
+            "label": "EPS status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "revenue",
+            "label": "Revenue",
+            "unit": "",
+            "format": "value",
+            "description": "Reported revenue"
+          },
+          {
+            "key": "revenue_confidence",
+            "label": "Revenue confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in revenue"
+          },
+          {
+            "key": "revenue_status",
+            "label": "Revenue status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "guidance_presence",
+            "label": "Guidance",
+            "unit": "",
+            "format": "value",
+            "description": "Forward outlook"
+          },
+          {
+            "key": "guidance_confidence",
+            "label": "Guidance confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in guidance"
+          },
+          {
+            "key": "guidance_status",
+            "label": "Guidance status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "tone",
+            "label": "Tone",
+            "unit": "",
+            "format": "value",
+            "description": "Management tone"
+          },
+          {
+            "key": "tone_confidence",
+            "label": "Tone confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Confidence in tone"
+          },
+          {
+            "key": "tone_status",
+            "label": "Tone status",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence validation status"
+          },
+          {
+            "key": "confidence",
+            "label": "Confidence",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Mean confidence"
+          },
+          {
+            "key": "issues",
+            "label": "Checks failed",
+            "unit": "checks",
+            "format": "value",
+            "description": "Validation failures"
+          },
+          {
+            "key": "flagged",
+            "label": "Flagged",
+            "unit": "",
+            "format": "value",
+            "description": "Requires review"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "presence"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1787,6 +4486,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1865,6 +4640,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -1932,6 +4783,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2010,6 +4937,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2077,6 +5080,96 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "index rows",
+          "unit_label": "index row",
+          "plain_line": "One KPI for each quarter",
+          "icon": "aggregate"
+        },
+        "example_fields": [
+          {
+            "key": "metric",
+            "label": "KPI",
+            "unit": "",
+            "format": "value",
+            "description": "Index measure"
+          },
+          {
+            "key": "season",
+            "label": "Quarter",
+            "unit": "",
+            "format": "value",
+            "description": "Calendar quarter"
+          },
+          {
+            "key": "metric_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "KPI value"
+          },
+          {
+            "key": "metric_unit",
+            "label": "Unit",
+            "unit": "",
+            "format": "value",
+            "description": "KPI unit"
+          },
+          {
+            "key": "n_reported",
+            "label": "Reported",
+            "unit": "records",
+            "format": "value",
+            "description": "Observed records"
+          },
+          {
+            "key": "n_expected",
+            "label": "Expected",
+            "unit": "records",
+            "format": "value",
+            "description": "Expected records"
+          },
+          {
+            "key": "coverage",
+            "label": "Coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Fraction of expected records"
+          },
+          {
+            "key": "threshold",
+            "label": "Minimum coverage",
+            "unit": "%",
+            "format": "fraction",
+            "description": "Minimum observations as share of expected records"
+          },
+          {
+            "key": "pass",
+            "label": "Gate",
+            "unit": "",
+            "format": "value",
+            "description": "Meets publication checks"
+          },
+          {
+            "key": "suppressed",
+            "label": "Suppressed",
+            "unit": "",
+            "format": "value",
+            "description": "Below publication threshold"
+          }
+        ],
+        "summaries": [
+          "funnel"
+        ]
+      },
       "ports": [
         {
           "id": "out",
@@ -2138,6 +5231,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2216,6 +5385,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2283,6 +5528,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2350,6 +5671,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2417,6 +5814,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2484,6 +5957,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2552,6 +6101,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2620,6 +6245,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2732,6 +6433,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2800,6 +6577,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2879,6 +6732,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -2958,6 +6887,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3037,6 +7042,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3067,6 +7148,82 @@
       "y": 220.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3097,6 +7254,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3127,6 +7360,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3157,6 +7466,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3187,6 +7572,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [
         {
           "id": "in",
@@ -3217,6 +7678,82 @@
       "y": 0.0
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [],
       "help_question": 0,
       "id": "cli",
@@ -3247,6 +7784,82 @@
       "y": null
     },
     {
+      "io": {
+        "source": null,
+        "takes": {
+          "noun": "settings",
+          "unit_label": "file",
+          "plain_line": "Settings used by this step",
+          "icon": "config"
+        },
+        "gives": {
+          "noun": "checked settings",
+          "unit_label": "check",
+          "plain_line": "Settings checked before running",
+          "icon": "check"
+        },
+        "example_fields": [
+          {
+            "key": "setting",
+            "label": "Setting",
+            "unit": "",
+            "format": "value",
+            "description": "Configuration setting"
+          },
+          {
+            "key": "setting_value",
+            "label": "Value",
+            "unit": "",
+            "format": "value",
+            "description": "Configured non-identifying value"
+          },
+          {
+            "key": "kind",
+            "label": "Type",
+            "unit": "",
+            "format": "value",
+            "description": "Setting value type"
+          },
+          {
+            "key": "quote_check",
+            "label": "Quote",
+            "unit": "",
+            "format": "value",
+            "description": "Evidence check passed"
+          },
+          {
+            "key": "number_check",
+            "label": "Number",
+            "unit": "",
+            "format": "value",
+            "description": "Number check passed"
+          },
+          {
+            "key": "scale_check",
+            "label": "Scale",
+            "unit": "",
+            "format": "value",
+            "description": "Scale check passed"
+          },
+          {
+            "key": "row_check",
+            "label": "Row",
+            "unit": "",
+            "format": "value",
+            "description": "Row check passed"
+          },
+          {
+            "key": "period_check",
+            "label": "Period",
+            "unit": "",
+            "format": "value",
+            "description": "Period check passed"
+          }
+        ],
+        "summaries": [
+          "checks"
+        ]
+      },
       "ports": [],
       "help_question": 0,
       "id": "schedule",

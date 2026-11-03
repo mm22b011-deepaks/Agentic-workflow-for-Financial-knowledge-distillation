@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { StrictMode, useEffect, useRef, useState, useMemo, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { Canvas } from "./features/canvas/Canvas";
@@ -20,10 +20,12 @@ import {
   validKPIKnowledgeBase,
   validPaneResponse,
 } from "./validators.js";
+import { sourceBadge } from "./shared/io";
 import "./style.css";
 function App() {
   const pipeline = usePipeline();
   const session = useSession();
+  const timestamp = useMemo(() => new Date().toISOString(), [pipeline.stages]);
   const preferences = usePreferences();
   const [palette, setPalette] = useState(false);
   const [query, setQuery] = useState("");
@@ -171,12 +173,8 @@ function App() {
       >
         <header className="topbar">
           <div className="pipeline-badge">
-            <i className="status-dot done" />
-            <span>
-              {pipeline.index.source === "synthetic"
-                ? copy.demo
-                : copy.production}
-            </span>
+            <span title={timestamp}>{sourceBadge(session.mode, pipeline.stages.source)}</span>
+            <time title={timestamp}>{new Date(timestamp).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>
           </div>
           <div className="toolbar" role="toolbar" aria-label={copy.runAll}>
             <Button
@@ -326,6 +324,8 @@ function App() {
       )}
       <Panel
         registry={pipeline.registry}
+        stages={pipeline.stages}
+        timestamp={timestamp}
         active={!!pipeline.active || pipeline.busy}
         onExecute={execute}
       />

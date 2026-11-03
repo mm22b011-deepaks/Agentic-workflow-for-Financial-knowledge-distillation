@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import csv
 import dataclasses
+import hashlib
+import hmac
 import io
 import json
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -31,6 +34,260 @@ from nowcast.jobs import JobStore, config_fingerprint
 from nowcast.paths import Paths
 from nowcast.storage import atomic_bytes, file_lock
 from nowcast.workflow_registry import canvas_registry
+
+_PANE_TOKEN_KEY = secrets.token_bytes(32)
+
+
+def index_rows(config: Config, frame: pd.DataFrame) -> pd.DataFrame:
+    """Present one KPI per quarter without changing the stored aggregate artifact."""
+    if not {'season_year', 'season_quarter'}.issubset(frame):
+        return frame
+    from nowcast.registry import load_registry
+
+    rows = []
+    count_keys = {
+        'eps_growth': 'growth',
+        'revenue_growth': 'revenue_growth',
+        'guidance': 'guidance',
+        'tone': 'tone',
+    }
+    for row in frame.to_dict('records'):
+        for kpi in load_registry(config).kpis:
+            n = row.get('n_obs_' + count_keys[kpi.id])
+            expected = row.get('n_expected')
+            rows.append(
+                {
+                    'metric': kpi.label,
+                    'season': f'{int(row["season_year"])}Q{int(row["season_quarter"])}',
+                    'metric_value': row.get(kpi.output),
+                    'metric_unit': kpi.unit,
+                    'n_reported': n,
+                    'n_expected': expected,
+                    'coverage': n / expected if n is not None and expected else None,
+                    'threshold': config.aggregation.min_observations / expected
+                    if expected
+                    else None,
+                    'pass': row.get('metric_status_' + kpi.output) == 'ok'
+                    and not row.get('suppressed', True),
+                    'suppressed': row.get('suppressed'),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFrame:
+    """Allow only typed, non-identifying attributes; never forward text or quotes."""
+    public = pd.DataFrame(index=frame.index)
+    for source, target in [('cik', 'member_token'), ('document_id', 'release_token')]:
+        if source in frame:
+            public[target] = frame[source].map(
+                lambda value: hmac.new(
+                    _PANE_TOKEN_KEY, str(value).encode(), hashlib.sha256
+                ).hexdigest()
+            )
+    dates = {
+        'joined',
+        'left',
+        'start_date',
+        'end_date',
+        'effective_from',
+        'effective_to',
+        'report_date',
+        'downloaded_at',
+    }
+    numeric = {
+        'chars',
+        'chars_sent',
+        'bytes',
+        'size_bytes',
+        'confidence',
+        'record_confidence',
+        'flagged',
+        'truncated',
+        'issues',
+        'mapped',
+        'season_year',
+        'season_quarter',
+        'n_reported',
+        'n_expected',
+        'coverage',
+        'suppressed',
+        'companies',
+        'quarters',
+        'releases',
+        'requests',
+        'days',
+        'base_requests',
+        'expected_requests',
+        'model_days',
+        'eps_growth_agg',
+        'revenue_growth_agg',
+        'quote_check',
+        'number_check',
+        'scale_check',
+        'row_check',
+        'period_check',
+        'metric_value',
+        'threshold',
+        'pass',
+    }
+    for column in frame:
+        if column in numeric:
+            public[column] = pd.to_numeric(frame[column], errors='coerce')
+        elif column in dates:
+            public[column] = pd.to_datetime(frame[column], errors='coerce', utc=True).dt.strftime(
+                '%Y-%m-%d'
+            )
+        elif column == 'season':
+            public[column] = frame[column].where(
+                frame[column].astype(str).str.fullmatch(r'\d{4}Q[1-4]')
+            )
+        elif column == 'items':
+            public[column] = frame[column].where(
+                frame[column].astype(str).str.fullmatch(r'[0-9.,; ]+')
+            )
+        elif column == 'outcome':
+            public[column] = frame[column].where(
+                frame[column].isin(['downloaded', 'no_release', 'failed', 'unvisited'])
+            )
+    for column, allowed in {
+        'reason': [
+            'empty_extraction',
+            'eps_missing',
+            'low_confidence',
+            'null_reason_missing',
+            'doc_truncated',
+            'validation_issues',
+            'quote_missing',
+            'quote_too_long',
+            'quote_not_found',
+            'number_not_in_quote',
+            'number_not_in_source',
+            'period_not_near_filing',
+            'period_invalid',
+            'basis_missing',
+            'vocab_invalid',
+        ],
+        'metric': [
+            'EPS growth proxy',
+            'Revenue growth proxy',
+            'Guidance direction',
+            'Tone score',
+            'eps_growth',
+            'revenue_growth',
+            'guidance',
+            'tone',
+        ],
+        'metric_unit': ['fraction', 'percent', 'score'],
+        'status': ['ok', 'suppressed', 'unavailable', 'insufficient_observations', 'no_consensus'],
+    }.items():
+        if column in frame:
+            public[column] = frame[column].where(frame[column].isin(allowed))
+    if 'model' in frame:
+        public['model'] = frame.model.where(frame.model.isin([*models, 'synthetic:free']))
+    for column in [
+        'parse_success_rate',
+        'empty_completion_rate',
+        'latency_p95_seconds',
+        'nonempty_extractions',
+        'tokens',
+    ]:
+        if column in frame:
+            public[column] = pd.to_numeric(frame[column], errors='coerce')
+    if 'reason' in public:
+        public['flagged'] = True
+        if 'field' in frame:
+            public['review_field'] = frame.field.where(frame.field.isin((*FIELDS, 'record')))
+    if 'seasons' in frame:
+        public['seasons'] = frame.seasons.map(
+            lambda value: (
+                len(value)
+                if isinstance(value, list)
+                else len(json.loads(value))
+                if isinstance(value, str) and value.startswith('[')
+                else value
+                if isinstance(value, (int, float))
+                else None
+            )
+        )
+    if 'cik' in frame:
+        public['mapped'] = frame.cik.notna() & frame.cik.astype(str).str.fullmatch(r'\d{1,10}')
+    if 'report_date' in public:
+        public['season'] = pd.to_datetime(public.report_date).dt.to_period('Q').astype(str)
+    if {'n_reported', 'n_expected'}.issubset(public):
+        public['coverage'] = public.n_reported.div(public.n_expected.where(public.n_expected.gt(0)))
+    if {'field', 'value'}.issubset(frame):
+        public['setting'] = frame.field.where(
+            frame.field.astype(str).str.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]*')
+        )
+        public['setting_value'] = frame.value.map(
+            lambda v: v if isinstance(v, (bool, int, float)) else None
+        )
+        public['kind'] = frame.value.map(
+            lambda v: (
+                'Boolean'
+                if isinstance(v, bool)
+                else 'Number'
+                if isinstance(v, (int, float))
+                else 'Names hidden'
+            )
+        )
+    if 'record' in frame:
+        records = frame.record.map(
+            lambda value: json.loads(value) if isinstance(value, str) else value
+        )
+        fiscal_seasons = records.map(
+            lambda record: (
+                f'{record.get("fiscal_year")}Q{record.get("fiscal_quarter")}'
+                if isinstance(record, dict)
+                and record.get('fiscal_year')
+                and record.get('fiscal_quarter') in [1, 2, 3, 4]
+                else None
+            )
+        )
+        public['season'] = (
+            fiscal_seasons.fillna(public.get('season')) if 'season' in public else fiscal_seasons
+        )
+        for key in ['reported_eps', 'revenue', 'guidance_presence', 'tone']:
+            name = {'reported_eps': 'eps', 'guidance_presence': 'guidance'}.get(key, key)
+            public[name + '_confidence'] = records.map(
+                lambda record, key=key: (
+                    record.get(key, {}).get('confidence') if isinstance(record, dict) else None
+                )
+            )
+            public[name + '_status'] = records.map(
+                lambda record, key=key: (
+                    'Present'
+                    if isinstance(record, dict) and record.get(key, {}).get('value') is not None
+                    else 'Not stated'
+                )
+            )
+            public[key] = records.map(
+                lambda record, key=key: (
+                    record.get(key, {}).get('value') if isinstance(record, dict) else None
+                )
+            )
+            if key in {'reported_eps', 'revenue'}:
+                public[key] = pd.to_numeric(public[key], errors='coerce')
+            else:
+                public[key] = public[key].where(
+                    public[key].isin(
+                        [
+                            'positive',
+                            'negative',
+                            'neutral',
+                            'yes',
+                            'no',
+                            'provided',
+                            'not_provided',
+                            'raised',
+                            'lowered',
+                            'maintained',
+                        ]
+                    )
+                )
+    return public.reset_index(drop=True)
+
 
 UPSTREAM = {
     'validate-config': None,
@@ -179,6 +436,43 @@ def frame_for(
                 for cik, season in zip(frame.cik, seasons, strict=True)
             ]
         ]
+    if node == 'estimate-scope' and not frame.empty:
+        import math
+
+        plans = []
+        for row in frame.to_dict('records'):
+            plan = row.get('scope_plan')
+            plan = json.loads(plan) if isinstance(plan, str) else plan
+            if isinstance(plan, dict):
+                plans.append({**plan, 'seasons': len(plan.get('seasons', []))})
+            else:
+                releases = row.get('documents', 0)
+                requests = releases * max(1, len(row.get('models', [])))
+                capacity = row.get('requests_per_day', 0)
+                plans.append(
+                    {
+                        'companies': row.get('companies'),
+                        'seasons': row.get('quarters'),
+                        'releases': releases,
+                        'base_requests': requests,
+                        'model_days': math.ceil(requests / capacity) if capacity else None,
+                    }
+                )
+        frame = pd.DataFrame(plans)
+    if node == 'gate' and {'metric', 'season'}.issubset(frame):
+        from nowcast.registry import load_registry
+
+        labels = {k.id: k.label for k in load_registry(config).kpis}
+        frame['metric'] = frame.metric.map(lambda value: labels.get(value, value))
+        aggregate = read_frame(
+            Paths.from_config(config).aggregates(config) / 'index_aggregates.parquet'
+        )
+        details = index_rows(config, aggregate)
+        if not details.empty:
+            attributes = [key for key in details if key not in frame or key in {'metric', 'season'}]
+            frame = frame.merge(details[attributes], on=['metric', 'season'], how='left')
+    if node in {'aggregate', 'publish', 'suppressed'}:
+        frame = index_rows(config, frame)
     return frame
 
 
@@ -216,14 +510,15 @@ def pane(
     seed: int = 42,
 ) -> PaneResponse:
     definitions = canvas_registry()
+    sources = {n.id: n.io.source for n in definitions.nodes}
     if node not in {n.id for n in definitions.nodes}:
         raise DataError('unknown node')
     incoming = [e.source for e in definitions.edges if e.target == node and not e.sub]
-    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))
+    incoming = list(dict.fromkeys([name for name in [sources.get(node), *incoming] if name]))
     selected = node
     if side == 'input':
-        selected = upstream or UPSTREAM.get(node) or (incoming[0] if incoming else node)
-        if upstream and upstream not in [*incoming, UPSTREAM.get(node)]:
+        selected = upstream or sources.get(node) or (incoming[0] if incoming else node)
+        if upstream and upstream not in [*incoming, sources.get(node)]:
             raise DataError('invalid upstream')
     frame = frame_for(config, config_path, store, selected, run)
     if (
@@ -270,31 +565,8 @@ def pane(
     if selected in {'publish', 'suppressed'} and 'suppressed' in frame:
         frame = frame[frame.suppressed.eq(selected == 'suppressed')]
     private = selected in PRIVATE_STAGES
-    if private and not trace:
-        public = pd.DataFrame({'row': range(1, len(frame) + 1)})
-        for column in (
-            'chars',
-            'chars_sent',
-            'truncated',
-            'issues',
-            'confidence',
-            'record_confidence',
-            'flagged',
-            'outcome',
-        ):
-            if column in frame:
-                if column == 'outcome':
-                    public[column] = (
-                        frame[column]
-                        .where(
-                            frame[column].isin(['downloaded', 'no_release', 'failed', 'unvisited']),
-                            None,
-                        )
-                        .to_numpy()
-                    )
-                else:
-                    public[column] = pd.to_numeric(frame[column], errors='coerce').to_numpy()
-        frame = public
+    if not trace:
+        frame = public_frame(frame, config.llm.models)
     elif private:
         if search and 'document_id' in frame:
             frame = frame[frame.document_id.astype(str).str.contains(search, regex=False)]
@@ -326,7 +598,7 @@ def pane(
         versions = list(
             connection.execute(
                 text('SELECT job_id FROM artifacts WHERE stage=:stage ORDER BY rowid DESC'),
-                {'stage': selected},
+                {'stage': (UPSTREAM.get(node) or selected) if side == 'input' else selected},
             ).scalars()
         )
     profiles = []
@@ -393,6 +665,7 @@ def pane(
 
 def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
     latest = store.list_runs()
+    sources = {n.id: n.io.source for n in canvas_registry().nodes}
     nodes = []
     cache = {}
     for node in canvas_registry().nodes:
@@ -430,9 +703,7 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
         if node.id == 'validate-config':
             out = 1 if job and job.status == 'succeeded' else None
         if node.id == 'estimate-scope' and present:
-            from nowcast.scope import scope_summary
-
-            out = scope_summary(config)['releases']
+            out = int(frame.releases.sum()) if 'releases' in frame else None
         if node.id == 'extract' and not out:
             from nowcast.extraction.runner import load_documents
             from nowcast.ingestion.rebuild import index_path
@@ -458,7 +729,7 @@ def stages(config: Config, config_path: Path, store: JobStore) -> StageSnapshot:
     report = Paths.from_config(config).resolve('manifests/ingest_report.json')
     skipped = json.loads(report.read_text()).get('skip_reasons', {}) if report.exists() else {}
     for state in nodes:
-        state.in_count = cache.get(UPSTREAM.get(state.id) or '')
+        state.in_count = cache.get(sources.get(state.id) or '')
         if state.id in {'ingest', 'download', 'discover'}:
             state.skipped_by_reason = skipped
     return StageSnapshot(nodes=nodes)

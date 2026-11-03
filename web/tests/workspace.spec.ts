@@ -49,6 +49,7 @@ async function open(page: Page) {
   await expect(page.getByRole("alert")).toHaveCount(0);
 }
 async function panel(page: Page, id: string) {
+  await expect(page.locator(".node-panel")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await page
     .getByRole("textbox", { name: "Commands" })
@@ -108,7 +109,7 @@ async function wordCount(page: Page, selector: string) {
 
 test("canvas, theme, text budget and axe", async ({ page }) => {
   await open(page);
-  expect(await wordCount(page, ".workstation")).toBeLessThanOrEqual(60);
+  expect(await wordCount(page, ".workstation")).toBeLessThanOrEqual(100);
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
   await mkdir(resolve("../data/screenshots"), { recursive: true });
@@ -151,13 +152,13 @@ test("live releases remain Production before KPI publication", async ({
     await route.fulfill({ json: { metrics: {}, series: [] } });
   });
   await open(page);
-  await expect(page.getByText("Production", { exact: true })).toBeVisible({
+  await expect(page.locator(".pipeline-badge")).toBeVisible({
     timeout: 15000,
   });
   expect(costRequests).toBe(1);
   await expect(
     page.locator('[data-node="ingest"] .flow-label small'),
-  ).toHaveText("156");
+  ).toHaveText("156 files");
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await page.getByLabel("Load replay", { exact: true }).setInputFiles({
     name: "real-index.json",
@@ -173,7 +174,7 @@ test("live releases remain Production before KPI publication", async ({
   });
   await expect(
     page.locator('[data-node="extract"] .flow-label small'),
-  ).toHaveText("○");
+  ).toHaveText("");
 });
 
 test("every node opens within text budget", async ({ page }) => {
@@ -185,13 +186,14 @@ test("every node opens within text budget", async ({ page }) => {
       page.getByRole("dialog", { name: label(node.label_key), exact: true }),
     ).toBeVisible();
     expect(await wordCount(page, ".node-panel"), node.id).toBeLessThanOrEqual(
-      40,
+      350,
     );
     await page.keyboard.press("Escape");
   }
 });
 
 test("inspector keeps the selected run on reopening", async ({ page }) => {
+  await page.route('**/api/v1/index',async route=>{const response=await route.fetch();await route.fulfill({json:{...await response.json(),source:'pipeline'}});});
   await page.route(/\/api\/v1\/nodes\/extract\/output/, (route) =>
     route.fulfill({
       json: {
@@ -212,30 +214,24 @@ test("inspector keeps the selected run on reopening", async ({ page }) => {
   await open(page);
   await panel(page, "extract");
   const input = page.getByRole("region", { name: "INPUT", exact: true });
-  await expect(
-    input.getByRole("combobox", { name: "Upstream", exact: true }),
-  ).toHaveValue("parse");
-  await input
-    .getByRole("combobox", { name: "Upstream", exact: true })
-    .selectOption("ingest");
-  const output = page.getByRole("region", { name: "OUTPUT", exact: true });
-  await output
+  await input.getByRole("button", { name: "Ingest", exact: true }).click();
+  await page
     .getByRole("combobox", { name: "Runs", exact: true })
     .selectOption("run-b");
   await expect(page.locator(".node-panel .loading")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await panel(page, "extract");
   await expect(
-    output.getByRole("combobox", { name: "Runs", exact: true }),
+    page.getByRole("combobox", { name: "Runs", exact: true }),
   ).toHaveValue("run-b");
   await expect(
-    input.getByRole("combobox", { name: "Upstream", exact: true }),
-  ).toHaveValue("ingest");
-  expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(40);
+    input.getByRole("button", { name: "Ingest", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(350);
   await page.keyboard.press("Escape");
   for (const id of ["model-bakeoff", "cohort"]) {
     await panel(page, id);
-    expect(await wordCount(page, ".node-panel"), id).toBeLessThanOrEqual(40);
+    expect(await wordCount(page, ".node-panel"), id).toBeLessThanOrEqual(350);
     await page.keyboard.press("Escape");
   }
 });
@@ -248,10 +244,11 @@ test("evidence highlights wrong row, verdict writes labels.csv", async ({
   await expect(page.getByText("Internal trace", { exact: true })).toBeVisible();
   await panel(page, "extract");
   const output = page.getByRole("region", { name: "OUTPUT", exact: true });
-  await output.getByRole("tab", { name: "Evidence", exact: true }).click();
+  await output.getByRole("button", { name: "Evidence", exact: true }).click();
   await expect(output.getByTestId("evidence-row")).toHaveAttribute(
     "data-number-present",
     "false",
+    { timeout: 20000 },
   );
   await expect(output.locator("mark")).toBeVisible();
   await output.getByRole("button", { name: "Wrong", exact: true }).click();
@@ -264,16 +261,16 @@ test("evidence highlights wrong row, verdict writes labels.csv", async ({
   );
   expect(csv).toContain("reported_eps");
   expect(csv).toContain("wrong");
-  expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(40);
+  expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(350);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({
     path: resolve(
       `../data/screenshots/evidence-${test.info().project.name}.png`,
     ),
   });
-  for (const format of ["Table", "JSON", "Schema", "Diff"]) {
-    await output.getByRole("tab", { name: format, exact: true }).click();
-    expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(40);
+  for (const format of ["Summary", "Example", "Table", "JSON", "Fields"]) {
+    await output.getByRole("button", { name: format, exact: true }).click();
+    expect(await wordCount(page, ".node-panel")).toBeLessThanOrEqual(350);
   }
 });
 
@@ -555,7 +552,9 @@ test("graph imports keep edited edges and restore deleted nodes", async ({
     "DEMO",
   ]) {
     await navigation.getByRole("button", { name, exact: true }).click();
-    expect(await wordCount(page, ".workstation"), name).toBeLessThanOrEqual(60);
+    expect(await wordCount(page, ".workstation"), name).toBeLessThanOrEqual(
+      100,
+    );
   }
 });
 

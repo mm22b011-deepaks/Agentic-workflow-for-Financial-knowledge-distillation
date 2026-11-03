@@ -137,6 +137,9 @@
     "CanvasNode": {
       "additionalProperties": false,
       "properties": {
+        "io": {
+          "$ref": "#/$defs/NodeIO"
+        },
         "ports": {
           "items": {
             "$ref": "#/$defs/FlowPort"
@@ -247,6 +250,7 @@
         }
       },
       "required": [
+        "io",
         "id",
         "label_key",
         "icon",
@@ -286,6 +290,114 @@
         "kind"
       ],
       "title": "FlowPort",
+      "type": "object"
+    },
+    "IOField": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "unit",
+        "format"
+      ],
+      "title": "IOField",
+      "type": "object"
+    },
+    "IOQuantity": {
+      "additionalProperties": false,
+      "properties": {
+        "noun": {
+          "title": "Noun",
+          "type": "string"
+        },
+        "unit_label": {
+          "title": "Unit Label",
+          "type": "string"
+        },
+        "plain_line": {
+          "title": "Plain Line",
+          "type": "string"
+        },
+        "icon": {
+          "title": "Icon",
+          "type": "string"
+        }
+      },
+      "required": [
+        "noun",
+        "unit_label",
+        "plain_line",
+        "icon"
+      ],
+      "title": "IOQuantity",
+      "type": "object"
+    },
+    "NodeIO": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "takes": {
+          "$ref": "#/$defs/IOQuantity"
+        },
+        "gives": {
+          "$ref": "#/$defs/IOQuantity"
+        },
+        "example_fields": {
+          "items": {
+            "$ref": "#/$defs/IOField"
+          },
+          "title": "Example Fields",
+          "type": "array"
+        },
+        "summaries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Summaries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "takes",
+        "gives",
+        "example_fields",
+        "summaries"
+      ],
+      "title": "NodeIO",
       "type": "object"
     }
   },

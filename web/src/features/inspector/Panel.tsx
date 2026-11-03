@@ -8,6 +8,8 @@ import { useSession } from "../../shared/state";
 import { validPaneResponse, validSettingsResponse } from "../../validators.js";
 import { DataPane } from "./DataPane";
 import type { CanvasRegistry } from "../../CanvasRegistry";
+import demoPanes from "../../io-demo.json";
+import type { StageSnapshot } from "../../StageSnapshot";
 import type { PaneResponse } from "../../PaneResponse";
 import type { CLIControl } from "../../CanvasRegistry";
 import type { ConfigControl } from "../../SettingsResponse";
@@ -27,10 +29,14 @@ export function inspectionState(id: string) {
 }
 export function Panel({
   registry,
+  stages,
+  timestamp,
   active,
   onExecute,
 }: {
   registry: CanvasRegistry;
+  stages: StageSnapshot;
+  timestamp: string;
   active: boolean;
   onExecute: (
     command: string,
@@ -44,6 +50,7 @@ export function Panel({
   const remembered = useRef(id);
   const [input, setInput] = useState<PaneResponse | null>(null);
   const [output, setOutput] = useState<PaneResponse | null>(null);
+  const [retry, setRetry] = useState(0);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<ConfigControl[]>([]);
   const [draftParameters, setParameters] = useState<Parameters>(
@@ -53,7 +60,6 @@ export function Panel({
     session.mode === "replay" ? {} : draftParameters;
   const [tab, setTab] = useState(memory[id ?? ""]?.tab ?? "parameters");
   const [section, setSection] = useState(memory[id ?? ""]?.section ?? 0);
-  const [controlPage, setControlPage] = useState(0);
   const [runs, setRuns] = useState({ input: "", output: "" });
   const [upstream, setUpstream] = useState("");
   const [queries, setQueries] = useState({ input: {}, output: {} });
@@ -67,7 +73,6 @@ export function Panel({
     setOutput(null);
     setRuns(saved?.runs ?? { input: "", output: "" });
     setUpstream(saved?.upstream ?? "");
-    setControlPage(0);
     setQueries({ input: {}, output: {} });
   }, [id, session.mode]);
   useEffect(() => {
@@ -87,27 +92,45 @@ export function Panel({
   useEffect(() => {
     if (!id) return;
     let alive = true;
-    if (session.mode === "replay") {
+    if (stages.source === "synthetic") {
+      const output = (demoPanes as Record<string, PaneResponse>)[id];
+      const source =
+        upstream ||
+        registry.nodes.find((n) => n.id === id)?.io.source ||
+        registry.edges.find(
+          (e) =>
+            e.target === id &&
+            !e.sub &&
+            registry.nodes.find((n) => n.id === e.source)?.variant !==
+              "trigger",
+        )?.source;
+      const input = (demoPanes as Record<string, PaneResponse>)[
+        source ?? "validate-config"
+      ];
       setInput({
+        ...input,
+        node: id,
+        side: "input",
+        upstream: source ? [source] : [],
+      });
+      setOutput(output);
+      setLoading(false);
+      return;
+    }
+    if (session.mode === "replay") {
+      const unavailable: PaneResponse = {
         node: id,
         side: "input",
         total: 0,
         offset: 0,
-        columns: ["row", "count"],
+        columns: [],
         rows: [],
-        config_hash: copy.unknown,
+        config_hash: "v1",
         status: "unavailable",
-      });
-      setOutput({
-        node: id,
-        side: "output",
-        total: 0,
-        offset: 0,
-        columns: ["row", "count"],
-        rows: [],
-        config_hash: copy.unknown,
-        status: "unavailable",
-      });
+      };
+      setInput(unavailable);
+      setOutput({ ...unavailable, side: "output" });
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -139,7 +162,18 @@ export function Panel({
     return () => {
       alive = false;
     };
-  }, [id, session.mode, session.trace, runs, upstream, queries, active]);
+  }, [
+    id,
+    session.mode,
+    session.trace,
+    runs,
+    upstream,
+    queries,
+    active,
+    retry,
+    stages.source,
+    registry,
+  ]);
   useEffect(() => {
     function key(event: KeyboardEvent) {
       if (event.key === "Escape") session.set({ panel: null });
@@ -209,22 +243,15 @@ export function Panel({
       help: "",
     })),
   ];
-  const settingsSupported = [
-    "extract",
-    "extract-step",
-    "model",
-    "model-bakeoff",
-    "ingest",
-    "sec",
-    "download",
-  ].includes(id ?? "");
-  const sections = [copy.source, copy.limits, copy.models];
-  const fields =
-    section === 0
-      ? controls
-      : section === 1
-        ? controls.filter((c) => ["sample", "limit", "seed"].includes(c.name))
-        : controls.filter((c) => c.name === "model");
+  const settingsSupported = true;
+  const fields = controls.filter(
+    (c) =>
+      c.kind !== "help" &&
+      c.name !== "set" &&
+      (tab === "settings"
+        ? c.name.startsWith("config:")
+        : !c.name.startsWith("config:")),
+  );
   const at = registry.nodes.findIndex((n) => n.id === id);
   return (
     <AnimatePresence>
@@ -239,6 +266,7 @@ export function Panel({
           }}
         >
           <motion.div
+            data-node={id}
             role="dialog"
             aria-modal="true"
             aria-label={label(node.label_key)}
@@ -249,7 +277,11 @@ export function Panel({
             transition={{ type: "spring", stiffness: 340, damping: 32 }}
           >
             <DataPane
-              key={id}
+              key={id + ":input"}
+              registry={registry}
+              stages={stages}
+              timestamp={timestamp}
+              retry={() => setRetry((n) => n + 1)}
               nodeId={id ?? copy.empty}
               side="input"
               upstreamValue={upstream}
@@ -323,202 +355,135 @@ export function Panel({
                     {copy.replay}
                   </button>
                 </div>
-                {tab === "parameters" ? (
-                  <>
-                    {sections.map((name, i) => (
-                      <div className="parameter-section" key={name}>
-                        <button
-                          className="section-toggle"
-                          onClick={() => {
-                            setSection(section === i ? -1 : i);
-                            setControlPage(0);
-                          }}
-                          aria-expanded={section === i}
-                        >
-                          <span>{glyphs.chevron}</span>
-                          {name}
-                        </button>
-                        {section === i && (
-                          <div>
-                            {fields
-                              .slice(controlPage, controlPage + 2)
-                              .map((control) => (
-                                <div
-                                  className="field-control"
-                                  data-flag={control.name}
-                                  key={control.name}
-                                >
-                                  <label htmlFor={`${id}-${control.name}`}>
-                                    {fieldLabel(
-                                      control.name
-                                        .split(".")
-                                        .pop()
-                                        ?.replace("config:", "") ??
-                                        control.name,
-                                    )}
-                                  </label>
-                                  {control.kind === "help" ? (
-                                    <Button
-                                      id={`${id}-${control.name}`}
-                                      icon="help"
-                                      title={copy.help}
-                                      onClick={() => session.set({ help: 13 })}
-                                    />
-                                  ) : control.kind === "boolean" ? (
-                                    <input
-                                      id={`${id}-${control.name}`}
-                                      role="switch"
-                                      type="checkbox"
-                                      checked={Boolean(
-                                        parameters[control.name] ??
-                                        control.default,
-                                      )}
-                                      onChange={(e) =>
-                                        setValue(control.name, e.target.checked)
-                                      }
-                                    />
-                                  ) : control.multiple ? (
-                                    <OrderedList
-                                      value={
-                                        (parameters[control.name] ??
-                                          control.default ??
-                                          []) as string[]
-                                      }
-                                      onChange={(value) =>
-                                        setValue(control.name, value)
-                                      }
-                                      name={`${id}-${control.name}`}
-                                    />
-                                  ) : control.choices ? (
-                                    <select
-                                      id={`${id}-${control.name}`}
-                                      value={String(
-                                        parameters[control.name] ??
-                                          control.default ??
-                                          "",
-                                      )}
-                                      onChange={(e) =>
-                                        setValue(control.name, e.target.value)
-                                      }
-                                    >
-                                      {control.choices.map((value) => (
-                                        <option key={value}>{value}</option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <div className="input-copy">
-                                      <input
-                                        id={`${id}-${control.name}`}
-                                        type={
-                                          ["number", "integer"].includes(
-                                            control.kind,
-                                          )
-                                            ? "number"
-                                            : "text"
-                                        }
-                                        readOnly={control.name === "config"}
-                                        value={String(
-                                          parameters[control.name] ??
-                                            control.default ??
-                                            "",
-                                        )}
-                                        placeholder={copy.unknown}
-                                        onChange={(e) =>
-                                          setValue(
-                                            control.name,
-                                            control.kind === "integer" ||
-                                              control.kind === "number"
-                                              ? Number(e.target.value)
-                                              : e.target.value,
-                                          )
-                                        }
-                                      />
-                                      {control.name === "config" && (
-                                        <Button
-                                          icon="copy"
-                                          title={copy.copy}
-                                          onClick={() =>
-                                            void navigator.clipboard?.writeText(
-                                              String(control.default),
-                                            )
-                                          }
-                                        />
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            {!fields.length && (
-                              <div className="empty-control">{copy.empty}</div>
+                {!!output?.runs?.length && (
+                  <label className="field-control">
+                    {copy.runs}
+                    <select
+                      aria-label={copy.runs}
+                      value={runs.output}
+                      onChange={(e) =>
+                        setRuns((old) => ({ ...old, output: e.target.value }))
+                      }
+                    >
+                      <option value="">{"Latest run"}</option>
+                      {output.runs.map((run, i) => (
+                        <option key={run} value={run}>
+                          {"Run " + (i + 1)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {fields.length > 0 && (
+                  <div className="parameter-section">
+                    <h3>
+                      {tab === "settings" ? copy.settings : copy.parameters}
+                    </h3>
+                    {fields.map((control) => (
+                      <div
+                        className="field-control"
+                        data-flag={control.name}
+                        key={control.name}
+                      >
+                        <label htmlFor={`${id}-${control.name}`}>
+                          {control.name === "config"
+                            ? "Settings file"
+                            : fieldLabel(
+                                control.name
+                                  .split(".")
+                                  .pop()
+                                  ?.replace("config:", "") ?? control.name,
+                              )}
+                        </label>
+                        {control.kind === "help" ? (
+                          <Button
+                            id={`${id}-${control.name}`}
+                            icon="help"
+                            title={copy.help}
+                            onClick={() => session.set({ help: 13 })}
+                          />
+                        ) : control.kind === "boolean" ? (
+                          <input
+                            id={`${id}-${control.name}`}
+                            role="switch"
+                            type="checkbox"
+                            checked={Boolean(
+                              parameters[control.name] ?? control.default,
                             )}
-                            {fields.length > 2 && (
-                              <div className="pager">
-                                <Button
-                                  icon="previous"
-                                  title={copy.previous}
-                                  disabled={controlPage === 0}
-                                  onClick={() =>
-                                    setControlPage(Math.max(0, controlPage - 2))
-                                  }
-                                />
-                                <small>
-                                  {Math.floor(controlPage / 2) + 1}/
-                                  {Math.ceil(fields.length / 2)}
-                                </small>
-                                <Button
-                                  icon="next"
-                                  title={copy.next}
-                                  disabled={controlPage + 2 >= fields.length}
-                                  onClick={() =>
-                                    setControlPage(controlPage + 2)
-                                  }
-                                />
-                              </div>
+                            onChange={(e) =>
+                              setValue(control.name, e.target.checked)
+                            }
+                          />
+                        ) : control.multiple ? (
+                          <OrderedList
+                            value={
+                              (parameters[control.name] ??
+                                control.default ??
+                                []) as string[]
+                            }
+                            onChange={(value) => setValue(control.name, value)}
+                            name={`${id}-${control.name}`}
+                          />
+                        ) : control.choices ? (
+                          <select
+                            id={`${id}-${control.name}`}
+                            value={String(
+                              parameters[control.name] ?? control.default ?? "",
+                            )}
+                            onChange={(e) =>
+                              setValue(control.name, e.target.value)
+                            }
+                          >
+                            {control.choices.map((value) => (
+                              <option key={value}>{value}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="input-copy">
+                            <input
+                              id={`${id}-${control.name}`}
+                              type={
+                                ["number", "integer"].includes(control.kind)
+                                  ? "number"
+                                  : "text"
+                              }
+                              readOnly={control.name === "config"}
+                              value={String(
+                                parameters[control.name] ??
+                                  control.default ??
+                                  "",
+                              )}
+                              placeholder={copy.unknown}
+                              onChange={(e) =>
+                                setValue(
+                                  control.name,
+                                  control.kind === "integer" ||
+                                    control.kind === "number"
+                                    ? Number(e.target.value)
+                                    : e.target.value,
+                                )
+                              }
+                            />
+                            {control.name === "config" && (
+                              <Button
+                                icon="copy"
+                                title={copy.copy}
+                                onClick={() =>
+                                  void navigator.clipboard?.writeText(
+                                    String(control.default),
+                                  )
+                                }
+                              />
                             )}
                           </div>
                         )}
                       </div>
                     ))}
-                  </>
-                ) : (
-                  <div className="settings-controls">
-                    {[
-                      [copy.timeout, "llm.timeout_seconds", 60],
-                      [copy.retries, "llm.retry_attempts", 1],
-                      [copy.cache, "cache.enabled", true],
-                    ]
-                      .slice(controlPage, controlPage + 2)
-                      .map(([name, path, value]) => (
-                        <label key={String(path)}>
-                          {name}
-                          <input
-                            type={
-                              typeof value === "boolean" ? "checkbox" : "number"
-                            }
-                            defaultValue={
-                              typeof value === "number" ? value : undefined
-                            }
-                            defaultChecked={
-                              typeof value === "boolean" ? value : undefined
-                            }
-                            onChange={(e) => {
-                              const current = (parameters.set ??
-                                []) as string[];
-                              setValue("set", [
-                                ...current.filter(
-                                  (item) => !item.startsWith(path + "="),
-                                ),
-                                `${path}=${typeof value === "boolean" ? e.target.checked : e.target.value}`,
-                              ]);
-                            }}
-                          />
-                        </label>
-                      ))}
-                    <Button
-                      icon="next"
-                      title={copy.next}
-                      onClick={() => setControlPage(controlPage ? 0 : 2)}
-                    />
+                  </div>
+                )}
+                {!fields.length && (
+                  <div className="empty-control">
+                    {"No parameters for this step"}
                   </div>
                 )}
                 {node.id === "model" && (
@@ -543,21 +508,7 @@ export function Panel({
                     })
                   }
                 />
-                <code>
-                  {(output?.run ?? input?.run ?? "").slice(0, 8) ||
-                    copy.unknown}
-                </code>
-                <span>
-                  {output?.duration == null
-                    ? copy.unknown
-                    : output.duration.toFixed(1) + copy.seconds}
-                </span>
-                <span>
-                  {output?.status === "unavailable"
-                    ? copy.unknown
-                    : (output?.total ?? copy.unknown)}
-                </span>
-                <code>{output?.config_hash ?? copy.unknown}</code>
+                <span>{node.io.takes.noun + " → " + node.io.gives.noun}</span>
                 <Button
                   icon="next"
                   title={copy.next}
@@ -571,7 +522,11 @@ export function Panel({
               </div>
             </section>
             <DataPane
-              key={id}
+              key={id + ":output"}
+              registry={registry}
+              stages={stages}
+              timestamp={timestamp}
+              retry={() => setRetry((n) => n + 1)}
               nodeId={id ?? copy.empty}
               side="output"
               data={output}

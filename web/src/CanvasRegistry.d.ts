@@ -6,6 +6,18 @@
  */
 
 export type Version = "v1";
+export type Source = string | null;
+export type Noun = string;
+export type UnitLabel = string;
+export type PlainLine = string;
+export type Icon = string;
+export type Key = string;
+export type Label = string;
+export type Unit = string;
+export type Format = string;
+export type Description = string;
+export type ExampleFields = IOField[];
+export type Summaries = string[];
 export type Id = string;
 export type Direction = "in" | "out";
 export type Kind = string;
@@ -24,7 +36,7 @@ export type Help = string;
 export type Controls = CLIControl[];
 export type Help1 = string;
 export type LabelKey = string;
-export type Icon = string;
+export type Icon1 = string;
 export type Variant = "square" | "trigger" | "wide" | "branch" | "sub";
 export type Group = string;
 export type Capability = "executable" | "planned" | "inspect" | "terminal";
@@ -34,7 +46,7 @@ export type X = number | null;
 export type Y = number | null;
 export type Nodes = CanvasNode[];
 export type TargetPort = string | null;
-export type Source = string;
+export type Source1 = string;
 export type Target = string;
 export type Port = string | null;
 export type Sub = boolean;
@@ -47,6 +59,7 @@ export interface CanvasRegistry {
   graph_schema: GraphSchema;
 }
 export interface CanvasNode {
+  io: NodeIO;
   ports?: Ports;
   help_question?: HelpQuestion;
   id: Id1;
@@ -54,7 +67,7 @@ export interface CanvasNode {
   controls?: Controls;
   help?: Help1;
   label_key: LabelKey;
-  icon: Icon;
+  icon: Icon1;
   variant?: Variant;
   group: Group;
   capability?: Capability;
@@ -62,6 +75,26 @@ export interface CanvasNode {
   open_output?: OpenOutput;
   x?: X;
   y?: Y;
+}
+export interface NodeIO {
+  source?: Source;
+  takes: IOQuantity;
+  gives: IOQuantity;
+  example_fields: ExampleFields;
+  summaries: Summaries;
+}
+export interface IOQuantity {
+  noun: Noun;
+  unit_label: UnitLabel;
+  plain_line: PlainLine;
+  icon: Icon;
+}
+export interface IOField {
+  key: Key;
+  label: Label;
+  unit: Unit;
+  format: Format;
+  description?: Description;
 }
 export interface FlowPort {
   id: Id;
@@ -80,7 +113,7 @@ export interface CLIControl {
 }
 export interface CanvasEdge {
   target_port?: TargetPort;
-  source: Source;
+  source: Source1;
   target: Target;
   port?: Port;
   sub?: Sub;
