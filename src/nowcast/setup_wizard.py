@@ -230,7 +230,7 @@ def initialize(
             if chosen:
                 updates[KEY] = chosen
         elif interactive:
-            if chosen:
+            if saved:
                 print('Existing key ' + json.dumps(metadata(chosen)))
                 if ask('Keep it? [Y/n] ').strip().lower() == 'n':
                     new = hidden('OpenRouter API key (input hidden):')

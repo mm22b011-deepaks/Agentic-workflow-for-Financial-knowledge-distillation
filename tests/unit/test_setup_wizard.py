@@ -25,6 +25,72 @@ def checkout(tmp_path):
     return tmp_path
 
 
+@pytest.mark.parametrize('arguments', [[], ['init', '--yes', '--no-key']])
+def test_bare_setup_enters_wizard_and_forwards_explicit_init_flags(tmp_path, arguments):
+    root = checkout(tmp_path)
+    shutil.copy2(ROOT / 'setup.sh', root / 'setup.sh')
+    python = root / '.venv/bin/python'
+    python.parent.mkdir(parents=True)
+    python.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > wizard-arguments\n')
+    python.chmod(0o755)
+    mise = root / '.tools/bin/mise'
+    mise.parent.mkdir(parents=True)
+    mise.write_text('#!/bin/sh\nexit 70\n')
+    mise.chmod(0o755)
+    child = {k: v for k, v in os.environ.items() if k != 'OPENROUTER_API_KEY'}
+    child['PATH'] = str(mise.parent) + os.pathsep + os.environ['PATH']
+    result = subprocess.run(
+        ['/bin/bash', str(root / 'setup.sh'), *arguments],
+        cwd=root,
+        env=child,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert (root / 'wizard-arguments').read_text().splitlines() == [
+        '-m',
+        'nowcast.setup_wizard',
+        *arguments[1:],
+    ]
+
+
+def test_missing_dotenv_key_prompts_even_when_an_exported_key_exists(tmp_path, monkeypatch, capsys):
+    from dotenv import dotenv_values
+
+    from nowcast.setup_wizard import build_parser, initialize
+
+    root = checkout(tmp_path)
+    exported = 'exported-' + 'a' * 24
+    pasted = 'pasted-' + 'b' * 24
+    monkeypatch.setenv('OPENROUTER_API_KEY', exported)
+    monkeypatch.setattr('nowcast.setup_wizard.bootstrap', lambda root: None)
+    monkeypatch.setattr(sys.stdin, 'isatty', lambda: True)
+    prompts = []
+
+    def hidden(label):
+        prompts.append(label)
+        return pasted
+
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))) as client:
+        assert (
+            initialize(
+                build_parser().parse_args([]),
+                root,
+                prompt=lambda label: '',
+                secret_prompt=hidden,
+                client=client,
+            )
+            == 0
+        )
+    assert prompts == ['OpenRouter API key (input hidden):']
+    assert dotenv_values(root / '.env')['OPENROUTER_API_KEY'] == pasted
+    assert (root / '.env').stat().st_mode & 0o777 == 0o600
+    output = capsys.readouterr()
+    assert pasted not in output.out + output.err and exported not in output.out + output.err
+    assert 'unset OPENROUTER_API_KEY' in output.out
+
+
 def test_noninteractive_skip_key_is_offline_and_does_not_prompt(tmp_path, monkeypatch, capsys):
     from nowcast.setup_wizard import build_parser, initialize
 
@@ -41,6 +107,56 @@ def test_noninteractive_skip_key_is_offline_and_does_not_prompt(tmp_path, monkey
     assert local['scope']['profile'] == 'standard'
     assert 'exported-' not in capsys.readouterr().out
     assert not (root / '.env').exists()
+
+
+def test_empty_hidden_input_skips_key_without_provider_calls(tmp_path, monkeypatch):
+    from nowcast.setup_wizard import build_parser, initialize
+
+    root = checkout(tmp_path)
+    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
+    monkeypatch.delenv('SEC_USER_AGENT', raising=False)
+    monkeypatch.setattr('nowcast.setup_wizard.bootstrap', lambda root: None)
+    monkeypatch.setattr(sys.stdin, 'isatty', lambda: True)
+    with httpx.Client(
+        transport=httpx.MockTransport(lambda request: pytest.fail('skipped key made a request'))
+    ) as client:
+        assert (
+            initialize(
+                build_parser().parse_args([]),
+                root,
+                prompt=lambda label: '',
+                secret_prompt=lambda label: '',
+                client=client,
+            )
+            == 0
+        )
+    assert load_config(root / 'configs/config.yaml', local=True).llm.offline
+    assert not (root / '.env').exists()
+
+
+def test_interactive_rerun_keeps_saved_key_without_another_secret_prompt(tmp_path, monkeypatch):
+    from dotenv import dotenv_values
+
+    from nowcast.setup_wizard import build_parser, initialize
+
+    root = checkout(tmp_path)
+    saved = 'saved-' + 'c' * 24
+    (root / '.env').write_text('OPENROUTER_API_KEY=' + saved + '\n')
+    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
+    monkeypatch.setattr('nowcast.setup_wizard.bootstrap', lambda root: None)
+    monkeypatch.setattr(sys.stdin, 'isatty', lambda: True)
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))) as client:
+        assert (
+            initialize(
+                build_parser().parse_args([]),
+                root,
+                prompt=lambda label: '',
+                secret_prompt=lambda label: pytest.fail('saved key prompted again'),
+                client=client,
+            )
+            == 0
+        )
+    assert dotenv_values(root / '.env')['OPENROUTER_API_KEY'] == saved
 
 
 def test_hidden_key_is_private_preserves_lines_and_redacts_shadow(tmp_path, monkeypatch, capsys):

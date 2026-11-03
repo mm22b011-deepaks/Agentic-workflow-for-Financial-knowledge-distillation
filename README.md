@@ -11,15 +11,14 @@ Turn SEC earnings releases into an identifier-free knowledge base of index-level
 Native Linux requires `git`, `curl`, `tar` and `make`. Bootstrap installs the pinned Python, Node and uv toolchain through mise.
 
 ```bash
-./setup.sh bootstrap
-./setup.sh init
+./setup.sh
 ./setup.sh demo
 ./setup.sh website
 ```
 
 Open **http://localhost:8767**. The website binds to `0.0.0.0`; use it on a trusted workstation/network. It has CSRF protection but no user login.
 
-Initialization accepts the API key without echo, stores it in ignored `.env`, and writes non-secret preferences to ignored `configs/local.yaml`. Exported environment values take precedence. Skip the key for offline use. SEC downloads require a contact-bearing `SEC_USER_AGENT`.
+Bare `./setup.sh` bootstraps the toolchain and opens initialization. When `.env` has no key, it asks for a hidden paste and saves it with owner-only permissions. Skip the key for offline use. Existing values are kept by default; exported environment values take precedence. SEC downloads require a contact-bearing `SEC_USER_AGENT`. Use `./setup.sh bootstrap` for installation only, or `./setup.sh init --yes --no-key` for noninteractive offline setup.
 
 ## Run
 
