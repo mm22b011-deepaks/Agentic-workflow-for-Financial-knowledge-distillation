@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "captured_at_utc": "2026-11-03T04:44:33.759644+00:00",
+  "source": "real pipeline; public index-level projection",
+  "partial": true,
+  "index_snapshots": 68,
+  "kpi_observations": 272,
+  "kpi_status_counts": {
+    "suppressed": 72,
+    "insufficient_observations": 65,
+    "ok": 135
+  },
+  "limitations": [
+    "Extraction is incomplete; blocked outcomes are preserved.",
+    "Per-document inputs, quotes and private evidence are not distributed.",
+    "Snapshot metrics describe the captured run, not current account usage."
+  ],
+  "files": {
+    "config.yaml": "e9ccb38e4727ea04997fa6c9a1b9fbf739c4d38f95f4680bfdeda246b9b8be3c",
+    "aggregates/index_aggregates.parquet": "70c1676777f33c8b3a01bf07a5b43fb5d419cbdd69c9613a2616714a3bd24010",
+    "exports/index.json": "5b3580f5cf85e6bc7dcac4af459606bba453221d54347027d835df3242215b2e",
+    "exports/kpis.json": "3f6c93c31aea5ae0ffe90c535ca45f7ba406b858d4afa2c4ecbf41fd0a458393",
+    "snapshots/stages.json": "14b6ff792cf1dca6abf5adf4e58b28535b7ecb668b2a13e8b45f290da023dd11",
+    "snapshots/coverage.json": "bb9d571c0d5c1cbecafc8e00c39cc02e84d510ab3d3ff355e9d2d40e4c850d11",
+    "snapshots/cost.json": "4929a78e5c24001c960027886f609d78f04e0fb6e847732562d929188540bc38",
+    "snapshots/bakeoff.json": "a98d45c565103dbd4193b40d54e18507d962dcaaffbec579a837cdf1ec525782",
+    "snapshots/plan.json": "37a50720efd5eb44aac70a912ae7b6bebc4b442c526c3f67cb59b2c432feb531",
+    "snapshots/schedule.json": "bf91dbe216121a8267c64adc8d580b1b19be86c8e32321b1d58d3f500aa02ef7"
+  },
+  "kind": "public-offline-snapshot"
+}

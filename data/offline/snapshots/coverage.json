@@ -1,0 +1,577 @@
+{
+  "version": "v1",
+  "metrics": {
+    "gate": 10.0,
+    "minimum_observations": 10.0
+  },
+  "series": [
+    {
+      "category": "coverage",
+      "metric": "eps_growth",
+      "season": "2025Q4",
+      "value": 0.125,
+      "denominator": 40.0,
+      "status": "insufficient_observations"
+    },
+    {
+      "category": "coverage",
+      "metric": "revenue_growth",
+      "season": "2025Q4",
+      "value": 0.55,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "guidance",
+      "season": "2025Q4",
+      "value": 0.275,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "tone",
+      "season": "2025Q4",
+      "value": 0.95,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "eps_growth",
+      "season": "2026Q1",
+      "value": 0.175,
+      "denominator": 40.0,
+      "status": "insufficient_observations"
+    },
+    {
+      "category": "coverage",
+      "metric": "revenue_growth",
+      "season": "2026Q1",
+      "value": 0.5,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "guidance",
+      "season": "2026Q1",
+      "value": 0.1,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "tone",
+      "season": "2026Q1",
+      "value": 0.95,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "eps_growth",
+      "season": "2026Q2",
+      "value": 0.275,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "revenue_growth",
+      "season": "2026Q2",
+      "value": 0.525,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "guidance",
+      "season": "2026Q2",
+      "value": 0.175,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "tone",
+      "season": "2026Q2",
+      "value": 0.875,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "eps_growth",
+      "season": "2026Q3",
+      "value": 0.25,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "revenue_growth",
+      "season": "2026Q3",
+      "value": 0.6,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "guidance",
+      "season": "2026Q3",
+      "value": 0.375,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "coverage",
+      "metric": "tone",
+      "season": "2026Q3",
+      "value": 0.925,
+      "denominator": 40.0,
+      "status": "ok"
+    },
+    {
+      "category": "reasons",
+      "metric": "eps_basis:quote_not_found",
+      "season": "",
+      "value": 16.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "fiscal_period:period_not_near_filing",
+      "season": "",
+      "value": 8.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_direction:low_confidence",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_direction:quote_missing",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_direction:quote_not_found",
+      "season": "",
+      "value": 7.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_direction:quote_too_long",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_metric:low_confidence",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_metric:quote_not_found",
+      "season": "",
+      "value": 4.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_presence:quote_missing",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "guidance_presence:quote_not_found",
+      "season": "",
+      "value": 6.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "prior_year_basis:quote_not_found",
+      "season": "",
+      "value": 34.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "prior_year_eps:low_confidence",
+      "season": "",
+      "value": 84.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "prior_year_eps:number_not_in_quote",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "prior_year_eps:number_not_in_source",
+      "season": "",
+      "value": 138.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "prior_year_eps:quote_not_found",
+      "season": "",
+      "value": 88.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "record:empty_extraction",
+      "season": "",
+      "value": 3.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "record:llm_failed",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "record:truncated",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "record:validation_issues",
+      "season": "",
+      "value": 170.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "reported_eps:low_confidence",
+      "season": "",
+      "value": 6.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "reported_eps:number_not_in_quote",
+      "season": "",
+      "value": 3.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "reported_eps:number_not_in_source",
+      "season": "",
+      "value": 15.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "reported_eps:quote_not_found",
+      "season": "",
+      "value": 7.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue:low_confidence",
+      "season": "",
+      "value": 21.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue:number_not_in_quote",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue:number_not_in_source",
+      "season": "",
+      "value": 32.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue:quote_not_found",
+      "season": "",
+      "value": 24.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue_yoy_growth:low_confidence",
+      "season": "",
+      "value": 15.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue_yoy_growth:number_not_in_quote",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue_yoy_growth:number_not_in_source",
+      "season": "",
+      "value": 17.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "revenue_yoy_growth:quote_not_found",
+      "season": "",
+      "value": 15.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "theme.demand:quote_not_found",
+      "season": "",
+      "value": 8.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "theme.margins:low_confidence",
+      "season": "",
+      "value": 3.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "theme.margins:quote_not_found",
+      "season": "",
+      "value": 12.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "theme.supply_chain:quote_not_found",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "tone:low_confidence",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "reasons",
+      "metric": "tone:quote_too_long",
+      "season": "",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "reported_eps",
+      "season": "",
+      "value": 0.8589743589743589,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "prior_year_eps",
+      "season": "",
+      "value": 0.23076923076923078,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "consensus_eps",
+      "season": "",
+      "value": 0.0,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "revenue",
+      "season": "",
+      "value": 0.7307692307692307,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "revenue_yoy_growth",
+      "season": "",
+      "value": 0.5641025641025641,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "eps_basis",
+      "season": "",
+      "value": 0.8974358974358975,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "prior_year_basis",
+      "season": "",
+      "value": 0.7435897435897436,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "guidance_presence",
+      "season": "",
+      "value": 0.8717948717948718,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "guidance_direction",
+      "season": "",
+      "value": 0.6346153846153846,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "guidance_metric",
+      "season": "",
+      "value": 0.8269230769230769,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "fields",
+      "metric": "tone",
+      "season": "",
+      "value": 0.9615384615384616,
+      "denominator": 156.0,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "downloaded",
+      "season": "2025Q4",
+      "value": 40.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "downloaded",
+      "season": "2026Q1",
+      "value": 39.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "no_release",
+      "season": "2026Q1",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "downloaded",
+      "season": "2026Q2",
+      "value": 39.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "no_release",
+      "season": "2026Q2",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "downloaded",
+      "season": "2026Q3",
+      "value": 38.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "cohort",
+      "metric": "no_release",
+      "season": "2026Q3",
+      "value": 2.0,
+      "denominator": null,
+      "status": "measured"
+    }
+  ]
+}

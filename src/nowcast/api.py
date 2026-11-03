@@ -27,6 +27,7 @@ from nowcast.contracts import (
     SessionResponse,
 )
 from nowcast.jobs import store_for
+from nowcast.offline import saved_snapshot
 from nowcast.paths import Paths
 
 
@@ -61,6 +62,8 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
                 header, nonce
             ):
                 return JSONResponse({'detail': 'session protection required'}, status_code=403)
+            if saved_snapshot(config, 'index', IndexSnapshot) is not None:
+                return JSONResponse({'detail': 'offline snapshot is read-only'}, status_code=409)
         if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
             import re
 
@@ -144,6 +147,9 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
 
     @app.get('/api/v1/index', response_model=IndexSnapshot)
     def index() -> IndexSnapshot:
+        bundled = saved_snapshot(config, 'index', IndexSnapshot)
+        if bundled is not None:
+            return bundled
         path = Paths.from_config(config).aggregates(config) / 'index_aggregates.parquet'
         demo = Paths.from_config(config).resolve('demo/index.json')
         document_index = Paths.from_config(config).resolve(config.data.document_index)
@@ -239,7 +245,9 @@ def create_app(config_path: Path, launch_workers: bool = True) -> FastAPI:
     def schedule() -> ScheduleSnapshot:
         from nowcast.scheduler import Scheduler
 
-        return ScheduleSnapshot.model_validate(Scheduler(config, config_path).snapshot())
+        return saved_snapshot(
+            config, 'schedule', ScheduleSnapshot
+        ) or ScheduleSnapshot.model_validate(Scheduler(config, config_path).snapshot())
 
     @app.get('/api/v1/trace')
     def trace(request: Request) -> dict[str, Any]:

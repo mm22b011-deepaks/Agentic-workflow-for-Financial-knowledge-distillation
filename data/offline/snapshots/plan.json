@@ -1,0 +1,46 @@
+{
+  "version": "v1",
+  "metrics": {},
+  "series": [
+    {
+      "category": "plan",
+      "metric": "companies",
+      "season": "",
+      "value": 40.0,
+      "denominator": null,
+      "status": "estimated"
+    },
+    {
+      "category": "plan",
+      "metric": "releases",
+      "season": "",
+      "value": 160.0,
+      "denominator": null,
+      "status": "estimated"
+    },
+    {
+      "category": "plan",
+      "metric": "base_requests",
+      "season": "",
+      "value": 160.0,
+      "denominator": null,
+      "status": "estimated"
+    },
+    {
+      "category": "plan",
+      "metric": "expected_requests",
+      "season": "",
+      "value": 185.0,
+      "denominator": null,
+      "status": "estimated"
+    },
+    {
+      "category": "plan",
+      "metric": "model_days",
+      "season": "",
+      "value": 1.0,
+      "denominator": null,
+      "status": "estimated"
+    }
+  ]
+}

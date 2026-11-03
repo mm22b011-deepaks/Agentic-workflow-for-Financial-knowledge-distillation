@@ -37,7 +37,15 @@ Only models ending in `:free` are accepted. Tracked defaults are 50 requests/day
 
 ## Data and privacy
 
-Runtime files stay under ignored `data/`: filings, checkpoints, request ledgers, aggregates and exports. The final knowledge base is `data/exports/kpis.json`, containing **index proxies only**. Coverage gates suppress unsupported values; partial runs remain visible.
+Private runtime files stay ignored under `data/`. The checked-in **`data/offline/`** bundle contains 68 real index snapshots, 272 KPI observations and public coverage, cost, bakeoff, plan and stage summaries. Its manifest records capture time, checksums and partial-run limitations. It contains no raw filings, company identifiers, private evidence, credentials or job databases.
+
+After bootstrap, view the bundled results without an API key or network access:
+
+```bash
+./setup.sh website --config data/offline/config.yaml
+```
+
+The bundle is a read-only, historical, partial snapshot; per-document inspection is unavailable. Published KPIs are in `data/offline/exports/kpis.json`, and `exports/index.json` can be loaded through Replay. Coverage gates suppress unsupported values.
 
 Index view is the default. Private evidence requires explicit server enablement and a session toggle; it never enters public exports or replay. RAPTOR, XBRL and Nowcast are planned capabilities.
 
@@ -52,6 +60,6 @@ make web-build      # Build with the pinned Node toolchain
 
 Frontend checks use the `typecheck`, `lint` and `test` npm scripts in `web/`, through mise. For example: `mise exec -- npm --prefix web test`. Browser tests use Playwright/axe and require Chromium. Use `.tools/bin/mise` if mise is not on PATH.
 
-Package committed source with `scripts/package.sh tresata-source.zip`. Credentials, real data, caches, dependency directories and archives are excluded. Do not submit a zip of the working directory.
+Package committed source and the public offline bundle with `scripts/package.sh tresata-source.zip`. Private runtime data, credentials, caches, dependency directories and archives are excluded. Do not submit a zip of the working directory.
 
 MIT licensed. Third-party data retains its own rights and terms.

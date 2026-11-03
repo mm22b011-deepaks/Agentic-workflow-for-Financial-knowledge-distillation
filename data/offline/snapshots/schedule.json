@@ -1,0 +1,258 @@
+{
+  "version": "v1",
+  "utc_day": "2026-11-03",
+  "local_time": "2026-11-03T10:14:33.486312+05:30",
+  "paused": false,
+  "models_confirmed": true,
+  "auth_blocked": false,
+  "next_run_utc": "2026-11-04T00:10:00+00:00",
+  "next_run_local": "2026-11-04T05:40:00+05:30",
+  "forecast": {
+    "version": "v1",
+    "profile": "standard",
+    "companies": 40,
+    "seasons": [
+      "2025Q4",
+      "2026Q1",
+      "2026Q2",
+      "2026Q3"
+    ],
+    "seed": 42,
+    "releases": 160,
+    "base_requests": 160,
+    "bakeoff_requests": 20,
+    "retry_reserve": 5,
+    "expected_requests": 185,
+    "daily_capacity": 895,
+    "daily_limit": 1000,
+    "model_days": 1,
+    "allowance_status": "unverified"
+  },
+  "days": [
+    {
+      "utc_day": "2026-11-02",
+      "local_time": "2026-11-02T05:40:00+05:30",
+      "used": 166,
+      "budget": 895,
+      "configured_limit": 1000,
+      "today": false,
+      "planned_requests": 180,
+      "retry_reserve": 5,
+      "planned_by_task": {
+        "bakeoff": 20,
+        "extract": 160
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "doctor",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "members",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "panel",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "ingest",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "index",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "estimate",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "bakeoff",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 20,
+      "attempts": 1,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "extract",
+      "status": "blocked",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 160,
+      "attempts": 1,
+      "last_error": "needs attention",
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "aggregate",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "export",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "labels",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "quality",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "report",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "labels-30",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": true,
+      "capability": "human"
+    },
+    {
+      "id": "spot-check-5",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": true,
+      "capability": "human"
+    },
+    {
+      "id": "nda",
+      "status": "pending",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": null,
+      "next_eligible": null,
+      "human": true,
+      "capability": "human"
+    },
+    {
+      "id": "xbrl",
+      "status": "blocked",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 0,
+      "last_error": "planned",
+      "next_eligible": null,
+      "human": false,
+      "capability": "planned"
+    },
+    {
+      "id": "batch-aggregate",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 2,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    },
+    {
+      "id": "batch-export",
+      "status": "done",
+      "earliest_day": "2026-11-02",
+      "quota_cost": 0,
+      "attempts": 2,
+      "last_error": null,
+      "next_eligible": null,
+      "human": false,
+      "capability": "executable"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-data/
+data/*
 raw/
 extractions/
 aggregates/
@@ -31,3 +31,21 @@ htmlcov/
 .tools/
 .hypothesis/
 configs/local.yaml
+
+# Only the public offline bundle is distributable; runtime files remain private.
+!data/offline/
+data/offline/**
+!data/offline/config.yaml
+!data/offline/manifest.json
+!data/offline/aggregates/
+!data/offline/aggregates/index_aggregates.parquet
+!data/offline/exports/
+!data/offline/exports/index.json
+!data/offline/exports/kpis.json
+!data/offline/snapshots/
+!data/offline/snapshots/stages.json
+!data/offline/snapshots/coverage.json
+!data/offline/snapshots/cost.json
+!data/offline/snapshots/bakeoff.json
+!data/offline/snapshots/plan.json
+!data/offline/snapshots/schedule.json

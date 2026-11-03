@@ -1,0 +1,86 @@
+{
+  "version": "v1",
+  "metrics": {},
+  "series": [
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3.5-lightning:free",
+      "season": "parse_success_rate",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3.5-lightning:free",
+      "season": "empty_completion_rate",
+      "value": 0.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3.5-lightning:free",
+      "season": "latency_p95_seconds",
+      "value": 292.0317767391068,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3.5-lightning:free",
+      "season": "nonempty_extractions",
+      "value": 9.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3.5-lightning:free",
+      "season": "tokens",
+      "value": 386918.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "season": "parse_success_rate",
+      "value": 1.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "season": "empty_completion_rate",
+      "value": 0.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "season": "latency_p95_seconds",
+      "value": 76.52678343588194,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "season": "nonempty_extractions",
+      "value": 9.0,
+      "denominator": null,
+      "status": "measured"
+    },
+    {
+      "category": "bakeoff",
+      "metric": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "season": "tokens",
+      "value": 253419.0,
+      "denominator": null,
+      "status": "measured"
+    }
+  ]
+}

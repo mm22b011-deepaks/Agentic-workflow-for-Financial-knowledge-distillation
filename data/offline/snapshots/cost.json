@@ -1,0 +1,22 @@
+{
+  "version": "v1",
+  "metrics": {
+    "p50": 200.7785879019939,
+    "p95": 381.88308655525617,
+    "prompt": 4458003.0,
+    "reasoning": 3254939.0,
+    "content": null,
+    "cache": 10.0,
+    "calls": 270.0,
+    "retries": 0.0,
+    "truncations": 44.0,
+    "429": 0.0,
+    "calls_per_document": 1.0769230769230769,
+    "xbrl_saved_calls": null,
+    "retry_measured_attempts": 168.0,
+    "document_measured_attempts": 168.0,
+    "used": 2.0,
+    "limit": 1000.0
+  },
+  "series": []
+}

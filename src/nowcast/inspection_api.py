@@ -24,6 +24,7 @@ from nowcast.contracts import (
 )
 from nowcast.errors import DataError
 from nowcast.jobs import JobStore
+from nowcast.offline import saved_snapshot
 from nowcast.workflow_registry import canvas_registry
 
 
@@ -74,11 +75,13 @@ def register(app: FastAPI, config: Config, config_path: Path, store: JobStore) -
     def kpis() -> KPIKnowledgeBase:
         from nowcast.knowledge import knowledge_base
 
-        return knowledge_base(config)
+        return saved_snapshot(config, 'kpis', KPIKnowledgeBase) or knowledge_base(config)
 
     @app.get('/api/v1/stages', response_model=StageSnapshot)
     def stages() -> StageSnapshot:
-        return inspection.stages(config, config_path, store)
+        return saved_snapshot(config, 'stages', StageSnapshot) or inspection.stages(
+            config, config_path, store
+        )
 
     @app.get('/api/v1/canvas-registry', response_model=CanvasRegistry)
     def registry() -> CanvasRegistry:
@@ -146,16 +149,16 @@ def register(app: FastAPI, config: Config, config_path: Path, store: JobStore) -
 
     @app.get('/api/v1/coverage', response_model=MetricSnapshot)
     def coverage() -> MetricSnapshot:
-        return inspection.coverage(config)
+        return saved_snapshot(config, 'coverage', MetricSnapshot) or inspection.coverage(config)
 
     @app.get('/api/v1/cost', response_model=MetricSnapshot)
     def cost() -> MetricSnapshot:
-        return inspection.cost(config, store)
+        return saved_snapshot(config, 'cost', MetricSnapshot) or inspection.cost(config, store)
 
     @app.get('/api/v1/plan', response_model=MetricSnapshot)
     def plan() -> MetricSnapshot:
-        return inspection.plan(config)
+        return saved_snapshot(config, 'plan', MetricSnapshot) or inspection.plan(config)
 
     @app.get('/api/v1/bakeoff', response_model=MetricSnapshot)
     def bakeoff() -> MetricSnapshot:
-        return inspection.bakeoff(config)
+        return saved_snapshot(config, 'bakeoff', MetricSnapshot) or inspection.bakeoff(config)

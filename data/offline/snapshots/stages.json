@@ -1,0 +1,504 @@
+{
+  "version": "v1",
+  "source": "pipeline",
+  "nodes": [
+    {
+      "id": "run-all",
+      "status": "done",
+      "in_count": null,
+      "out_count": 340,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "validate-config",
+      "status": "done",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "build-constituents",
+      "status": "done",
+      "in_count": null,
+      "out_count": 637,
+      "duration": 7.733065,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "estimate-scope",
+      "status": "done",
+      "in_count": 637,
+      "out_count": 4,
+      "duration": 5.441197,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "ingest",
+      "status": "done",
+      "in_count": 4,
+      "out_count": 156,
+      "duration": 223.096106,
+      "skipped_by_reason": {
+        "already_downloaded": 5,
+        "duplicate_exhibit": 32,
+        "duplicate_season": 7
+      },
+      "last_run": null
+    },
+    {
+      "id": "extract",
+      "status": "error",
+      "in_count": 156,
+      "out_count": 151,
+      "duration": 46355.014845,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "aggregate",
+      "status": "done",
+      "in_count": 151,
+      "out_count": 272,
+      "duration": 12.187038,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "gate",
+      "status": "done",
+      "in_count": 272,
+      "out_count": 68,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "publish",
+      "status": "done",
+      "in_count": 68,
+      "out_count": 272,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "suppressed",
+      "status": "done",
+      "in_count": 68,
+      "out_count": 272,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "nowcast",
+      "status": "planned",
+      "in_count": 272,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "cohort",
+      "status": "done",
+      "in_count": 4,
+      "out_count": 160,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "discover",
+      "status": "idle",
+      "in_count": 160,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {
+        "already_downloaded": 5,
+        "duplicate_exhibit": 32,
+        "duplicate_season": 7
+      },
+      "last_run": null
+    },
+    {
+      "id": "download",
+      "status": "done",
+      "in_count": null,
+      "out_count": 156,
+      "duration": null,
+      "skipped_by_reason": {
+        "already_downloaded": 5,
+        "duplicate_exhibit": 32,
+        "duplicate_season": 7
+      },
+      "last_run": null
+    },
+    {
+      "id": "parse",
+      "status": "done",
+      "in_count": 156,
+      "out_count": 156,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "extract-step",
+      "status": "error",
+      "in_count": 156,
+      "out_count": 151,
+      "duration": 46355.014845,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "validate",
+      "status": "done",
+      "in_count": 151,
+      "out_count": 151,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "consolidate",
+      "status": "done",
+      "in_count": 151,
+      "out_count": 151,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "review",
+      "status": "done",
+      "in_count": 151,
+      "out_count": 755,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "xbrl",
+      "status": "planned",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "model",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "cache",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "limiter",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "validators",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "sec",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "rate",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "kpi",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "rebuild-index",
+      "status": "done",
+      "in_count": 156,
+      "out_count": 156,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "model-bakeoff",
+      "status": "done",
+      "in_count": 156,
+      "out_count": 2,
+      "duration": 2681.827854,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "doctor",
+      "status": "done",
+      "in_count": null,
+      "out_count": 1,
+      "duration": 4.070384,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "freeze-panel",
+      "status": "done",
+      "in_count": null,
+      "out_count": 1,
+      "duration": 4.419027,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "validate-index",
+      "status": "done",
+      "in_count": null,
+      "out_count": 156,
+      "duration": 158.448444,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "supersede-stale",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo",
+      "status": "done",
+      "in_count": null,
+      "out_count": 1,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "serve",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "export",
+      "status": "done",
+      "in_count": null,
+      "out_count": 340,
+      "duration": 12.285088,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "prepare-labels",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "quality-summary",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "report",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-plan",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-status",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-run",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-pause",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-resume",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-install",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule-uninstall",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "raptor",
+      "status": "planned",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo-ingest",
+      "status": "done",
+      "in_count": null,
+      "out_count": 500,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo-parse",
+      "status": "done",
+      "in_count": null,
+      "out_count": 500,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo-extract",
+      "status": "done",
+      "in_count": null,
+      "out_count": 500,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo-validate",
+      "status": "done",
+      "in_count": null,
+      "out_count": 500,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "demo-aggregate",
+      "status": "done",
+      "in_count": null,
+      "out_count": 4,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "cli",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    },
+    {
+      "id": "schedule",
+      "status": "idle",
+      "in_count": null,
+      "out_count": null,
+      "duration": null,
+      "skipped_by_reason": {},
+      "last_run": null
+    }
+  ]
+}
