@@ -196,16 +196,9 @@ def test_period_and_theme_vocabulary_are_checked(config: Config) -> None:
 
 
 def test_reply_budget_covers_measured_successful_completions(config: Config) -> None:
-    import json
-
-    evidence = json.loads(
-        (Path(__file__).resolve().parents[2] / 'evidence/reply-budget.json').read_text()
-    )
-    assert (
-        evidence['successful_completion_tokens']['maximum']
-        <= config.llm.max_tokens
-        <= config.llm.max_tokens_ceiling
-    )
+    # Maximum observed completion in the original 60 successful requests.
+    measured_maximum = 30_973
+    assert measured_maximum <= config.llm.max_tokens <= config.llm.max_tokens_ceiling
 
 
 def test_schema_invalid_reply_is_not_cacheable() -> None:

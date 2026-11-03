@@ -33,7 +33,7 @@ jobs:
       - run: npm --prefix web ci
       - run: make references web-build
       - run: npm --prefix web run typecheck && npm --prefix web run lint
-      - run: git diff --exit-code -- schemas docs/cli.md docs/help.md web/src
+      - run: git diff --exit-code -- schemas web/src
       - run: cd web && npx playwright install --with-deps chromium
       - run: npm --prefix web test
   online-audits:

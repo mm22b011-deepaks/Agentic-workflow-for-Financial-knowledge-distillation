@@ -1,4 +1,3 @@
-import helpSource from "./help.md?raw";
 export const copy = {
   exportKpis: "Export KPIs",
   indexFile: "tresata-index.json",
@@ -240,10 +239,22 @@ export function fieldLabel(key: string): string {
     )[key] ?? short(key)
   );
 }
-export const helpAnswers = helpSource
-  .split(/^## /m)
-  .slice(1)
-  .map((part) => part.slice(part.indexOf("\n")).trim());
+export const helpAnswers = [
+  "One CLI stage. Double-click to inspect input and output. ○ → ○",
+  "Teal tools, coral selection; green done, amber attention, red error. ○ ✓ △ ×",
+  "One company × one filing quarter. Frozen panels reuse companies. 40 × 4",
+  "○ means unavailable or unmeasured. It never means zero. ○ ≠ 0",
+  "Observations must meet configured publish thresholds. Coverage is not accuracy. n ÷ N → ◆",
+  "Inspect flagged fields here. Four blocking reasons exclude the record. △ → ✓ / ×",
+  "RAPTOR, XBRL and Nowcast are planned and cannot execute. ◌ ⇢ ◇",
+  "Validated Index fixtures only. Replay executes nothing and excludes private evidence. ▶ → ◇",
+  "Resume requires unchanged configuration and upstream hashes; quotas still apply. Ⅱ → ▶",
+  "Identifier-free proxies and anonymous rows. Internal trace lasts this session only. ◇ → ○",
+  "Only configured :free models. Bakeoff selects measured results within quota. ○ → 1",
+  "Persisted UTC reservations count against your cap, minus schedule reserves. n / N",
+  "Internal trace → Evidence. J/K navigate; 1/2/3 mark verdicts; E opens evidence. ✓ × ?",
+  "Use the palette or validated graph import. Commands come from argparse. + → ○"
+];
 export const glyphs = {
   plus: "+",
   minus: "−",

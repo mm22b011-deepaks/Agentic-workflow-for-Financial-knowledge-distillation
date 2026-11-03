@@ -574,7 +574,7 @@ MUTANTS += (
     ),
     Mutant(
         'final: human panel overwritten',
-        'scripts/prepare_review.py',
+        'src/nowcast/operations.py',
         'if target.exists():',
         'if False:',
         ('tests/unit/test_final_safeguards.py',),

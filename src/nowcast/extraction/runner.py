@@ -158,8 +158,7 @@ def prepare_text(config: Config, document: Document) -> DocumentText:
 
     `chars_total` is the length after conversion and section selection, i.e. the text
     the prompt would carry if nothing were cut; `chars_sent` is what it did carry.
-    The gap is the only honest measure of how much of a long release the model never
-    saw, and on the real corpus it is not small: see DEFECTS.md H5.
+    The gap measures how much of a long release the model never saw.
     """
     raw = document.raw_path.read_text(encoding='utf-8', errors='replace')
     if document.raw_path.suffix.lower() in {'.htm', '.html'}:

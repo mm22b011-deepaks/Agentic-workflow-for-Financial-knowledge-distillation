@@ -6,9 +6,7 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^docs/history/original-ef4e696/
       - id: end-of-file-fixer
-        exclude: ^docs/history/original-ef4e696/
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
