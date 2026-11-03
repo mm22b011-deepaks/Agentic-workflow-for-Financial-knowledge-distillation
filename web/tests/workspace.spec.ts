@@ -303,6 +303,8 @@ test("help accordion, tour and text budget", async ({ page }) => {
     .getByRole("button", { name: "How do I verify a record?" })
     .click();
   await expect(drawer.locator(".help-answer")).toContainText("J/K");
+  // Wait for the answer fade before measuring its text contrast.
+  await expect(drawer.locator(".help-answer")).toHaveCSS("opacity", "1");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await drawer.getByRole("button", { name: "Tour", exact: true }).click();
   await expect(
