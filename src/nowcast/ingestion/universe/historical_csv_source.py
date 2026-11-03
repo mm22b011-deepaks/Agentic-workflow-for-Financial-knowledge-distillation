@@ -101,11 +101,12 @@ def snapshots_to_intervals(snapshots: pd.DataFrame) -> pd.DataFrame:
         {item for item in long['date'].tolist() if isinstance(item, date)}
     )
     intervals: list[dict[str, object]] = []
-    for ticker, group in long.groupby('ticker', sort=True):
-        present = {item for item in group['date'].tolist() if isinstance(item, date)}
-        if not present:
+    for ticker_key, group in long.groupby('ticker', sort=True):
+        ticker = str(ticker_key)
+        present_dates = {item for item in group['date'].tolist() if isinstance(item, date)}
+        if not present_dates:
             continue
-        present_set = set(present)
+        present_set = set(present_dates)
         # Consecutive snapshots where the ticker is present form one interval; a ticker
         # that leaves and later rejoins gets separate intervals, not one spanning the gap.
         run_start: date | None = None

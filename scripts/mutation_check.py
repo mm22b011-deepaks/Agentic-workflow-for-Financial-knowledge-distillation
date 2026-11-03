@@ -73,8 +73,8 @@ MUTANTS = (
     Mutant(
         'provenance: canonical input omitted',
         'src/nowcast/inspection.py',
-        '    incoming = list(dict.fromkeys([name for name in [UPSTREAM.get(node), *incoming] if name]))\n',
-        '',
+        '[name for name in [sources.get(node), *upstream_stages(node), *incoming] if name]',
+        '[name for name in incoming if name]',
         (
             'tests/integration/test_inspection.py::test_inspector_names_the_upstream_artifact_it_reads',
         ),
@@ -311,8 +311,8 @@ MUTANTS = (
     Mutant(
         '401 retried like a transient error',
         COMPOSITION,
-        'except (BudgetExceeded, AuthError, ModelNotFound):',
-        'except (BudgetExceeded, ModelNotFound):',
+        'except (BudgetExceeded, AuthError, ModelNotFound) as fatal:',
+        'except (BudgetExceeded, ModelNotFound) as fatal:',
         tuple(AUTH_TESTS),
     ),
     Mutant(

@@ -259,23 +259,20 @@ def public_frame(frame: pd.DataFrame, models: tuple[str, ...] = ()) -> pd.DataFr
         )
         for key in ['reported_eps', 'revenue', 'guidance_presence', 'tone']:
             name = {'reported_eps': 'eps', 'guidance_presence': 'guidance'}.get(key, key)
-            public[name + '_confidence'] = records.map(
-                lambda record, key=key: (
-                    record.get(key, {}).get('confidence') if isinstance(record, dict) else None
-                )
-            )
-            public[name + '_status'] = records.map(
-                lambda record, key=key: (
-                    'Present'
-                    if isinstance(record, dict) and record.get(key, {}).get('value') is not None
-                    else 'Not stated'
-                )
-            )
-            public[key] = records.map(
-                lambda record, key=key: (
-                    record.get(key, {}).get('value') if isinstance(record, dict) else None
-                )
-            )
+            public[name + '_confidence'] = [
+                record.get(key, {}).get('confidence') if isinstance(record, dict) else None
+                for record in records
+            ]
+            public[name + '_status'] = [
+                'Present'
+                if isinstance(record, dict) and record.get(key, {}).get('value') is not None
+                else 'Not stated'
+                for record in records
+            ]
+            public[key] = [
+                record.get(key, {}).get('value') if isinstance(record, dict) else None
+                for record in records
+            ]
             if key in {'reported_eps', 'revenue'}:
                 public[key] = pd.to_numeric(public[key], errors='coerce')
             else:
@@ -660,8 +657,8 @@ def pane(
         )
     total = len(frame)
     values = frame.iloc[offset : offset + limit].copy()
-    for column in values:
-        values[column] = values[column].map(
+    for value_column in values:
+        values[value_column] = values[value_column].map(
             lambda value: (
                 json.dumps(value, default=str) if isinstance(value, (dict, list, tuple)) else value
             )

@@ -230,10 +230,14 @@ def per_document_metrics(config: Config, extractions: pd.DataFrame) -> DocumentM
         'record' in queued.get((document, str(name)), set())
         for document, name in zip(frame['document_id'], model, strict=True)
     ]
-    frame['flagged_fields'] = [
-        queued.get((document, str(name)), set())
-        for document, name in zip(frame['document_id'], model, strict=True)
-    ]
+    frame['flagged_fields'] = pd.Series(
+        [
+            queued.get((document, str(name)), set())
+            for document, name in zip(frame['document_id'], model, strict=True)
+        ],
+        index=frame.index,
+        dtype=object,
+    )
     if 'record_confidence' in frame.columns:
         frame['confidence'] = pd.to_numeric(frame['record_confidence'], errors='coerce')
     elif 'confidence' in frame.columns:
